@@ -1,0 +1,29 @@
+export {};
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        _id: string;
+        roles: string[];
+        appAccess: string[];
+        permissions: {
+          candidates?: { read?: boolean; write?: boolean; manage?: boolean };
+          jobs?: { read?: boolean; write?: boolean; manage?: boolean };
+          interviews?: { read?: boolean; write?: boolean; schedule?: boolean };
+          clients?: { read?: boolean; write?: boolean; manage?: boolean };
+          team?: { read?: boolean; write?: boolean; manage?: boolean };
+          analytics?: { read?: boolean };
+          assignments?: { read?: boolean; write?: boolean; manage?: boolean };
+          reports?: { read?: boolean; write?: boolean; manage?: boolean };
+          eod?: { read?: boolean; write?: boolean; approve?: boolean };
+          performanceReview?: {
+            read?: boolean;
+            write?: boolean;
+            approve?: boolean;
+          };
+        };
+      };
+    }
+  }
+}

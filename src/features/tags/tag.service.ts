@@ -1,0 +1,63 @@
+import AppError from '../../shared/utils/AppError';
+import Tag from './tag.model';
+import type { CreateTagInput, ITag, UpdateTagInput } from './tag.types';
+
+export const getAllTags = async (): Promise<ITag[]> => {
+  const tags = await Tag.find().sort({ name: 1 });
+  return tags.map(t => t.toSafeObject());
+};
+
+export const createTag = async (
+  input: CreateTagInput,
+  createdBy: string
+): Promise<ITag> => {
+  const existing = await Tag.findOne({
+    name: { $regex: new RegExp(`^${input.name}$`, 'i') },
+  });
+  if (existing) {
+    throw new AppError(
+      409,
+      'TAG_ALREADY_EXISTS',
+      'A tag with this name already exists'
+    );
+  }
+  const tag = new Tag({ ...input, createdBy });
+  await tag.save();
+  return tag.toSafeObject();
+};
+
+export const updateTag = async (
+  id: string,
+  input: UpdateTagInput
+): Promise<ITag> => {
+  const tag = await Tag.findById(id);
+  if (!tag) {
+    throw new AppError(404, 'TAG_NOT_FOUND', 'Tag not found');
+  }
+  if (input.name) {
+    const duplicate = await Tag.findOne({
+      _id: { $ne: id },
+      name: { $regex: new RegExp(`^${input.name}$`, 'i') },
+    });
+    if (duplicate) {
+      throw new AppError(
+        409,
+        'TAG_ALREADY_EXISTS',
+        'A tag with this name already exists'
+      );
+    }
+  }
+  if (input.name !== undefined) tag.name = input.name;
+  if (input.color !== undefined) tag.color = input.color;
+  await tag.save();
+  return tag.toSafeObject();
+};
+
+export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
+  const tag = await Tag.findById(id);
+  if (!tag) {
+    throw new AppError(404, 'TAG_NOT_FOUND', 'Tag not found');
+  }
+  await tag.deleteOne();
+  return { deleted: true };
+};

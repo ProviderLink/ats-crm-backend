@@ -7,8 +7,7 @@ import Job from '../../jobs/job.model';
 export const getDashboardStats = async () => {
   const [
     totalCandidates,
-    activeCandidates,
-    idleCandidates,
+    approvedCandidates,
     hiredCandidates,
     totalJobs,
     openJobs,
@@ -16,11 +15,10 @@ export const getDashboardStats = async () => {
     activeClients,
     totalApplications,
     pendingApplications,
-    inPipelineApplications,
+    approvedApplications,
   ] = await Promise.all([
     Candidate.countDocuments({}),
-    Candidate.countDocuments({ status: 'active' }),
-    Candidate.countDocuments({ status: 'idle' }),
+    Candidate.countDocuments({ status: 'approved' }),
     Candidate.countDocuments({ status: 'hired' }),
     Job.countDocuments({}),
     Job.countDocuments({ status: 'open' }),
@@ -28,7 +26,7 @@ export const getDashboardStats = async () => {
     Client.countDocuments({ status: 'active' }),
     Application.countDocuments({}),
     Application.countDocuments({ phase: 'pending' }),
-    Application.countDocuments({ phase: 'in_pipeline' }),
+    Application.countDocuments({ phase: 'approved' }),
   ]);
 
   const recentApplications = await Application.find({})
@@ -53,7 +51,7 @@ export const getDashboardStats = async () => {
     openJobsList.map(async job => {
       const [total, inPipeline, hired, pending] = await Promise.all([
         Application.countDocuments({ jobId: job._id }),
-        Application.countDocuments({ jobId: job._id, phase: 'in_pipeline' }),
+        Application.countDocuments({ jobId: job._id, phase: 'approved' }),
         Application.countDocuments({ jobId: job._id, phase: 'hired' }),
         Application.countDocuments({ jobId: job._id, phase: 'pending' }),
       ]);
@@ -67,7 +65,7 @@ export const getDashboardStats = async () => {
         status: job.status,
         openings: job.openings,
         totalApplications: total,
-        inPipelineCount: inPipeline,
+        approvedCount: inPipeline,
         hiredCount: hired,
         pendingCount: pending,
       };
@@ -77,8 +75,7 @@ export const getDashboardStats = async () => {
   return {
     overview: {
       totalCandidates,
-      activeCandidates,
-      idleCandidates,
+      approvedCandidates,
       hiredCandidates,
       totalJobs,
       openJobs,
@@ -86,7 +83,7 @@ export const getDashboardStats = async () => {
       activeClients,
       totalApplications,
       pendingApplications,
-      inPipelineApplications,
+      approvedApplications,
     },
     recentApplications,
     upcomingInterviews,

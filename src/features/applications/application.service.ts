@@ -110,7 +110,7 @@ export const createApplication = async (
     const firstStage = job.pipeline.stages.sort(
       (a: { order: number }, b: { order: number }) => a.order - b.order
     )[0];
-    phase = 'in_pipeline';
+    phase = 'approved';
     currentStage = {
       stageId: firstStage._id,
       stageName: firstStage.name,
@@ -134,7 +134,7 @@ export const createApplication = async (
   });
 
   if (input.source === 'internal_upload' || input.source === 'assigned') {
-    await candidateService.updateCandidateStatus(input.candidateId, 'active');
+    await candidateService.updateCandidateStatus(input.candidateId, 'approved');
   }
 
   if (input.source === 'direct_apply') {
@@ -173,7 +173,7 @@ export const approveApplication = async (
     (a: { order: number }, b: { order: number }) => a.order - b.order
   )[0];
 
-  application.phase = 'in_pipeline';
+  application.phase = 'approved';
   application.currentStage = {
     stageId: firstStage._id,
     stageName: firstStage.name,
@@ -191,7 +191,7 @@ export const approveApplication = async (
 
   await candidateService.updateCandidateStatus(
     String(application.candidateId),
-    'active'
+    'approved'
   );
 
   return application.toSafeObject();
@@ -223,13 +223,13 @@ export const rejectApplication = async (
 
   const activeApps = await Application.countDocuments({
     candidateId: application.candidateId,
-    phase: { $in: ['pending', 'in_pipeline'] },
+    phase: { $in: ['pending', 'approved'] },
   });
   if (activeApps === 0) {
-    await candidateService.updateCandidateStatus(
-      String(application.candidateId),
-      'idle'
-    );
+    const candidate = await Candidate.findById(application.candidateId);
+    if (candidate && !candidate.inTalentPool) {
+      await candidateService.deleteCandidate(String(application.candidateId));
+    }
   }
 
   return application.toSafeObject();
@@ -243,11 +243,11 @@ export const moveStage = async (
   if (!application) {
     throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
   }
-  if (application.phase !== 'in_pipeline') {
+  if (application.phase !== 'approved') {
     throw new AppError(
       400,
       'APPLICATION_INVALID_PHASE',
-      'Can only move stages for in_pipeline applications'
+      'Can only move stages for approved applications'
     );
   }
 
@@ -278,7 +278,7 @@ export const hireApplication = async (
   if (!application) {
     throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
   }
-  if (application.phase !== 'in_pipeline') {
+  if (application.phase !== 'approved') {
     throw new AppError(
       400,
       'APPLICATION_INVALID_PHASE',

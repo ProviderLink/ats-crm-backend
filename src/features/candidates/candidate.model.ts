@@ -118,7 +118,7 @@ const candidateSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'active', 'idle', 'hired'],
+      enum: ['pending', 'approved', 'hired'],
       default: 'pending',
     },
 

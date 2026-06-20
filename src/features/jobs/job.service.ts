@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import Application from '../applications/application.model';
 import Client from '../clients/client.model';
 import PipelineTemplate from '../pipeline-templates/pipelineTemplate.model';
-import Application from '../applications/application.model';
 import Job from './job.model';
 import {
   AssignPipelineInput,
@@ -102,7 +102,7 @@ export const deleteJob = async (id: string): Promise<{ deleted: boolean }> => {
 
   const activeApps = await Application.countDocuments({
     jobId: id,
-    phase: { $in: ['pending', 'in_pipeline'] },
+    phase: { $in: ['pending', 'approved'] },
   });
   if (activeApps > 0) {
     throw new AppError(

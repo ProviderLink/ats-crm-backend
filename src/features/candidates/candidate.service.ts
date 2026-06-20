@@ -80,7 +80,7 @@ export const createCandidate = async (
       'A candidate with this email already exists'
     );
 
-  const status = input.source === 'applied' ? 'pending' : 'active';
+  const status = input.source === 'applied' ? 'pending' : 'approved';
 
   const candidate = await Candidate.create({
     firstName: input.firstName,
@@ -180,7 +180,7 @@ export const updateTalentPool = async (
 
 export const updateCandidateStatus = async (
   id: string,
-  status: 'pending' | 'active' | 'idle' | 'hired'
+  status: 'pending' | 'approved' | 'hired'
 ): Promise<ICandidate> => {
   const candidate = await Candidate.findById(id);
   if (!candidate)

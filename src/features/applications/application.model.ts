@@ -68,7 +68,7 @@ const applicationSchema = new Schema(
 
     phase: {
       type: String,
-      enum: ['pending', 'in_pipeline', 'hired', 'rejected'],
+      enum: ['pending', 'approved', 'hired', 'rejected'],
       default: 'pending',
     },
 

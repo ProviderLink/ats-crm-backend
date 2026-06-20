@@ -165,7 +165,7 @@ async function seed() {
       resumeUrl: 'https://example.com/resume.pdf',
       resumeOriginalName: 'resume.pdf',
       source: 'internal_upload',
-      status: 'active',
+      status: 'approved',
       yearsOfExperience: 2,
       createdBy: admin._id,
     });
@@ -174,7 +174,7 @@ async function seed() {
       candidateId: candidate._id,
       jobId: job._id,
       clientId: client._id,
-      phase: 'in_pipeline',
+      phase: 'approved',
       source: 'internal_upload',
       currentStage: {
         stageId: firstStage._id,

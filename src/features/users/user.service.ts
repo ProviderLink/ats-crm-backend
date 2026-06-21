@@ -233,11 +233,9 @@ export const deactivateUser = async (id: string): Promise<SafeUser> => {
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
-  user.isActive = false;
-  user.refreshTokenAts = null;
-  user.refreshTokenCrm = null;
-  await user.save();
-  return user.toSafeObject();
+  const safeUser = user.toSafeObject();
+  await User.findByIdAndDelete(id);
+  return safeUser;
 };
 
 export const provisionVA = async (

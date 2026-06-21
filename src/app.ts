@@ -67,21 +67,23 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(
-  '/api',
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-  })
-);
+if (env.NODE_ENV === 'production') {
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 100,
+    })
+  );
 
-app.use(
-  '/api/v1/auth',
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-  })
-);
+  app.use(
+    '/api/v1/auth',
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 10,
+    })
+  );
+}
 
 // Shared routes
 app.use('/api/v1/shared/users', userRouter);

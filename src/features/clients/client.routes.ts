@@ -42,7 +42,9 @@ const createClientSchema = z.object({
     .optional(),
 });
 
-const updateClientSchema = createClientSchema.partial();
+const updateClientSchema = createClientSchema.partial().extend({
+  status: z.enum(['active', 'inactive', 'suspended']).optional(),
+});
 
 const createContactSchema = z.object({
   name: z.string().min(1).max(100),

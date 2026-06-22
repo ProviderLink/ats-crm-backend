@@ -3,10 +3,13 @@ import { AppError } from '../../shared/utils/AppError';
 import Job from '../jobs/job.model';
 import Client from './client.model';
 import type {
+  ClientNote,
   CreateClientInput,
+  CreateClientNoteInput,
   CreateContactInput,
   IClient,
   UpdateClientInput,
+  UpdateClientNoteInput,
   UpdateContactInput,
 } from './client.types';
 
@@ -185,7 +188,9 @@ export const removeContact = async (
   return client.toSafeObject();
 };
 
-export const deleteClient = async (id: string): Promise<{ deleted: boolean }> => {
+export const deleteClient = async (
+  id: string
+): Promise<{ deleted: boolean }> => {
   const client = await Client.findById(id);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
 
@@ -262,4 +267,98 @@ export const updateCrmProfile = async (
 
   await client.save();
   return client.toSafeObject();
+};
+
+// ---------------------------------------------------------------------------
+// Client notes sub-resource
+// ---------------------------------------------------------------------------
+
+export const listNotes = async (clientId: string): Promise<ClientNote[]> => {
+  const client = await Client.findById(clientId);
+  if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
+  const notes = client.toSafeObject().notes ?? [];
+  // Newest first
+  return [...notes].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+};
+
+export const addNote = async (
+  clientId: string,
+  input: CreateClientNoteInput,
+  authorId?: string
+): Promise<ClientNote> => {
+  const client = await Client.findById(clientId);
+  if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
+
+  const note = client.notes.create({
+    method: input.method,
+    content: input.content,
+    author: authorId ? new mongoose.Types.ObjectId(authorId) : null,
+  } as never);
+  client.notes.push(note);
+
+  if (authorId) client.updatedBy = new mongoose.Types.ObjectId(authorId);
+  await client.save();
+
+  const saved = note as unknown as ClientNote & {
+    _id: mongoose.Types.ObjectId;
+    author: mongoose.Types.ObjectId | null;
+  };
+  return {
+    _id: String(saved._id),
+    method: saved.method,
+    content: saved.content,
+    author: saved.author ? String(saved.author) : null,
+    createdAt: saved.createdAt,
+    updatedAt: saved.updatedAt,
+  };
+};
+
+export const updateNote = async (
+  clientId: string,
+  noteId: string,
+  input: UpdateClientNoteInput,
+  updatedBy?: string
+): Promise<ClientNote> => {
+  const client = await Client.findById(clientId);
+  if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
+
+  const note = client.notes.find(n => String(n._id) === noteId);
+  if (!note) throw new AppError(404, 'NOTE_NOT_FOUND', 'Note not found');
+
+  if (input.method !== undefined) note.method = input.method;
+  if (input.content !== undefined) note.content = input.content;
+
+  if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+  client.markModified('notes');
+  await client.save();
+
+  return {
+    _id: String(note._id),
+    method: note.method,
+    content: note.content,
+    author: note.author ? String(note.author) : null,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+  };
+};
+
+export const deleteNote = async (
+  clientId: string,
+  noteId: string,
+  updatedBy?: string
+): Promise<{ deleted: boolean }> => {
+  const client = await Client.findById(clientId);
+  if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
+
+  const index = client.notes.findIndex(n => String(n._id) === noteId);
+  if (index === -1) {
+    throw new AppError(404, 'NOTE_NOT_FOUND', 'Note not found');
+  }
+
+  client.notes.splice(index, 1);
+  if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+  await client.save();
+  return { deleted: true };
 };

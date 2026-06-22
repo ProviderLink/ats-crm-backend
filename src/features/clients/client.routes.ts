@@ -7,11 +7,15 @@ import { validate } from '../../shared/validators/common.validator';
 import {
   addContact,
   createClient,
+  createClientNote,
   deleteClient,
+  deleteClientNote,
   deleteContact,
   getAllClients,
   getClientById,
+  listClientNotes,
   updateClient,
+  updateClientNote,
   updateContact,
   updateCrmProfile,
   uploadLogo,
@@ -49,6 +53,13 @@ const createContactSchema = z.object({
 });
 
 const updateContactSchema = createContactSchema.partial();
+
+const createClientNoteSchema = z.object({
+  method: z.enum(['call', 'email', 'meeting', 'message', 'other']),
+  content: z.string().min(1).max(5000),
+});
+
+const updateClientNoteSchema = createClientNoteSchema.partial();
 
 const updateCrmProfileSchema = z.object({
   healthStatus: z.enum(['green', 'yellow', 'red']).optional(),
@@ -140,6 +151,40 @@ router.patch(
   requireRoles('admin', 'account_manager'),
   validate(updateCrmProfileSchema),
   updateCrmProfile
+);
+
+// --- Client notes sub-resource -------------------------------------------
+router.get(
+  '/:clientId/notes',
+  requireRoles(
+    'admin',
+    'hiring_manager',
+    'recruiter',
+    'coordinator',
+    'account_manager',
+    'client'
+  ),
+  listClientNotes
+);
+
+router.post(
+  '/:clientId/notes',
+  requireRoles('admin', 'account_manager', 'recruiter', 'coordinator'),
+  validate(createClientNoteSchema),
+  createClientNote
+);
+
+router.patch(
+  '/:clientId/notes/:noteId',
+  requireRoles('admin', 'account_manager', 'recruiter', 'coordinator'),
+  validate(updateClientNoteSchema),
+  updateClientNote
+);
+
+router.delete(
+  '/:clientId/notes/:noteId',
+  requireRoles('admin', 'account_manager'),
+  deleteClientNote
 );
 
 export default router;

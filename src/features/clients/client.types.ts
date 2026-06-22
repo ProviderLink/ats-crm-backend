@@ -7,6 +7,32 @@ export interface ClientContact {
   isPrimary: boolean;
 }
 
+export type ClientNoteMethod =
+  | 'call'
+  | 'email'
+  | 'meeting'
+  | 'message'
+  | 'other';
+
+export interface ClientNote {
+  _id: string;
+  method: ClientNoteMethod;
+  content: string;
+  author: string | null; // User id
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateClientNoteInput {
+  method: ClientNoteMethod;
+  content: string;
+}
+
+export interface UpdateClientNoteInput {
+  method?: ClientNoteMethod;
+  content?: string;
+}
+
 export interface ClientAddress {
   street: string;
   city: string;
@@ -41,6 +67,7 @@ export interface IClient {
   description: string;
   address: ClientAddress;
   contacts: ClientContact[];
+  notes: ClientNote[];
   tags: string[];
   crmProfile: ClientCrmProfile | null;
   createdBy: string | null;

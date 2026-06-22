@@ -124,3 +124,45 @@ export const updateCrmProfile = catchAsync(
     sendSuccess(res, client, 'CRM profile updated', 200);
   }
 );
+
+export const listClientNotes = catchAsync(
+  async (req: Request, res: Response) => {
+    const { clientId } = req.params;
+    const notes = await clientService.listNotes(clientId);
+    sendSuccess(res, notes, 'Notes retrieved', 200, { total: notes.length });
+  }
+);
+
+export const createClientNote = catchAsync(
+  async (req: Request, res: Response) => {
+    const { clientId } = req.params;
+    const body = req.body;
+    const author = req.user!._id;
+    const note = await clientService.addNote(clientId, body, author);
+    sendSuccess(res, note, 'Note created', 201);
+  }
+);
+
+export const updateClientNote = catchAsync(
+  async (req: Request, res: Response) => {
+    const { clientId, noteId } = req.params;
+    const body = req.body;
+    const updatedBy = req.user!._id;
+    const note = await clientService.updateNote(
+      clientId,
+      noteId,
+      body,
+      updatedBy
+    );
+    sendSuccess(res, note, 'Note updated', 200);
+  }
+);
+
+export const deleteClientNote = catchAsync(
+  async (req: Request, res: Response) => {
+    const { clientId, noteId } = req.params;
+    const updatedBy = req.user!._id;
+    await clientService.deleteNote(clientId, noteId, updatedBy);
+    sendSuccess(res, { deleted: true }, 'Note deleted', 200);
+  }
+);

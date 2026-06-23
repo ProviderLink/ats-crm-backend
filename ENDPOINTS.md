@@ -82,3 +82,57 @@ Upload a logo image (multipart form). Replaces any existing logo.
 - `DELETE /:clientId/notes/:noteId`
 
 Where `method ∈ { call, email, meeting, message, other }`.
+
+## Candidates
+
+Mounted at: `/api/v1/ats/candidates`
+
+### `GET /`
+
+List candidates.
+
+Query params:
+
+| Param          | Type                     | Notes                      |
+| -------------- | ------------------------ | -------------------------- |
+| `status`       | string                   | Filter by candidate status |
+| `inTalentPool` | boolean                  | Filter talent pool         |
+| `search`       | string                   | Full-text search           |
+| `tags`         | string (comma-separated) | Filter by tag IDs          |
+| `page`         | number (default 1)       | Pagination                 |
+| `limit`        | number (default 20)      | Pagination                 |
+
+### `POST /`
+
+Create a candidate. Requires a resume file (multipart form).
+
+### `GET /:id`
+
+Retrieve a single candidate.
+
+### `PATCH /:id`
+
+Update a candidate. All fields are optional.
+
+| Field               | Type     | Notes                                                                                              |
+| ------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `firstName`         | string   |                                                                                                    |
+| `lastName`          | string   |                                                                                                    |
+| `phone`             | string   |                                                                                                    |
+| `videoIntroUrl`     | string   |                                                                                                    |
+| `videoIntroSource`  | string   | `cloudinary` \| `external`                                                                         |
+| `yearsOfExperience` | number   |                                                                                                    |
+| `tags`              | string[] | Array of tag IDs                                                                                   |
+| `parsedData`        | object   | Optional. Shape: `{ summary, skills[], languages[], certifications[], experience[], education[] }` |
+
+### `DELETE /:id`
+
+Delete a candidate.
+
+### `POST /:id/avatar`
+
+Upload an avatar image (multipart form).
+
+### `PATCH /:id/talent-pool`
+
+Add or remove a candidate from the talent pool. Body: `{ action: 'add' | 'remove', notes?: string }`.

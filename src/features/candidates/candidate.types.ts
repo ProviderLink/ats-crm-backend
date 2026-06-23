@@ -90,4 +90,5 @@ export interface UpdateCandidateInput {
   videoIntroSource?: string | null;
   yearsOfExperience?: number;
   tags?: string[];
+  parsedData?: ICandidateParsedData | null;
 }

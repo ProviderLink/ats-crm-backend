@@ -125,6 +125,10 @@ export const updateCandidate = async (
     candidate.tags = input.tags.map(
       t => new mongoose.Types.ObjectId(t)
     ) as unknown as mongoose.Types.ObjectId[];
+  if (input.parsedData !== undefined) {
+    candidate.parsedData = input.parsedData;
+    candidate.markModified('parsedData');
+  }
 
   candidate.updatedBy = new mongoose.Types.ObjectId(
     updatedBy

@@ -34,6 +34,35 @@ const updateCandidateSchema = z.object({
   videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
   yearsOfExperience: z.number().min(0).optional(),
   tags: z.array(z.string()).optional(),
+  parsedData: z
+    .object({
+      summary: z.string().optional(),
+      skills: z.array(z.string()).optional(),
+      languages: z.array(z.string()).optional(),
+      certifications: z.array(z.string()).optional(),
+      experience: z
+        .array(
+          z.object({
+            company: z.string().optional(),
+            title: z.string().optional(),
+            duration: z.string().optional(),
+            description: z.string().optional(),
+          })
+        )
+        .optional(),
+      education: z
+        .array(
+          z.object({
+            institution: z.string().optional(),
+            degree: z.string().optional(),
+            field: z.string().optional(),
+            year: z.string().optional(),
+          })
+        )
+        .optional(),
+    })
+    .optional()
+    .nullable(),
 });
 
 const talentPoolSchema = z.object({

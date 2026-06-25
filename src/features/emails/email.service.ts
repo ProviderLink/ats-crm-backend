@@ -108,6 +108,16 @@ export const sendEmail = async (input: SendEmailInput): Promise<IEmail> => {
   return email.toSafeObject();
 };
 
+export const markEmailAsRead = async (id: string): Promise<IEmail> => {
+  const email = await Email.findByIdAndUpdate(
+    id,
+    { isRead: true },
+    { new: true }
+  );
+  if (!email) throw new AppError(404, 'EMAIL_NOT_FOUND', 'Email not found');
+  return email.toSafeObject();
+};
+
 export const resendEmail = async (id: string): Promise<IEmail> => {
   const email = await Email.findById(id);
   if (!email) throw new AppError(404, 'EMAIL_NOT_FOUND', 'Email not found');

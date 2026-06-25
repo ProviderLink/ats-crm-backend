@@ -10,6 +10,7 @@ import {
   getAllEmails,
   getEmailById,
   getEmailThread,
+  markAsRead,
   resendEmail,
   sendEmail,
 } from './email.controller';
@@ -57,6 +58,8 @@ router.get(
 );
 
 router.get('/:id', requirePermission('emails', 'read'), getEmailById);
+
+router.patch('/:id/read', requirePermission('emails', 'read'), markAsRead);
 
 router.post('/:id/resend', requirePermission('emails', 'write'), resendEmail);
 

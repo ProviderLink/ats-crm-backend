@@ -42,6 +42,7 @@ export interface IEmail {
   bouncedAt: Date | null;
   openCount: number;
   clickCount: number;
+  isRead: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -98,6 +98,7 @@ const emailSchema = new Schema(
     bouncedAt: { type: Date, default: null },
     openCount: { type: Number, default: 0 },
     clickCount: { type: Number, default: 0 },
+    isRead: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

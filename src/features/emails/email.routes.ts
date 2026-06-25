@@ -7,6 +7,7 @@ import {
 } from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import {
+  deleteEmail,
   getAllEmails,
   getEmailById,
   getEmailThread,
@@ -60,6 +61,8 @@ router.get(
 router.get('/:id', requirePermission('emails', 'read'), getEmailById);
 
 router.patch('/:id/read', requirePermission('emails', 'read'), markAsRead);
+
+router.delete('/:id', requirePermission('emails', 'write'), deleteEmail);
 
 router.post('/:id/resend', requirePermission('emails', 'write'), resendEmail);
 

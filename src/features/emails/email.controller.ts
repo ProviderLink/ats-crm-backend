@@ -79,3 +79,9 @@ export const markAsRead = catchAsync(async (req: Request, res: Response) => {
   const email = await emailService.markEmailAsRead(id);
   sendSuccess(res, email, 'Email marked as read', 200);
 });
+
+export const deleteEmail = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  await emailService.deleteEmail(id);
+  sendSuccess(res, null, 'Email deleted', 200);
+});

@@ -19,8 +19,10 @@ const emailSchema = new Schema(
 
 const aiSchema = new Schema(
   {
+    provider: { type: String, enum: ['claude', 'openai'], default: 'claude' },
     resumeValidation: { type: Boolean, default: true },
     candidateScoring: { type: Boolean, default: true },
+    resumeParsing: { type: Boolean, default: true },
   },
   { _id: false }
 );

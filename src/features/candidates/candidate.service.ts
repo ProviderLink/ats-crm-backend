@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { deleteFromCloudinary } from '../../config/cloudinary';
+import { runResumeParsing } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
 import Candidate from './candidate.model';
 import type {
@@ -98,6 +99,11 @@ export const createCandidate = async (
     status,
     createdBy: new mongoose.Types.ObjectId(createdBy),
   });
+
+  // Trigger AI resume parsing in background if resume text is provided
+  if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+    runResumeParsing(candidate._id.toString());
+  }
 
   return candidate.toSafeObject();
 };

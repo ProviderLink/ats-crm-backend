@@ -5,8 +5,10 @@ export interface ISettings {
     fromName: string;
   };
   ai: {
+    provider: 'claude' | 'openai';
     resumeValidation: boolean;
     candidateScoring: boolean;
+    resumeParsing: boolean;
   };
   companyTimezone: string;
   createdAt: Date;
@@ -19,8 +21,10 @@ export interface UpdateSettingsInput {
     fromName?: string;
   };
   ai?: {
+    provider?: 'claude' | 'openai';
     resumeValidation?: boolean;
     candidateScoring?: boolean;
+    resumeParsing?: boolean;
   };
   companyTimezone?: string;
 }

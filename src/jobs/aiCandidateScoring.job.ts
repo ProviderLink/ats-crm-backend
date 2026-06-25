@@ -3,7 +3,12 @@ import Candidate from '../features/candidates/candidate.model';
 import { updateAiScore } from '../features/candidates/candidate.service';
 import Job from '../features/jobs/job.model';
 import { getSettings } from '../features/settings/settings.service';
-import { callClaude, parseJsonResponse } from '../shared/utils/ai';
+import {
+  getAiProvider,
+  parseJsonResponse,
+  withRetry,
+} from '../shared/utils/ai';
+import logger from '../shared/utils/logger';
 
 export async function runCandidateScoring(
   candidateId: string,
@@ -45,7 +50,8 @@ Respond with exactly this JSON structure:
 `;
 
   try {
-    const text = await callClaude(prompt, 1500);
+    const provider = await getAiProvider();
+    const text = await withRetry(() => provider.generate(prompt, 1500));
     const result = parseJsonResponse<{
       score: number;
       recommendation: string;
@@ -71,12 +77,27 @@ Respond with exactly this JSON structure:
         metadata: {
           score: result.score,
           recommendation: result.recommendation,
+          provider: provider.name,
         },
       });
+      logger.info('AI candidate scoring completed', {
+        candidateId,
+        jobId,
+        score: result.score,
+        recommendation: result.recommendation,
+        provider: provider.name,
+      });
     } else {
-      console.error('Failed to parse AI scoring response');
+      logger.error('Failed to parse AI scoring response', {
+        candidateId,
+        jobId,
+      });
     }
   } catch (error) {
-    console.error('AI candidate scoring failed:', error);
+    logger.error('AI candidate scoring failed', {
+      candidateId,
+      jobId,
+      error: (error as Error).message,
+    });
   }
 }

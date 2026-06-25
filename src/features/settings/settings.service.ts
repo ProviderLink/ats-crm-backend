@@ -1,3 +1,4 @@
+import { clearAiProviderCache } from '../../shared/utils/ai';
 import Settings from './settings.model';
 import type { ISettings, UpdateSettingsInput } from './settings.types';
 
@@ -22,13 +23,20 @@ export const updateSettings = async (
   }
 
   if (input.ai) {
+    if (input.ai.provider !== undefined) {
+      settings.ai.provider = input.ai.provider;
+    }
     if (input.ai.resumeValidation !== undefined) {
       settings.ai.resumeValidation = input.ai.resumeValidation;
     }
     if (input.ai.candidateScoring !== undefined) {
       settings.ai.candidateScoring = input.ai.candidateScoring;
     }
+    if (input.ai.resumeParsing !== undefined) {
+      settings.ai.resumeParsing = input.ai.resumeParsing;
+    }
     settings.markModified('ai');
+    clearAiProviderCache();
   }
 
   if (input.companyTimezone) {

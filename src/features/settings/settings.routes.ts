@@ -16,8 +16,10 @@ const updateSettingsSchema = z.object({
     .optional(),
   ai: z
     .object({
+      provider: z.enum(['claude', 'openai']).optional(),
       resumeValidation: z.boolean().optional(),
       candidateScoring: z.boolean().optional(),
+      resumeParsing: z.boolean().optional(),
     })
     .optional(),
   companyTimezone: z.string().min(1).optional(),

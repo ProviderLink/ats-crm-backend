@@ -4,7 +4,12 @@ import { updateAiValidation } from '../features/applications/application.service
 import Candidate from '../features/candidates/candidate.model';
 import Job from '../features/jobs/job.model';
 import { getSettings } from '../features/settings/settings.service';
-import { callClaude, parseJsonResponse } from '../shared/utils/ai';
+import {
+  getAiProvider,
+  parseJsonResponse,
+  withRetry,
+} from '../shared/utils/ai';
+import logger from '../shared/utils/logger';
 
 export async function runResumeValidation(
   applicationId: string
@@ -16,7 +21,7 @@ export async function runResumeValidation(
   const job = await Job.findById(application.jobId);
 
   if (!candidate?.resumeRawText || candidate.resumeRawText.trim() === '') {
-    console.log('No resume text available for validation');
+    logger.debug('No resume text available for validation', { applicationId });
     return;
   }
 
@@ -46,7 +51,8 @@ Respond with exactly this JSON structure:
 `;
 
   try {
-    const text = await callClaude(prompt);
+    const provider = await getAiProvider();
+    const text = await withRetry(() => provider.generate(prompt));
     const result = parseJsonResponse<{
       isValid: boolean;
       score: number;
@@ -63,12 +69,27 @@ Respond with exactly this JSON structure:
         type: 'ai_resume_validation_completed',
         resourceType: 'application',
         resourceId: applicationId,
-        metadata: { score: result.score, isValid: result.isValid },
+        metadata: {
+          score: result.score,
+          isValid: result.isValid,
+          provider: provider.name,
+        },
+      });
+      logger.info('AI resume validation completed', {
+        applicationId,
+        score: result.score,
+        isValid: result.isValid,
+        provider: provider.name,
       });
     } else {
-      console.error('Failed to parse AI resume validation response');
+      logger.error('Failed to parse AI resume validation response', {
+        applicationId,
+      });
     }
   } catch (error) {
-    console.error('AI resume validation failed:', error);
+    logger.error('AI resume validation failed', {
+      applicationId,
+      error: (error as Error).message,
+    });
   }
 }

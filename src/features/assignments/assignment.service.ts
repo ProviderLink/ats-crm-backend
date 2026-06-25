@@ -1,40 +1,54 @@
-import mongoose from 'mongoose'
-import AppError from '../../shared/utils/AppError'
-import { createLog } from '../activity-logs/activityLog.service'
-import Candidate from '../candidates/candidate.model'
-import Client from '../clients/client.model'
-import { createAssignmentReminders } from '../survey-reminders/surveyReminder.service'
-import * as userService from '../users/user.service'
-import Assignment from './assignment.model'
-import type { CreateAssignmentInput, IAssignment, UpdateAssignmentInput } from './assignment.types'
+import mongoose from 'mongoose';
+import AppError from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
+import Candidate from '../candidates/candidate.model';
+import Client from '../clients/client.model';
+import { createAssignmentReminders } from '../survey-reminders/surveyReminder.service';
+import * as userService from '../users/user.service';
+import Assignment from './assignment.model';
+import type {
+  CreateAssignmentInput,
+  IAssignment,
+  UpdateAssignmentInput,
+} from './assignment.types';
 
 export const getAllAssignments = async (filters: {
-  candidateId?: string
-  clientId?: string
-  accountManagerId?: string
-  status?: string
-  page?: number
-  limit?: number
+  candidateId?: string;
+  clientId?: string;
+  accountManagerId?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
 }): Promise<{
-  assignments: IAssignment[]
-  total: number
-  page: number
-  limit: number
-  totalPages: number
+  assignments: IAssignment[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }> => {
-  const { candidateId, clientId, accountManagerId, status, page = 1, limit = 20 } = filters
-  const query: Record<string, unknown> = {}
+  const {
+    candidateId,
+    clientId,
+    accountManagerId,
+    status,
+    page = 1,
+    limit = 20,
+  } = filters;
+  const query: Record<string, unknown> = {};
 
-  if (candidateId !== undefined) query['candidateId'] = new mongoose.Types.ObjectId(candidateId)
-  if (clientId !== undefined) query['clientId'] = new mongoose.Types.ObjectId(clientId)
-  if (accountManagerId !== undefined) query['accountManagerId'] = new mongoose.Types.ObjectId(accountManagerId)
-  if (status !== undefined) query['status'] = status
+  if (candidateId !== undefined)
+    query['candidateId'] = new mongoose.Types.ObjectId(candidateId);
+  if (clientId !== undefined)
+    query['clientId'] = new mongoose.Types.ObjectId(clientId);
+  if (accountManagerId !== undefined)
+    query['accountManagerId'] = new mongoose.Types.ObjectId(accountManagerId);
+  if (status !== undefined) query['status'] = status;
 
-  const skip = (page - 1) * limit
+  const skip = (page - 1) * limit;
   const [assignments, total] = await Promise.all([
     Assignment.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Assignment.countDocuments(query),
-  ])
+  ]);
 
   return {
     assignments: assignments.map(a => a.toSafeObject()),
@@ -42,24 +56,26 @@ export const getAllAssignments = async (filters: {
     page,
     limit,
     totalPages: Math.ceil(total / limit),
-  }
-}
+  };
+};
 
 export const getAssignmentById = async (id: string): Promise<IAssignment> => {
-  const assignment = await Assignment.findById(id)
-  if (!assignment) throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found')
-  return assignment.toSafeObject()
-}
+  const assignment = await Assignment.findById(id);
+  if (!assignment)
+    throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
+  return assignment.toSafeObject();
+};
 
 export const createAssignment = async (
   input: CreateAssignmentInput,
   createdBy: string
 ): Promise<IAssignment> => {
-  const candidate = await Candidate.findById(input.candidateId)
-  if (!candidate) throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found')
+  const candidate = await Candidate.findById(input.candidateId);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
 
-  const client = await Client.findById(input.clientId)
-  if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found')
+  const client = await Client.findById(input.clientId);
+  if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
 
   const assignment = await Assignment.create({
     candidateId: new mongoose.Types.ObjectId(input.candidateId),
@@ -70,29 +86,40 @@ export const createAssignment = async (
     accountManagerId: new mongoose.Types.ObjectId(input.accountManagerId),
     notes: input.notes ?? null,
     createdBy: new mongoose.Types.ObjectId(createdBy),
-  })
+  });
 
-  const primaryContact = client.contacts.find((c: { isPrimary: boolean }) => c.isPrimary)
-  const clientEmail = primaryContact?.email ?? client.email
-  const firstName = primaryContact?.name?.split(' ')[0] ?? 'Client'
-  const lastName = primaryContact?.name?.split(' ').slice(1).join(' ') ?? ''
+  const primaryContact = client.contacts.find(
+    (c: { isPrimary: boolean }) => c.isPrimary
+  );
+  const clientEmail = primaryContact?.email ?? client.email;
+  const firstName = primaryContact?.name?.split(' ')[0] ?? 'Client';
+  const lastName = primaryContact?.name?.split(' ').slice(1).join(' ') ?? '';
 
   const { inviteToken } = await userService.provisionClient(
     String(client._id),
     firstName,
     lastName,
     clientEmail
-  )
+  );
 
   if (inviteToken !== null) {
-    console.log(`Client account created for ${clientEmail}. Invite token: ${inviteToken}`)
+    userService
+      .sendTeamMemberInvite({
+        email: clientEmail,
+        firstName,
+        inviteToken,
+        invitedByName: 'CRM System',
+      })
+      .catch(err => {
+        console.error('Failed to send client invite email:', err);
+      });
   }
 
   createAssignmentReminders(
     assignment._id.toString(),
     new Date(input.startDate),
     input.accountManagerId
-  )
+  );
 
   createLog({
     type: 'assignment_created',
@@ -101,76 +128,92 @@ export const createAssignment = async (
     relatedType: 'candidate',
     relatedId: input.candidateId,
     performedBy: createdBy,
-  })
+  });
 
-  return assignment.toSafeObject()
-}
+  return assignment.toSafeObject();
+};
 
 export const updateAssignment = async (
   id: string,
   input: UpdateAssignmentInput,
   updatedBy: string
 ): Promise<IAssignment> => {
-  const assignment = await Assignment.findById(id)
-  if (!assignment) throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found')
+  const assignment = await Assignment.findById(id);
+  if (!assignment)
+    throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
 
   if (assignment.status === 'ended') {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Cannot update an ended assignment')
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Cannot update an ended assignment'
+    );
   }
 
-  if (input.serviceType !== undefined) assignment.serviceType = input.serviceType
-  if (input.startDate !== undefined) assignment.startDate = new Date(input.startDate)
-  if (input.endDate !== undefined) assignment.endDate = input.endDate ? new Date(input.endDate) : null
+  if (input.serviceType !== undefined)
+    assignment.serviceType = input.serviceType;
+  if (input.startDate !== undefined)
+    assignment.startDate = new Date(input.startDate);
+  if (input.endDate !== undefined)
+    assignment.endDate = input.endDate ? new Date(input.endDate) : null;
   if (input.accountManagerId !== undefined) {
-    assignment.accountManagerId = new mongoose.Types.ObjectId(input.accountManagerId)
+    assignment.accountManagerId = new mongoose.Types.ObjectId(
+      input.accountManagerId
+    );
   }
-  if (input.notes !== undefined) assignment.notes = input.notes ?? null
+  if (input.notes !== undefined) assignment.notes = input.notes ?? null;
 
-  assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy)
-  await assignment.save()
-  return assignment.toSafeObject()
-}
+  assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+  await assignment.save();
+  return assignment.toSafeObject();
+};
 
 export const endAssignment = async (
   id: string,
   updatedBy: string
 ): Promise<IAssignment> => {
-  const assignment = await Assignment.findById(id)
-  if (!assignment) throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found')
+  const assignment = await Assignment.findById(id);
+  if (!assignment)
+    throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
 
   if (assignment.status === 'ended') {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Assignment is already ended')
+    throw new AppError(400, 'VALIDATION_ERROR', 'Assignment is already ended');
   }
 
-  assignment.status = 'ended'
-  if (!assignment.endDate) assignment.endDate = new Date()
-  assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy)
-  await assignment.save()
+  assignment.status = 'ended';
+  if (!assignment.endDate) assignment.endDate = new Date();
+  assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+  await assignment.save();
 
   createLog({
     type: 'assignment_ended',
     resourceType: 'assignment',
     resourceId: id,
     performedBy: updatedBy,
-  })
+  });
 
-  return assignment.toSafeObject()
-}
+  return assignment.toSafeObject();
+};
 
 export const updateAssignmentStatus = async (
   id: string,
   status: 'active' | 'on_hold',
   updatedBy: string
 ): Promise<IAssignment> => {
-  const assignment = await Assignment.findById(id)
-  if (!assignment) throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found')
+  const assignment = await Assignment.findById(id);
+  if (!assignment)
+    throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
 
   if (assignment.status === 'ended') {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Cannot change status of ended assignment')
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Cannot change status of ended assignment'
+    );
   }
 
-  assignment.status = status
-  assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy)
-  await assignment.save()
-  return assignment.toSafeObject()
-}
+  assignment.status = status;
+  assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+  await assignment.save();
+  return assignment.toSafeObject();
+};

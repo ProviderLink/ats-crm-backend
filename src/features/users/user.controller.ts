@@ -5,6 +5,7 @@ import {
 } from '../../config/cloudinary';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
+import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
 import * as userService from './user.service';
 
@@ -44,6 +45,19 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
   const body = req.body;
   const createdBy = req.user!._id;
   const { user, inviteToken } = await userService.createUser(body, createdBy);
+
+  // Send invite email asynchronously (don't block the response)
+  userService
+    .sendTeamMemberInvite({
+      email: user.email,
+      firstName: user.firstName,
+      inviteToken,
+      invitedByName: `${req.user!.firstName} ${req.user!.lastName}`,
+    })
+    .catch(err => {
+      logger.error('Failed to send team member invite email', err);
+    });
+
   sendSuccess(
     res,
     { user, inviteToken },

@@ -64,11 +64,21 @@ const emailSchema = new Schema(
     bodyText: { type: String, default: '' },
     status: {
       type: String,
-      enum: ['pending', 'sent', 'delivered', 'failed', 'received'],
+      enum: [
+        'pending',
+        'sent',
+        'delivered',
+        'delayed',
+        'failed',
+        'bounced',
+        'complained',
+        'received',
+      ],
       default: 'pending',
     },
     threadId: { type: String, default: null },
     inReplyTo: { type: String, default: null },
+    messageId: { type: String, default: null },
     templateId: {
       type: Schema.Types.ObjectId,
       ref: 'EmailTemplate',
@@ -83,6 +93,11 @@ const emailSchema = new Schema(
     sentBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     sentAt: { type: Date, default: null },
     receivedAt: { type: Date, default: null },
+    openedAt: { type: Date, default: null },
+    clickedAt: { type: Date, default: null },
+    bouncedAt: { type: Date, default: null },
+    openCount: { type: Number, default: 0 },
+    clickCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -91,6 +106,8 @@ emailSchema.index({ 'context.candidateId': 1 });
 emailSchema.index({ 'context.applicationId': 1 });
 emailSchema.index({ 'context.jobId': 1 });
 emailSchema.index({ threadId: 1 });
+emailSchema.index({ messageId: 1 });
+emailSchema.index({ resendId: 1 });
 emailSchema.index({ status: 1 });
 emailSchema.index({ createdAt: -1 });
 

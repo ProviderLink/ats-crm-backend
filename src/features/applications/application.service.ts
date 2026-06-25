@@ -309,9 +309,16 @@ export const hireApplication = async (
   );
 
   if (inviteToken !== null) {
-    console.log(
-      `VA account created for ${candidate.email}. Invite token: ${inviteToken}`
-    );
+    userService
+      .sendTeamMemberInvite({
+        email: candidate.email,
+        firstName: candidate.firstName,
+        inviteToken,
+        invitedByName: 'ATS System',
+      })
+      .catch(err => {
+        console.error('Failed to send VA invite email:', err);
+      });
   }
 
   return application.toSafeObject();

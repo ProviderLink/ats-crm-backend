@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/node';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express from 'express';
+import express, { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { connectDB } from './config/db';
@@ -28,6 +28,7 @@ import settingsRouter from './features/settings/settings.routes';
 import surveyReminderRouter from './features/survey-reminders/surveyReminder.routes';
 import tagRouter from './features/tags/tag.routes';
 import userRouter from './features/users/user.routes';
+import webhookRouter from './features/webhooks/webhook.routes';
 import workEntryRouter from './features/work-entries/workEntry.routes';
 import { startBackgroundJobs } from './jobs';
 import { migrateClientCompanySize } from './scripts/migrateClientCompanySize';
@@ -47,7 +48,20 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+
+// Capture raw body for Resend webhook signature verification.
+// The `verify` callback receives the raw Buffer BEFORE JSON.parse —
+// this is the standard Express pattern for HMAC verification.
+// Use req.originalUrl (not req.path) — path isn't set by the router yet.
+app.use(
+  express.json({
+    verify: (req: Request, _res: Response, buf: Buffer) => {
+      if (req.originalUrl.startsWith('/api/webhooks/resend')) {
+        (req as any).rawBody = buf;
+      }
+    },
+  })
+);
 app.use(cookieParser());
 
 app.use((req, res, next) => {
@@ -113,6 +127,9 @@ app.use('/api/v1/crm/performance-reviews', performanceReviewRouter);
 app.use('/api/v1/crm/survey-reminders', surveyReminderRouter);
 app.use('/api/v1/crm/dashboard', crmDashboardRouter);
 app.use('/api/v1/crm/reports', reportsRouter);
+
+// Webhook routes (no auth — called by Resend servers)
+app.use('/api/webhooks', webhookRouter);
 
 app.use((_req, _res, next) => {
   next(new AppError(404, 'RESOURCE_NOT_FOUND', 'Route not found'));

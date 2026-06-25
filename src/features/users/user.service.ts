@@ -1,7 +1,10 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { env } from '../../config/env';
 import { AppError } from '../../shared/utils/AppError';
+import { sendEmail } from '../../shared/utils/email';
+import logger from '../../shared/utils/logger';
 import User from './user.model';
 import type {
   AppAccess,
@@ -215,6 +218,111 @@ export const createUser = async (
   });
 
   return { user: user.toSafeObject(), inviteToken };
+};
+
+/**
+ * Build an HTML invite email for new team members.
+ */
+function buildInviteEmailHtml(params: {
+  firstName: string;
+  companyName: string;
+  invitedBy: string;
+  inviteUrl: string;
+}): string {
+  const { firstName, companyName, invitedBy, inviteUrl } = params;
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You've been invited to join ${companyName}</title>
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color: #1a1a2e; padding: 30px; text-align: center;">
+              <h1 style="color: #ffffff; font-size: 24px; margin: 0;">${companyName}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <h2 style="color: #1a1a2e; font-size: 20px; margin: 0 0 20px;">You've been invited! 🎉</h2>
+              <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 16px;">
+                Hello ${firstName},
+              </p>
+              <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 16px;">
+                <strong>${invitedBy}</strong> has invited you to join <strong>${companyName}</strong> on the team portal.
+              </p>
+              <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #bfdbfe; margin: 24px 0;">
+                <p style="color: #1e40af; font-size: 14px; line-height: 1.6; margin: 0;">
+                  Click the button below to accept your invitation and set up your account. This link will expire in 24 hours.
+                </p>
+              </div>
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${inviteUrl}" style="display: inline-block; background-color: #71abbf; color: #ffffff; font-size: 16px; font-weight: 600; padding: 14px 32px; border-radius: 6px; text-decoration: none;">
+                  Accept Invitation
+                </a>
+              </div>
+              <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0 0 8px;">
+                Or copy and paste this URL into your browser:
+              </p>
+              <p style="color: #71abbf; font-size: 14px; line-height: 1.6; margin: 0 0 24px; word-break: break-all;">
+                <a href="${inviteUrl}" style="color: #71abbf;">${inviteUrl}</a>
+              </p>
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+              <p style="color: #999999; font-size: 12px; line-height: 1.6; margin: 0;">
+                This invitation was sent by ${invitedBy}. If you weren't expecting this invitation, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Send invitation email to a newly created team member.
+ */
+export const sendTeamMemberInvite = async (params: {
+  email: string;
+  firstName: string;
+  inviteToken: string;
+  invitedByName?: string;
+}): Promise<void> => {
+  const { email, firstName, inviteToken, invitedByName } = params;
+
+  const inviteUrl = `${env.ATS_FRONTEND_URL}/verify-email/${inviteToken}`;
+  const companyName = env.COMPANY_NAME;
+  const invitedBy = invitedByName || 'Administrator';
+
+  const html = buildInviteEmailHtml({
+    firstName,
+    companyName,
+    invitedBy,
+    inviteUrl,
+  });
+
+  const text = `Welcome to ${companyName}!\n\nHi ${firstName},\n\n${invitedBy} has invited you to join ${companyName} on the team portal.\n\nAccept your invitation by visiting: ${inviteUrl}\n\nThis link will expire in 24 hours.\n\nIf you weren't expecting this invitation, you can safely ignore this email.`;
+
+  try {
+    await sendEmail({
+      to: [email],
+      subject: `You've been invited to join ${companyName}`,
+      html,
+      text,
+    });
+    logger.info(`Invite email sent to ${email}`);
+  } catch (err) {
+    // Log but don't throw — user was created successfully
+    logger.error(`Failed to send invite email to ${email}`, err);
+  }
 };
 
 export const updateUser = async (

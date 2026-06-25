@@ -26,6 +26,7 @@ export interface IEmail {
   status: string;
   threadId: string | null;
   inReplyTo: string | null;
+  messageId: string | null;
   templateId: string | null;
   context: IEmailContext;
   resendId: string | null;
@@ -36,6 +37,11 @@ export interface IEmail {
   sentBy: string | null;
   sentAt: Date | null;
   receivedAt: Date | null;
+  openedAt: Date | null;
+  clickedAt: Date | null;
+  bouncedAt: Date | null;
+  openCount: number;
+  clickCount: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import {
   approveApplication,
@@ -28,60 +31,41 @@ const notesSchema = z.object({
 const router = Router();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getAllApplications
-);
+router.get('/', requirePermission('candidates', 'read'), getAllApplications);
 
-router.get(
-  '/:id',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getApplicationById
-);
+router.get('/:id', requirePermission('candidates', 'read'), getApplicationById);
 
 router.patch(
   '/:id/approve',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('candidates', 'write'),
   approveApplication
 );
 
 router.patch(
   '/:id/reject',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('candidates', 'write'),
   validate(rejectSchema),
   rejectApplication
 );
 
 router.patch(
   '/:id/stage',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('candidates', 'write'),
   validate(moveStageSchema),
   moveStage
 );
 
 router.patch(
   '/:id/hire',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('candidates', 'write'),
   hireApplication
 );
 
 router.patch(
   '/:id/notes',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('candidates', 'write'),
   validate(notesSchema),
   updateNotes
 );

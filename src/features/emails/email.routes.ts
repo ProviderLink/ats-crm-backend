@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import {
   getAllEmails,
@@ -36,36 +39,25 @@ const sendEmailSchema = z.object({
 const router = Router();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
-  getAllEmails
-);
+router.get('/', requirePermission('emails', 'read'), getAllEmails);
 
 router.post(
   '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('emails', 'write'),
   validate(sendEmailSchema),
   sendEmail
 );
 
 router.get(
   '/thread/:threadId',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('emails', 'read'),
   getEmailThread
 );
 
-router.get(
-  '/:id',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
-  getEmailById
-);
+router.get('/:id', requirePermission('emails', 'read'), getEmailById);
 
-router.post(
-  '/:id/resend',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
-  resendEmail
-);
+router.post('/:id/resend', requirePermission('emails', 'write'), resendEmail);
 
 export default router;

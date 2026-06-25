@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import authenticate from '../../../shared/middleware/authenticate';
-import { requireRoles } from '../../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../../shared/middleware/authorize';
 import { getDashboard } from './atsDashboard.controller';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
-  getDashboard
-);
+router.get('/', requirePermission('dashboard', 'read'), getDashboard);
 
 export default router;

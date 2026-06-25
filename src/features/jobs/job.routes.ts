@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import { PIPELINE_STAGE_ICONS } from '../pipeline-templates/pipelineTemplate.types';
 import {
@@ -87,57 +90,38 @@ const router = Router();
 router.post('/:id/apply', validate(applyToJobSchema), applyToJob);
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getAllJobs
-);
+router.get('/', requirePermission('jobs', 'read'), getAllJobs);
 
 router.post(
   '/',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('jobs', 'write'),
   validate(createJobSchema),
   createJob
 );
 
-router.get(
-  '/:id',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getJobById
-);
+router.get('/:id', requirePermission('jobs', 'read'), getJobById);
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('jobs', 'write'),
   validate(updateJobSchema),
   updateJob
 );
 
-router.delete('/:id', requireRoles('admin'), deleteJob);
+router.delete('/:id', requirePermission('jobs', 'manage'), deleteJob);
 
 router.patch(
   '/:id/status',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('jobs', 'write'),
   validate(updateStatusSchema),
   updateJobStatus
 );
 
 router.patch(
   '/:id/pipeline',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('jobs', 'write'),
   validate(assignPipelineSchema),
   assignPipeline
 );

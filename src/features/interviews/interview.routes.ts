@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import {
   cancelInterview,
@@ -57,56 +60,35 @@ const feedbackSchema = z.object({
 const router = Router();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getAllInterviews
-);
+router.get('/', requirePermission('interviews', 'read'), getAllInterviews);
 
 router.post(
   '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('interviews', 'write'),
   validate(createInterviewSchema),
   createInterview
 );
 
-router.get(
-  '/:id',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getInterviewById
-);
+router.get('/:id', requirePermission('interviews', 'read'), getInterviewById);
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('interviews', 'write'),
   validate(updateInterviewSchema),
   updateInterview
 );
 
-router.delete('/:id', requireRoles('admin', 'hiring_manager'), cancelInterview);
+router.delete(
+  '/:id',
+  requirePermission('interviews', 'write'),
+  cancelInterview
+);
 
 router.post(
   '/:id/feedback',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
+  requirePermission('interviews', 'write'),
   validate(feedbackSchema),
   submitFeedback
 );

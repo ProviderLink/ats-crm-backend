@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
-import { PIPELINE_STAGE_ICONS } from './pipelineTemplate.types';
 import {
   createTemplate,
   deleteTemplate,
@@ -11,6 +13,7 @@ import {
   getTemplateById,
   updateTemplate,
 } from './pipelineTemplate.controller';
+import { PIPELINE_STAGE_ICONS } from './pipelineTemplate.types';
 
 const router = Router();
 
@@ -42,33 +45,38 @@ const updateTemplateSchema = z.object({
 });
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
 router.get(
   '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('pipelineTemplates', 'read'),
   getAllTemplates
 );
 
 router.post(
   '/',
-  requireRoles('admin'),
+  requirePermission('pipelineTemplates', 'write'),
   validate(createTemplateSchema),
   createTemplate
 );
 
 router.get(
   '/:id',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('pipelineTemplates', 'read'),
   getTemplateById
 );
 
 router.patch(
   '/:id',
-  requireRoles('admin'),
+  requirePermission('pipelineTemplates', 'write'),
   validate(updateTemplateSchema),
   updateTemplate
 );
 
-router.delete('/:id', requireRoles('admin'), deleteTemplate);
+router.delete(
+  '/:id',
+  requirePermission('pipelineTemplates', 'write'),
+  deleteTemplate
+);
 
 export default router;

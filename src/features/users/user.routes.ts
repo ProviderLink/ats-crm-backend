@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import { requirePermission } from '../../shared/middleware/authorize';
 import { uploadUserAvatarFile } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import {
@@ -75,16 +75,25 @@ router.use(authenticate);
 router.patch('/me', validate(updateMeSchema), updateMe);
 router.post('/me/avatar', uploadUserAvatarFile, uploadAvatar);
 
-// Admin-only routes
-router.use(requireRoles('admin'));
-
-router.get('/', getAllUsers);
-router.post('/', validate(createUserSchema), createUser);
-router.get('/:id', getUserById);
-router.patch('/:id', validate(updateUserSchema), updateUser);
-router.delete('/:id', deactivateUser);
+// Admin-only routes (team management)
+router.get('/', requirePermission('team', 'read'), getAllUsers);
+router.post(
+  '/',
+  requirePermission('team', 'write'),
+  validate(createUserSchema),
+  createUser
+);
+router.get('/:id', requirePermission('team', 'read'), getUserById);
+router.patch(
+  '/:id',
+  requirePermission('team', 'write'),
+  validate(updateUserSchema),
+  updateUser
+);
+router.delete('/:id', requirePermission('team', 'manage'), deactivateUser);
 router.patch(
   '/:id/permissions',
+  requirePermission('team', 'manage'),
   validate(updatePermissionsSchema),
   updatePermissions
 );

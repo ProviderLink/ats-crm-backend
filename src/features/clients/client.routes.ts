@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { uploadLogo as uploadLogoMiddleware } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import {
@@ -79,78 +82,58 @@ const updateCrmProfileSchema = z.object({
 const router = Router();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'account_manager'
-  ),
-  getAllClients
-);
+router.get('/', requirePermission('clients', 'read'), getAllClients);
 
 router.post(
   '/',
-  requireRoles('admin'),
+  requirePermission('clients', 'write'),
   validate(createClientSchema),
   createClient
 );
 
-router.get(
-  '/:id',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'account_manager',
-    'client'
-  ),
-  getClientById
-);
+router.get('/:id', requirePermission('clients', 'read'), getClientById);
 
 router.patch(
   '/:id',
-  requireRoles('admin'),
+  requirePermission('clients', 'write'),
   validate(updateClientSchema),
   updateClient
 );
 
-router.delete('/:id', requireRoles('admin'), deleteClient);
+router.delete('/:id', requirePermission('clients', 'manage'), deleteClient);
 
 router.post(
   '/:id/logo',
-  requireRoles('admin'),
+  requirePermission('clients', 'write'),
   uploadLogoMiddleware,
   uploadLogo
 );
 
 router.post(
   '/:id/contacts',
-  requireRoles('admin', 'account_manager'),
+  requirePermission('clients', 'write'),
   validate(createContactSchema),
   addContact
 );
 
 router.patch(
   '/:id/contacts/:contactId',
-  requireRoles('admin', 'account_manager'),
+  requirePermission('clients', 'write'),
   validate(updateContactSchema),
   updateContact
 );
 
 router.delete(
   '/:id/contacts/:contactId',
-  requireRoles('admin', 'account_manager'),
+  requirePermission('clients', 'write'),
   deleteContact
 );
 
 router.patch(
   '/:id/crm-profile',
-  requireRoles('admin', 'account_manager'),
+  requirePermission('clients', 'write'),
   validate(updateCrmProfileSchema),
   updateCrmProfile
 );
@@ -158,34 +141,27 @@ router.patch(
 // --- Client notes sub-resource -------------------------------------------
 router.get(
   '/:clientId/notes',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'account_manager',
-    'client'
-  ),
+  requirePermission('clients', 'read'),
   listClientNotes
 );
 
 router.post(
   '/:clientId/notes',
-  requireRoles('admin', 'account_manager', 'recruiter', 'coordinator'),
+  requirePermission('clients', 'write'),
   validate(createClientNoteSchema),
   createClientNote
 );
 
 router.patch(
   '/:clientId/notes/:noteId',
-  requireRoles('admin', 'account_manager', 'recruiter', 'coordinator'),
+  requirePermission('clients', 'write'),
   validate(updateClientNoteSchema),
   updateClientNote
 );
 
 router.delete(
   '/:clientId/notes/:noteId',
-  requireRoles('admin', 'account_manager'),
+  requirePermission('clients', 'write'),
   deleteClientNote
 );
 

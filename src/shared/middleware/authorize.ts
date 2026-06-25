@@ -38,7 +38,26 @@ export const requirePermission = (resource: string, action: string) =>
       string,
       Record<string, boolean | undefined> | undefined
     >;
-    if (perms[resource]?.[action] === true) return next();
+    const resourcePerms = perms[resource];
+    if (!resourcePerms) {
+      throw new AppError(
+        403,
+        'AUTH_INSUFFICIENT_PERMISSIONS',
+        'You do not have permission to perform this action'
+      );
+    }
+
+    // Hierarchy: manage > write > read; schedule > write > read
+    const allowed =
+      resourcePerms[action] === true ||
+      (action === 'read' &&
+        (resourcePerms.write === true ||
+          resourcePerms.manage === true ||
+          resourcePerms.schedule === true)) ||
+      (action === 'write' &&
+        (resourcePerms.manage === true || resourcePerms.schedule === true));
+
+    if (allowed) return next();
 
     throw new AppError(
       403,

@@ -29,14 +29,21 @@ function deriveAppAccess(roles: UserRole[]): AppAccess[] {
 }
 
 function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
+  // ── Admin: everything ──────────────────────────────────────────────
   if (roles.includes('admin')) {
     return {
       candidates: { read: true, write: true, manage: true },
       jobs: { read: true, write: true, manage: true },
       interviews: { read: true, write: true, schedule: true },
       clients: { read: true, write: true, manage: true },
+      emails: { read: true, write: true },
+      tags: { read: true, write: true, manage: true },
+      settings: { read: true, write: true },
+      dashboard: { read: true },
       team: { read: true, write: true, manage: true },
-      analytics: { read: true },
+      pipelineTemplates: { read: true, write: true },
+      emailTemplates: { read: true, write: true },
+      activityLogs: { read: true },
       assignments: { read: true, write: true, manage: true },
       reports: { read: true, write: true, manage: true },
       eod: { read: true, write: true, approve: true },
@@ -58,42 +65,73 @@ function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
 
   for (const role of roles) {
     switch (role) {
+      // ── ATS roles ────────────────────────────────────────────────
       case 'hiring_manager':
-        merge('jobs', { read: true, write: true, manage: true });
         merge('candidates', { read: true, write: true, manage: true });
-        merge('analytics', { read: true });
-        merge('interviews', { read: true });
+        merge('jobs', { read: true, write: true, manage: true });
+        merge('interviews', { read: true, write: true });
         merge('clients', { read: true });
+        merge('emails', { read: true, write: true });
+        merge('tags', { read: true, write: true });
+        merge('settings', { read: true });
+        merge('dashboard', { read: true });
+        merge('pipelineTemplates', { read: true });
+        merge('emailTemplates', { read: true });
         break;
+
       case 'recruiter':
         merge('candidates', { read: true, write: true, manage: true });
         merge('jobs', { read: true });
-        merge('interviews', { read: true });
+        merge('interviews', { read: true, write: true });
         merge('clients', { read: true });
+        merge('emails', { read: true, write: true });
+        merge('tags', { read: true });
+        merge('settings', { read: true });
+        merge('dashboard', { read: true });
+        merge('pipelineTemplates', { read: true });
+        merge('emailTemplates', { read: true });
         break;
+
       case 'coordinator':
         merge('candidates', { read: true, write: true });
         merge('jobs', { read: true });
-        merge('interviews', { read: true });
-        break;
-      case 'interviewer':
         merge('interviews', { read: true, write: true, schedule: true });
-        merge('candidates', { read: true });
+        merge('clients', { read: true });
+        merge('emails', { read: true, write: true });
+        merge('tags', { read: true });
+        merge('settings', { read: true });
+        merge('dashboard', { read: true });
+        merge('pipelineTemplates', { read: true });
+        merge('emailTemplates', { read: true });
         break;
+
+      case 'interviewer':
+        merge('candidates', { read: true });
+        merge('interviews', { read: true, write: true });
+        merge('tags', { read: true });
+        break;
+
+      // ── CRM roles ────────────────────────────────────────────────
       case 'account_manager':
+        merge('clients', { read: true, write: true });
+        merge('dashboard', { read: true });
+        merge('activityLogs', { read: true });
         merge('assignments', { read: true, write: true, manage: true });
         merge('reports', { read: true, write: true, manage: true });
         merge('eod', { read: true, write: true, approve: true });
         merge('performanceReview', { read: true, write: true, approve: true });
         break;
+
       case 'client':
+        merge('clients', { read: true });
         merge('assignments', { read: true });
         merge('reports', { read: true });
         merge('eod', { read: true });
         break;
+
       case 'va':
-        merge('eod', { write: true });
         merge('assignments', { read: true });
+        merge('eod', { write: true });
         break;
     }
   }
@@ -189,6 +227,8 @@ export const updateUser = async (
   if (input.roles !== undefined) {
     user.roles = input.roles as UserRole[];
     user.appAccess = deriveAppAccess(input.roles) as AppAccess[];
+    user.permissions = buildPermissionsForRoles(input.roles);
+    user.markModified('permissions');
   }
   if (input.firstName !== undefined) user.firstName = input.firstName;
   if (input.lastName !== undefined) user.lastName = input.lastName;

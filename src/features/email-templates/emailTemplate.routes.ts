@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import * as templateController from './emailTemplate.controller';
 
@@ -46,33 +49,38 @@ const updateTemplateSchema = createTemplateSchema.partial().extend({
 });
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
 router.get(
   '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('emailTemplates', 'read'),
   templateController.getAllTemplates
 );
 
 router.post(
   '/',
-  requireRoles('admin'),
+  requirePermission('emailTemplates', 'write'),
   validate(createTemplateSchema),
   templateController.createTemplate
 );
 
 router.get(
   '/:id',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
+  requirePermission('emailTemplates', 'read'),
   templateController.getTemplateById
 );
 
 router.patch(
   '/:id',
-  requireRoles('admin'),
+  requirePermission('emailTemplates', 'write'),
   validate(updateTemplateSchema),
   templateController.updateTemplate
 );
 
-router.delete('/:id', requireRoles('admin'), templateController.deleteTemplate);
+router.delete(
+  '/:id',
+  requirePermission('emailTemplates', 'write'),
+  templateController.deleteTemplate
+);
 
 export default router;

@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { uploadAvatar, uploadResume } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import {
@@ -77,59 +80,50 @@ const assignJobSchema = z.object({
 const router = Router();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter', 'coordinator'),
-  getAllCandidates
-);
+router.get('/', requirePermission('candidates', 'read'), getAllCandidates);
 
 router.post(
   '/',
-  requireRoles('admin', 'hiring_manager', 'recruiter'),
+  requirePermission('candidates', 'write'),
   uploadResume,
   validate(createCandidateSchema, 'body'),
   createCandidate
 );
 
-router.get(
-  '/:id',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  getCandidateById
-);
+router.get('/:id', requirePermission('candidates', 'read'), getCandidateById);
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'hiring_manager', 'recruiter'),
+  requirePermission('candidates', 'write'),
   validate(updateCandidateSchema),
   updateCandidate
 );
 
-router.delete('/:id', requireRoles('admin'), deleteCandidate);
+router.delete(
+  '/:id',
+  requirePermission('candidates', 'manage'),
+  deleteCandidate
+);
 
 router.post(
   '/:id/avatar',
-  requireRoles('admin', 'hiring_manager', 'recruiter'),
+  requirePermission('candidates', 'write'),
   uploadAvatar,
   uploadAvatarController
 );
 
 router.patch(
   '/:id/talent-pool',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('candidates', 'write'),
   validate(talentPoolSchema),
   updateTalentPool
 );
 
 router.post(
   '/:id/assign-job',
-  requireRoles('admin', 'hiring_manager', 'recruiter'),
+  requirePermission('candidates', 'write'),
   validate(assignJobSchema),
   assignJob
 );

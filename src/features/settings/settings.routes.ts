@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import { requirePermission } from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import { getSettings, updateSettings } from './settings.controller';
 
@@ -25,10 +25,10 @@ const updateSettingsSchema = z.object({
 
 router.use(authenticate);
 
-router.get('/', requireRoles('admin'), getSettings);
+router.get('/', requirePermission('settings', 'read'), getSettings);
 router.patch(
   '/',
-  requireRoles('admin'),
+  requirePermission('settings', 'write'),
   validate(updateSettingsSchema),
   updateSettings
 );

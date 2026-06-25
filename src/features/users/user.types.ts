@@ -15,8 +15,14 @@ export interface UserPermissions {
   jobs?: { read?: boolean; write?: boolean; manage?: boolean };
   interviews?: { read?: boolean; write?: boolean; schedule?: boolean };
   clients?: { read?: boolean; write?: boolean; manage?: boolean };
+  emails?: { read?: boolean; write?: boolean };
+  tags?: { read?: boolean; write?: boolean; manage?: boolean };
+  settings?: { read?: boolean; write?: boolean };
+  dashboard?: { read?: boolean };
   team?: { read?: boolean; write?: boolean; manage?: boolean };
-  analytics?: { read?: boolean };
+  pipelineTemplates?: { read?: boolean; write?: boolean };
+  emailTemplates?: { read?: boolean; write?: boolean };
+  activityLogs?: { read?: boolean };
   assignments?: { read?: boolean; write?: boolean; manage?: boolean };
   reports?: { read?: boolean; write?: boolean; manage?: boolean };
   eod?: { read?: boolean; write?: boolean; approve?: boolean };

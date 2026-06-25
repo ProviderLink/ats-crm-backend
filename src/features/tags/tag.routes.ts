@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requirePermission,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import * as tagController from './tag.controller';
 
@@ -17,33 +20,28 @@ const createTagSchema = z.object({
 const updateTagSchema = createTagSchema.partial();
 
 router.use(authenticate);
+router.use(requireAppAccess('ats'));
 
-router.get(
-  '/',
-  requireRoles(
-    'admin',
-    'hiring_manager',
-    'recruiter',
-    'coordinator',
-    'interviewer'
-  ),
-  tagController.getAllTags
-);
+router.get('/', requirePermission('tags', 'read'), tagController.getAllTags);
 
 router.post(
   '/',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('tags', 'write'),
   validate(createTagSchema),
   tagController.createTag
 );
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'hiring_manager'),
+  requirePermission('tags', 'write'),
   validate(updateTagSchema),
   tagController.updateTag
 );
 
-router.delete('/:id', requireRoles('admin'), tagController.deleteTag);
+router.delete(
+  '/:id',
+  requirePermission('tags', 'manage'),
+  tagController.deleteTag
+);
 
 export default router;

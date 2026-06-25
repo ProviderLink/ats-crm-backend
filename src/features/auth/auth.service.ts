@@ -108,11 +108,72 @@ export const forgotPassword = async (email: string) => {
   user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
-  const resetUrl = `${env.ATS_FRONTEND_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${env.ATS_FRONTEND_URL}/ats/reset-password?token=${resetToken}`;
   await sendEmail({
     to: [user.email],
-    subject: 'Reset your password',
-    html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
+    subject: 'Reset your Arista ATS password',
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f7;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#1a1a2e;padding:32px 40px;text-align:center;">
+              <h1 style="color:#ffffff;font-size:24px;margin:0;font-weight:700;">Arista ATS</h1>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+              <h2 style="color:#1a1a2e;font-size:20px;margin:0 0 16px;">Password Reset Request</h2>
+              <p style="color:#4a4a5a;font-size:15px;line-height:1.6;margin:0 0 24px;">
+                You recently requested to reset your password for your Arista ATS account.
+                Click the button below to set a new password:
+              </p>
+              <table cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
+                <tr>
+                  <td align="center" style="background-color:#4361ee;border-radius:6px;padding:14px 36px;">
+                    <a href="${resetUrl}" style="color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;display:inline-block;">Reset Your Password</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="color:#4a4a5a;font-size:14px;line-height:1.5;margin:0 0 8px;">
+                Or copy and paste this link into your browser:
+              </p>
+              <p style="color:#4361ee;font-size:13px;line-height:1.5;margin:0 0 24px;word-break:break-all;">
+                ${resetUrl}
+              </p>
+              <div style="border-top:1px solid #e8e8ec;padding-top:20px;">
+                <p style="color:#8a8a9a;font-size:13px;line-height:1.5;margin:0 0 8px;">
+                  ⏱ This link expires in <strong>1 hour</strong>.
+                </p>
+                <p style="color:#8a8a9a;font-size:13px;line-height:1.5;margin:0;">
+                  If you did not request this, you can safely ignore this email.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#fafafa;padding:24px 40px;text-align:center;">
+              <p style="color:#8a8a9a;font-size:12px;margin:0;">
+                &copy; ${new Date().getFullYear()} Arista ATS. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
   });
 };
 
@@ -132,6 +193,31 @@ export const resetPassword = async (token: string, password: string) => {
   user.passwordHash = await bcrypt.hash(password, 12);
   user.passwordResetToken = null;
   user.passwordResetExpires = null;
+  user.refreshTokenAts = null;
+  user.refreshTokenCrm = null;
+  await user.save();
+};
+
+export const changePassword = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isMatch) {
+    throw new AppError(
+      400,
+      'AUTH_INVALID_CREDENTIALS',
+      'Current password is incorrect'
+    );
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
   user.refreshTokenAts = null;
   user.refreshTokenCrm = null;
   await user.save();

@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { env } from '../../config/env';
 import AppError from './AppError';
+import logger from './logger';
 
 const resend = new Resend(env.RESEND_API_KEY);
 
@@ -34,7 +35,17 @@ export const sendEmail = async (params: {
   });
 
   if (error || !data) {
-    throw new AppError(500, 'EMAIL_SEND_FAILED', 'Failed to send email');
+    logger.error('Failed to send email via Resend', {
+      error,
+      to: params.to,
+      subject: params.subject,
+      from: `${env.COMPANY_NAME} <${env.COMPANY_EMAIL}>`,
+    });
+    throw new AppError(
+      500,
+      'EMAIL_SEND_FAILED',
+      error?.message || 'Failed to send email'
+    );
   }
 
   return { id: data.id };

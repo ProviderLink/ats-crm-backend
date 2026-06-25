@@ -1,4 +1,8 @@
 import { Request, Response } from 'express';
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from '../../config/cloudinary';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
@@ -55,6 +59,13 @@ export const updateUser = catchAsync(async (req: Request, res: Response) => {
   sendSuccess(res, user, 'User updated', 200);
 });
 
+export const updateMe = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!._id;
+  const body = req.body;
+  const user = await userService.updateMe(userId, body);
+  sendSuccess(res, user, 'Profile updated', 200);
+});
+
 export const deactivateUser = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -80,3 +91,26 @@ export const updatePermissions = catchAsync(
     sendSuccess(res, user, 'Permissions updated', 200);
   }
 );
+
+export const uploadAvatar = catchAsync(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'No file provided');
+  }
+
+  const userId = req.user!._id;
+  const user = await userService.getUserById(userId);
+
+  const { url } = await uploadToCloudinary(req.file, 'avatars');
+
+  // Delete old avatar if exists
+  if (user.avatar) {
+    const match = user.avatar.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+    const publicId = match ? match[1] : null;
+    if (publicId) {
+      deleteFromCloudinary(publicId, 'image');
+    }
+  }
+
+  const updatedUser = await userService.updateUser(userId, { avatar: url });
+  sendSuccess(res, updatedUser, 'Avatar uploaded', 200);
+});

@@ -238,6 +238,21 @@ export const deactivateUser = async (id: string): Promise<SafeUser> => {
   return safeUser;
 };
 
+export const updateMe = async (
+  id: string,
+  input: { firstName?: string; lastName?: string; phone?: string }
+): Promise<SafeUser> => {
+  const user = await User.findById(id);
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+
+  if (input.firstName !== undefined) user.firstName = input.firstName;
+  if (input.lastName !== undefined) user.lastName = input.lastName;
+  if (input.phone !== undefined) user.phone = input.phone;
+
+  await user.save();
+  return user.toSafeObject();
+};
+
 export const provisionVA = async (
   candidateId: string,
   firstName: string,

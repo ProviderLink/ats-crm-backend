@@ -20,6 +20,11 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8),
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
 router.post('/login', validate(loginSchema), authController.login);
 router.post('/logout', authenticate, authController.logout);
 router.post('/refresh-token', authController.refreshToken);
@@ -32,6 +37,12 @@ router.post(
   '/reset-password',
   validate(resetPasswordSchema),
   authController.resetPassword
+);
+router.post(
+  '/change-password',
+  authenticate,
+  validate(changePasswordSchema),
+  authController.changePassword
 );
 
 export default router;

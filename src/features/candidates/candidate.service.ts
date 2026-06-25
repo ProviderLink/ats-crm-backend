@@ -94,6 +94,11 @@ export const createCandidate = async (
     videoIntroUrl: input.videoIntroUrl ?? null,
     videoIntroSource: input.videoIntroSource ?? null,
     yearsOfExperience: input.yearsOfExperience ?? 0,
+    englishProficiency: input.englishProficiency ?? null,
+    currentSalaryPHP: input.currentSalaryPHP ?? null,
+    currentSalaryUSD: input.currentSalaryUSD ?? null,
+    reasonForLeaving: input.reasonForLeaving ?? null,
+    cityOfResidence: input.cityOfResidence ?? null,
     source: input.source,
     tags: input.tags ? input.tags.map(t => new mongoose.Types.ObjectId(t)) : [],
     status,
@@ -127,6 +132,16 @@ export const updateCandidate = async (
     candidate.videoIntroSource = input.videoIntroSource;
   if (input.yearsOfExperience !== undefined)
     candidate.yearsOfExperience = input.yearsOfExperience;
+  if (input.englishProficiency !== undefined)
+    candidate.englishProficiency = input.englishProficiency;
+  if (input.currentSalaryPHP !== undefined)
+    candidate.currentSalaryPHP = input.currentSalaryPHP;
+  if (input.currentSalaryUSD !== undefined)
+    candidate.currentSalaryUSD = input.currentSalaryUSD;
+  if (input.reasonForLeaving !== undefined)
+    candidate.reasonForLeaving = input.reasonForLeaving;
+  if (input.cityOfResidence !== undefined)
+    candidate.cityOfResidence = input.cityOfResidence;
   if (input.tags !== undefined)
     candidate.tags = input.tags.map(
       t => new mongoose.Types.ObjectId(t)

@@ -53,6 +53,17 @@ export interface ICandidate {
   parsedData: ICandidateParsedData | null;
   aiScore: ICandidateAiScore | null;
   yearsOfExperience: number;
+  englishProficiency:
+    | 'basic'
+    | 'conversational'
+    | 'professional'
+    | 'fluent'
+    | 'native'
+    | null;
+  currentSalaryPHP: number | null;
+  currentSalaryUSD: number | null;
+  reasonForLeaving: string | null;
+  cityOfResidence: string | null;
   source: string;
   tags: string[];
   inTalentPool: boolean;
@@ -77,6 +88,17 @@ export interface CreateCandidateInput {
   videoIntroUrl?: string | null;
   videoIntroSource?: string | null;
   yearsOfExperience?: number;
+  englishProficiency?:
+    | 'basic'
+    | 'conversational'
+    | 'professional'
+    | 'fluent'
+    | 'native'
+    | null;
+  currentSalaryPHP?: number | null;
+  currentSalaryUSD?: number | null;
+  reasonForLeaving?: string | null;
+  cityOfResidence?: string | null;
   source: 'applied' | 'internal_upload';
   tags?: string[];
 }
@@ -91,4 +113,15 @@ export interface UpdateCandidateInput {
   yearsOfExperience?: number;
   tags?: string[];
   parsedData?: ICandidateParsedData | null;
+  englishProficiency?:
+    | 'basic'
+    | 'conversational'
+    | 'professional'
+    | 'fluent'
+    | 'native'
+    | null;
+  currentSalaryPHP?: number | null;
+  currentSalaryUSD?: number | null;
+  reasonForLeaving?: string | null;
+  cityOfResidence?: string | null;
 }

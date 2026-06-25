@@ -102,6 +102,15 @@ const candidateSchema = new Schema(
     aiScore: { type: aiScoreSchema, default: null },
 
     yearsOfExperience: { type: Number, default: 0 },
+    englishProficiency: {
+      type: String,
+      enum: ['basic', 'conversational', 'professional', 'fluent', 'native'],
+      default: null,
+    },
+    currentSalaryPHP: { type: Number, default: null },
+    currentSalaryUSD: { type: Number, default: null },
+    reasonForLeaving: { type: String, default: null, maxlength: 500 },
+    cityOfResidence: { type: String, default: null, maxlength: 100 },
     source: {
       type: String,
       enum: ['applied', 'internal_upload'],

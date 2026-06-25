@@ -26,6 +26,14 @@ const createCandidateSchema = z.object({
   videoIntroUrl: z.string().url().optional().nullable(),
   videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
   yearsOfExperience: z.number().min(0).optional(),
+  englishProficiency: z
+    .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
+    .optional()
+    .nullable(),
+  currentSalaryPHP: z.number().min(0).optional().nullable(),
+  currentSalaryUSD: z.number().min(0).optional().nullable(),
+  reasonForLeaving: z.string().max(500).optional().nullable(),
+  cityOfResidence: z.string().max(100).optional().nullable(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -66,6 +74,14 @@ const updateCandidateSchema = z.object({
     })
     .optional()
     .nullable(),
+  englishProficiency: z
+    .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
+    .optional()
+    .nullable(),
+  currentSalaryPHP: z.number().min(0).optional().nullable(),
+  currentSalaryUSD: z.number().min(0).optional().nullable(),
+  reasonForLeaving: z.string().max(500).optional().nullable(),
+  cityOfResidence: z.string().max(100).optional().nullable(),
 });
 
 const talentPoolSchema = z.object({

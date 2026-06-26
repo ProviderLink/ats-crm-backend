@@ -3,7 +3,11 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from '../../config/cloudinary';
-import { runCandidateScoring, runResumeParsing } from '../../jobs';
+import {
+  runCandidacyValidation,
+  runCandidateScoring,
+  runResumeParsing,
+} from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { extractResumeText } from '../../shared/utils/extract-resume-text';
@@ -342,6 +346,14 @@ export const publicUploadAndParse = catchAsync(
         // Don't fail the request — return candidate without parsedData
       }
     }
+
+    // Trigger TYPE 1 AI candidacy validation — fire-and-forget (result stored on Candidate.aiValidation)
+    runCandidacyValidation(candidate._id.toString()).catch(err => {
+      logger.error('AI candidacy validation failed during public upload', {
+        candidateId: candidate._id,
+        error: (err as Error).message,
+      });
+    });
 
     // Re-fetch to get the parsedData that was saved by the AI job
     const updatedCandidate = await candidateService.getCandidateById(

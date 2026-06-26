@@ -9,6 +9,7 @@ const router = Router();
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  app: z.enum(['ats', 'crm']).optional(),
 });
 
 const forgotPasswordSchema = z.object({

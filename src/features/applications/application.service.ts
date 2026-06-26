@@ -215,15 +215,32 @@ export const rejectApplication = async (
     throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
   }
 
-  // Simply mark this application as rejected — never delete the candidate.
-  // A candidate may have other active applications. Rejecting one job
-  // doesn't mean the candidate is garbage.
+  // Mark this application as rejected
   application.phase = 'rejected';
   application.rejectedAt = new Date();
   application.rejectedBy = new mongoose.Types.ObjectId(input.rejectedBy);
   application.rejectionReason = input.rejectionReason ?? null;
   application.currentStage = null;
   await application.save();
+
+  // §5.3 Cascade deletion: delete candidate only if ALL three conditions are true
+  const candidate = await Candidate.findById(application.candidateId);
+  if (candidate) {
+    // Condition 1: no other active applications (pending or approved on other jobs)
+    const otherActiveApps = await Application.countDocuments({
+      candidateId: application.candidateId,
+      _id: { $ne: application._id },
+      phase: { $in: ['pending', 'approved'] },
+    });
+
+    const hasNoOtherActiveApps = otherActiveApps === 0;
+    const notInTalentPool = candidate.inTalentPool === false;
+    const notHired = candidate.status !== 'hired';
+
+    if (hasNoOtherActiveApps && notInTalentPool && notHired) {
+      await candidateService.deleteCandidate(String(candidate._id));
+    }
+  }
 
   return application.toSafeObject();
 };

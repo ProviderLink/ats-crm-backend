@@ -66,9 +66,50 @@ export const createJob = async (
   const client = await Client.findById(input.clientId);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
 
+  // --- Pipeline assignment (§5.9) ---
+  let pipelineTemplate;
+  if (input.pipelineTemplateId) {
+    // User explicitly selected a template
+    pipelineTemplate = await PipelineTemplate.findById(
+      input.pipelineTemplateId
+    );
+    if (!pipelineTemplate) {
+      throw new AppError(
+        404,
+        'PIPELINE_TEMPLATE_NOT_FOUND',
+        'Selected pipeline template not found'
+      );
+    }
+  } else {
+    // No template selected — auto-assign the default
+    pipelineTemplate = await PipelineTemplate.findOne({ isDefault: true });
+    if (!pipelineTemplate) {
+      throw new AppError(
+        422,
+        'PIPELINE_REQUIRED',
+        'No default pipeline template exists. Please create one or select a template.'
+      );
+    }
+  }
+
+  const copiedStages = pipelineTemplate.stages.map(stage => ({
+    _id: new mongoose.Types.ObjectId(),
+    name: stage.name,
+    color: stage.color,
+    order: stage.order,
+    isActive: stage.isActive,
+    icon: stage.icon ?? 'ClipboardList',
+  }));
+
+  const { pipelineTemplateId: _unused, ...restInput } = input;
+
   const job = await Job.create({
-    ...input,
+    ...restInput,
     status: 'draft',
+    pipeline: {
+      templateId: pipelineTemplate._id as mongoose.Types.ObjectId,
+      stages: copiedStages,
+    },
     createdBy,
   });
   return job.toSafeObject();

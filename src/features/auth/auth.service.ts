@@ -8,6 +8,7 @@ import User from '../users/user.model';
 import type { AuthTokenPayload, LoginInput } from './auth.types';
 
 export const login = async (input: LoginInput) => {
+  const app = input.app ?? 'ats';
   const user = await User.findOne({ email: input.email.toLowerCase() });
   if (!user) {
     throw new AppError(
@@ -53,22 +54,39 @@ export const login = async (input: LoginInput) => {
     }
   );
 
-  user.refreshTokenAts = refreshToken;
-  user.lastLoginAts = new Date();
+  // Store refresh token and last login in the app-specific fields
+  if (app === 'crm') {
+    user.refreshTokenCrm = refreshToken;
+    user.lastLoginCrm = new Date();
+  } else {
+    user.refreshTokenAts = refreshToken;
+    user.lastLoginAts = new Date();
+  }
   await user.save();
 
-  return { user: user.toSafeObject(), accessToken, refreshToken };
+  return { user: user.toSafeObject(), accessToken, refreshToken, app };
 };
 
-export const logout = async (userId: string) => {
+export const logout = async (userId: string, app?: 'ats' | 'crm') => {
   const user = await User.findById(userId);
   if (user) {
-    user.refreshTokenAts = null;
+    if (app === 'crm') {
+      user.refreshTokenCrm = null;
+    } else if (app === 'ats') {
+      user.refreshTokenAts = null;
+    } else {
+      // No app specified — clear both
+      user.refreshTokenAts = null;
+      user.refreshTokenCrm = null;
+    }
     await user.save();
   }
 };
 
-export const refreshToken = async (token: string) => {
+export const refreshToken = async (
+  token: string,
+  app: 'ats' | 'crm' = 'ats'
+) => {
   let decoded: jwt.JwtPayload;
   try {
     decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as jwt.JwtPayload;
@@ -77,7 +95,14 @@ export const refreshToken = async (token: string) => {
   }
 
   const user = await User.findById(decoded._id);
-  if (!user || user.refreshTokenAts !== token) {
+  if (!user) {
+    throw new AppError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
+  }
+
+  // Check the correct app-specific refresh token
+  const storedToken =
+    app === 'crm' ? user.refreshTokenCrm : user.refreshTokenAts;
+  if (storedToken !== token) {
     throw new AppError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
   }
 

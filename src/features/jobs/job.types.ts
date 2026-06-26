@@ -61,6 +61,7 @@ export interface CreateJobInput {
   skills?: string[];
   tags?: string[];
   salaryRange?: IJobSalaryRange | null;
+  pipelineTemplateId?: string;
   applicationDeadline?: Date | null;
   startDate?: Date | null;
   benefits?: string[];

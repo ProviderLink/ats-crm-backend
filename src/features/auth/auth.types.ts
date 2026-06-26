@@ -1,6 +1,7 @@
 export interface LoginInput {
   email: string;
   password: string;
+  app?: 'ats' | 'crm';
 }
 
 export interface AuthTokenPayload {

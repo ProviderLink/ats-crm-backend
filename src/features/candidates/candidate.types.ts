@@ -91,7 +91,7 @@ export interface CreateCandidateInput {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phone?: string;
   resumeUrl: string;
   resumeOriginalName: string;
   resumeRawText?: string;

@@ -98,7 +98,7 @@ export const createCandidate = async (
     firstName: input.firstName,
     lastName: input.lastName,
     email: input.email,
-    phone: input.phone,
+    phone: input.phone ?? '',
     resumeUrl: input.resumeUrl,
     resumeOriginalName: input.resumeOriginalName,
     resumeRawText: input.resumeRawText ?? '',

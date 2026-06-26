@@ -98,7 +98,7 @@ const candidateSchema = new Schema(
       lowercase: true,
       trim: true,
     },
-    phone: { type: String, required: true },
+    phone: { type: String, default: '' },
     avatar: { type: String, default: null },
 
     resumeUrl: { type: String, required: true },

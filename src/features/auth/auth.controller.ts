@@ -6,8 +6,11 @@ import { sendSuccess } from '../../shared/utils/response';
 import * as authService from './auth.service';
 
 export const login = catchAsync(async (req: Request, res: Response) => {
-  const { user, accessToken, refreshToken } = await authService.login(req.body);
-  res.cookie('refreshTokenAts', refreshToken, {
+  const { user, accessToken, refreshToken, app } = await authService.login(
+    req.body
+  );
+  const cookieName = app === 'crm' ? 'refreshTokenCrm' : 'refreshTokenAts';
+  res.cookie(cookieName, refreshToken, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -17,17 +20,31 @@ export const login = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const logout = catchAsync(async (req: Request, res: Response) => {
-  await authService.logout(req.user!._id);
-  res.clearCookie('refreshTokenAts');
+  const app =
+    (req.query.app as 'ats' | 'crm') ?? (req.body.app as 'ats' | 'crm');
+  await authService.logout(req.user!._id, app);
+  if (app === 'crm') {
+    res.clearCookie('refreshTokenCrm');
+  } else if (app === 'ats') {
+    res.clearCookie('refreshTokenAts');
+  } else {
+    res.clearCookie('refreshTokenAts');
+    res.clearCookie('refreshTokenCrm');
+  }
   sendSuccess(res, {}, 'Logged out', 200);
 });
 
 export const refreshToken = catchAsync(async (req: Request, res: Response) => {
-  const token = req.cookies.refreshTokenAts as string | undefined;
+  const app: 'ats' | 'crm' =
+    (req.query.app as 'ats' | 'crm') ??
+    (req.body.app as 'ats' | 'crm') ??
+    'ats';
+  const cookieName = app === 'crm' ? 'refreshTokenCrm' : 'refreshTokenAts';
+  const token = req.cookies[cookieName] as string | undefined;
   if (!token) {
     throw new AppError(401, 'AUTH_TOKEN_INVALID', 'No refresh token');
   }
-  const { user, accessToken } = await authService.refreshToken(token);
+  const { user, accessToken } = await authService.refreshToken(token, app);
   sendSuccess(res, { user, accessToken }, 'Token refreshed', 200);
 });
 

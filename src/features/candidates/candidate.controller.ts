@@ -3,9 +3,14 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from '../../config/cloudinary';
+import { runResumeParsing } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
+import { extractResumeText } from '../../shared/utils/extract-resume-text';
+import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
+import * as applicationService from '../applications/application.service';
+import { getJobById } from '../jobs/job.service';
 import * as candidateService from './candidate.service';
 
 export const getAllCandidates = catchAsync(
@@ -63,12 +68,20 @@ export const createCandidate = catchAsync(
     }
     const body = req.body;
     const createdBy = req.user!._id;
+
+    // Extract raw text from uploaded PDF/DOCX for AI parsing
+    const resumeRawText = await extractResumeText(
+      req.file.buffer,
+      req.file.mimetype
+    );
+
     const { url } = await uploadToCloudinary(req.file, 'resumes');
     const candidate = await candidateService.createCandidate(
       {
         ...body,
         resumeUrl: url,
         resumeOriginalName: req.file.originalname,
+        resumeRawText,
         source: 'internal_upload',
       },
       createdBy
@@ -143,10 +156,93 @@ export const updateTalentPool = catchAsync(
 export const assignJob = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { jobId } = req.body;
+  const updatedBy = req.user!._id;
+
+  // Verify candidate exists
+  const candidate = await candidateService.getCandidateById(id);
+  if (!candidate) {
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+  }
+
+  // Get job to determine clientId
+  const job = await getJobById(jobId);
+  if (!job) {
+    throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+  }
+
+  // Create application
+  const application = await applicationService.createApplication({
+    candidateId: id,
+    jobId,
+    clientId: job.clientId,
+    source: 'assigned',
+    createdBy: updatedBy,
+  });
+
   sendSuccess(
     res,
-    { candidateId: id, jobId, assigned: true },
+    { candidateId: id, jobId, applicationId: application._id, assigned: true },
     'Candidate assigned to job',
-    200
+    201
   );
 });
+
+export const publicUploadAndParse = catchAsync(
+  async (req: Request, res: Response) => {
+    if (!req.file) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
+    }
+
+    const body = req.body;
+
+    logger.info(
+      `Public upload-and-parse: ${body.firstName} ${body.lastName} (${body.email})`
+    );
+
+    // Extract raw text from the uploaded PDF/DOCX
+    const resumeRawText = await extractResumeText(
+      req.file.buffer,
+      req.file.mimetype
+    );
+
+    // Upload resume to Cloudinary
+    const { url: resumeUrl } = await uploadToCloudinary(req.file, 'resumes');
+
+    // Create candidate (source: 'applied', no createdBy for public)
+    const candidate = await candidateService.createCandidate(
+      {
+        ...body,
+        resumeUrl,
+        resumeOriginalName: req.file.originalname,
+        resumeRawText,
+        source: 'applied' as const,
+      },
+      null // public apply has no authenticated user
+    );
+
+    // Await AI resume parsing synchronously (not fire-and-forget)
+    if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+      try {
+        await runResumeParsing(candidate._id.toString());
+      } catch (err) {
+        logger.error('AI parsing failed during public upload', {
+          candidateId: candidate._id,
+          error: (err as Error).message,
+        });
+        // Don't fail the request — return candidate without parsedData
+      }
+    }
+
+    // Re-fetch to get the parsedData that was saved by the AI job
+    const updatedCandidate = await candidateService.getCandidateById(
+      candidate._id.toString(),
+      false
+    );
+
+    logger.info(
+      `Public upload-and-parse complete: ${updatedCandidate._id}, parsedData=${!!updatedCandidate.parsedData}`
+    );
+
+    sendSuccess(res, updatedCandidate, 'Resume uploaded and parsed', 201);
+  }
+);

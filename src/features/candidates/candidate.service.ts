@@ -67,9 +67,19 @@ export const getCandidateById = async (
   return result;
 };
 
+export const getCandidateByEmail = async (
+  email: string
+): Promise<ICandidate | null> => {
+  const candidate = await Candidate.findOne({
+    email: email.toLowerCase(),
+  });
+  if (!candidate) return null;
+  return candidate.toSafeObject();
+};
+
 export const createCandidate = async (
   input: CreateCandidateInput,
-  createdBy: string
+  createdBy: string | null
 ): Promise<ICandidate> => {
   const existing = await Candidate.findOne({
     email: input.email.toLowerCase(),
@@ -102,7 +112,7 @@ export const createCandidate = async (
     source: input.source,
     tags: input.tags ? input.tags.map(t => new mongoose.Types.ObjectId(t)) : [],
     status,
-    createdBy: new mongoose.Types.ObjectId(createdBy),
+    createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
   });
 
   // Trigger AI resume parsing in background if resume text is provided
@@ -116,7 +126,7 @@ export const createCandidate = async (
 export const updateCandidate = async (
   id: string,
   input: UpdateCandidateInput,
-  updatedBy: string
+  updatedBy: string | null
 ): Promise<ICandidate> => {
   const candidate = await Candidate.findById(id);
   if (!candidate)
@@ -151,9 +161,11 @@ export const updateCandidate = async (
     candidate.markModified('parsedData');
   }
 
-  candidate.updatedBy = new mongoose.Types.ObjectId(
-    updatedBy
-  ) as unknown as mongoose.Types.ObjectId;
+  candidate.updatedBy = updatedBy
+    ? (new mongoose.Types.ObjectId(
+        updatedBy
+      ) as unknown as mongoose.Types.ObjectId)
+    : null;
 
   await candidate.save();
   return candidate.toSafeObject();
@@ -226,6 +238,15 @@ export const updateParsedData = async (
 
   candidate.parsedData = parsedData;
   candidate.markModified('parsedData');
+
+  // Also update the top-level yearsOfExperience from AI-extracted value
+  if (
+    parsedData.yearsOfExperience !== undefined &&
+    parsedData.yearsOfExperience > 0
+  ) {
+    candidate.yearsOfExperience = parsedData.yearsOfExperience;
+  }
+
   await candidate.save();
   return candidate.toSafeObject();
 };

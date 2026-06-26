@@ -13,6 +13,7 @@ import {
   deleteCandidate,
   getAllCandidates,
   getCandidateById,
+  publicUploadAndParse,
   updateCandidate,
   updateTalentPool,
   uploadAvatar as uploadAvatarController,
@@ -25,13 +26,19 @@ const createCandidateSchema = z.object({
   phone: z.string().min(1),
   videoIntroUrl: z.string().url().optional().nullable(),
   videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
-  yearsOfExperience: z.number().min(0).optional(),
+  yearsOfExperience: z.coerce.number().min(0).optional(),
   englishProficiency: z
     .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
     .optional()
     .nullable(),
-  currentSalaryPHP: z.number().min(0).optional().nullable(),
-  currentSalaryUSD: z.number().min(0).optional().nullable(),
+  currentSalaryPHP: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().min(0).nullable()
+  ),
+  currentSalaryUSD: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().min(0).nullable()
+  ),
   reasonForLeaving: z.string().max(500).optional().nullable(),
   cityOfResidence: z.string().max(100).optional().nullable(),
   tags: z.array(z.string()).optional(),
@@ -48,6 +55,7 @@ const updateCandidateSchema = z.object({
   parsedData: z
     .object({
       summary: z.string().optional(),
+      yearsOfExperience: z.number().min(0).optional(),
       skills: z.array(z.string()).optional(),
       languages: z.array(z.string()).optional(),
       certifications: z.array(z.string()).optional(),
@@ -94,6 +102,45 @@ const assignJobSchema = z.object({
 });
 
 const router = Router();
+
+// ── PUBLIC ROUTES (no authentication required) ──
+
+/**
+ * @route   POST /api/v1/ats/candidates/public/upload-and-parse
+ * @desc    Upload resume + personal info, create candidate, run AI parsing, return candidate with parsedData
+ * @access  Public
+ */
+const publicApplySchema = z.object({
+  firstName: z.string().min(1).max(50),
+  lastName: z.string().min(1).max(50),
+  email: z.string().email(),
+  phone: z.string().min(1),
+  videoIntroUrl: z.string().url().optional().nullable(),
+  videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
+  englishProficiency: z
+    .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
+    .optional()
+    .nullable(),
+  currentSalaryPHP: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().min(0).nullable()
+  ),
+  currentSalaryUSD: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().min(0).nullable()
+  ),
+  reasonForLeaving: z.string().max(500).optional().nullable(),
+  cityOfResidence: z.string().max(100).optional().nullable(),
+});
+
+router.post(
+  '/public/upload-and-parse',
+  uploadResume,
+  validate(publicApplySchema, 'body'),
+  publicUploadAndParse
+);
+
+// ── AUTHENTICATED ROUTES ──
 
 router.use(authenticate);
 router.use(requireAppAccess('ats'));

@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
+import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
+import * as applicationService from '../applications/application.service';
+import * as candidateService from '../candidates/candidate.service';
 import * as jobService from './job.service';
 
 export const getAllJobs = catchAsync(async (req: Request, res: Response) => {
@@ -72,9 +75,11 @@ export const assignPipeline = catchAsync(
 );
 
 export const applyToJob = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id: jobId } = req.params;
   const body = req.body;
-  const job = await jobService.getJobById(id);
+
+  // Validate job exists and is open
+  const job = await jobService.getJobById(jobId);
   if (job.status !== 'open') {
     throw new AppError(
       400,
@@ -82,5 +87,65 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
       'This job is not accepting applications'
     );
   }
-  sendSuccess(res, { jobId: id, received: true }, 'Application received', 201);
+
+  let candidateId = body.candidateId;
+
+  // If candidateId is provided, update the existing candidate with reviewed data
+  if (candidateId) {
+    // Update candidate with reviewed parsedData if provided
+    if (body.parsedData) {
+      await candidateService.updateCandidate(
+        candidateId,
+        { parsedData: body.parsedData },
+        null // public apply, no auth user
+      );
+    }
+  } else {
+    // Create a new candidate from the form data (resume was already uploaded)
+    // This handles the case where the public flow sends data without a candidateId
+    const existing = await candidateService.getCandidateByEmail(body.email);
+    if (existing) {
+      candidateId = existing._id;
+    } else {
+      const candidate = await candidateService.createCandidate(
+        {
+          firstName: body.firstName,
+          lastName: body.lastName,
+          email: body.email,
+          phone: body.phone,
+          resumeUrl: body.resumeUrl,
+          resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
+          resumeRawText: body.resumeRawText || '',
+          videoIntroUrl: body.videoIntroUrl ?? null,
+          source: 'applied',
+        },
+        null
+      );
+      candidateId = candidate._id;
+    }
+  }
+
+  // Create the application
+  const application = await applicationService.createApplication({
+    candidateId,
+    jobId,
+    clientId: job.clientId,
+    source: 'direct_apply',
+  });
+
+  logger.info(
+    `Public application created: ${application._id} for job ${jobId}`
+  );
+
+  sendSuccess(
+    res,
+    {
+      applicationId: application._id,
+      candidateId,
+      jobId,
+      received: true,
+    },
+    'Application submitted successfully',
+    201
+  );
 });

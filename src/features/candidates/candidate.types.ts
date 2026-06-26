@@ -14,6 +14,7 @@ export interface ICandidateEducation {
 
 export interface ICandidateParsedData {
   summary: string;
+  yearsOfExperience: number;
   skills: string[];
   languages: string[];
   certifications: string[];

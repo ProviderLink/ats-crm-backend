@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
-import { runCandidateScoring, runResumeValidation } from '../../jobs';
+import {
+  runCandidateScoring,
+  runResumeParsing,
+  runResumeValidation,
+} from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
 import Candidate from '../candidates/candidate.model';
 import * as candidateService from '../candidates/candidate.service';
@@ -139,6 +143,11 @@ export const createApplication = async (
 
   if (input.source === 'direct_apply') {
     runResumeValidation(application._id.toString());
+  }
+
+  // Trigger resume parsing for any source if candidate has raw text but no structured data
+  if (candidate.resumeRawText && !candidate.parsedData) {
+    runResumeParsing(candidate._id.toString());
   }
 
   return application.toSafeObject();

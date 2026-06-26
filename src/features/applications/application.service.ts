@@ -209,37 +209,21 @@ export const approveApplication = async (
 export const rejectApplication = async (
   id: string,
   input: RejectApplicationInput
-): Promise<IApplication | { deleted: boolean; isFirstRejection: boolean }> => {
+): Promise<IApplication> => {
   const application = await Application.findById(id);
   if (!application) {
     throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
   }
 
-  const isFirstRejection = application.phase === 'pending';
-
-  if (isFirstRejection) {
-    await Application.deleteOne({ _id: application._id });
-    await candidateService.deleteCandidate(String(application.candidateId));
-    return { deleted: true, isFirstRejection: true };
-  }
-
+  // Simply mark this application as rejected — never delete the candidate.
+  // A candidate may have other active applications. Rejecting one job
+  // doesn't mean the candidate is garbage.
   application.phase = 'rejected';
   application.rejectedAt = new Date();
   application.rejectedBy = new mongoose.Types.ObjectId(input.rejectedBy);
   application.rejectionReason = input.rejectionReason ?? null;
   application.currentStage = null;
   await application.save();
-
-  const activeApps = await Application.countDocuments({
-    candidateId: application.candidateId,
-    phase: { $in: ['pending', 'approved'] },
-  });
-  if (activeApps === 0) {
-    const candidate = await Candidate.findById(application.candidateId);
-    if (candidate && !candidate.inTalentPool) {
-      await candidateService.deleteCandidate(String(application.candidateId));
-    }
-  }
 
   return application.toSafeObject();
 };
@@ -347,6 +331,27 @@ export const updateApplicationNotes = async (
   application.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await application.save();
 
+  return application.toSafeObject();
+};
+
+export const updateApplicationAiScore = async (
+  id: string,
+  aiScore: {
+    score: number;
+    recommendation: string;
+    summary: string;
+    strengths: string[];
+    concerns: string[];
+  }
+): Promise<IApplication> => {
+  const application = await Application.findById(id);
+  if (!application) {
+    throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
+  }
+
+  application.aiScore = aiScore;
+  application.markModified('aiScore');
+  await application.save();
   return application.toSafeObject();
 };
 

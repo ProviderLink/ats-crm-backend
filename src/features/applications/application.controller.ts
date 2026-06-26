@@ -48,20 +48,11 @@ export const rejectApplication = catchAsync(
     const { id } = req.params;
     const rejectedBy = req.user!._id;
     const { rejectionReason } = req.body;
-    const result = await applicationService.rejectApplication(id, {
+    const application = await applicationService.rejectApplication(id, {
       rejectedBy,
       rejectionReason,
     });
-    if ('deleted' in result && result.deleted) {
-      sendSuccess(
-        res,
-        { deleted: true, isFirstRejection: true },
-        'Application rejected and candidate removed',
-        200
-      );
-    } else {
-      sendSuccess(res, result, 'Application rejected', 200);
-    }
+    sendSuccess(res, application, 'Application rejected', 200);
   }
 );
 

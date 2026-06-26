@@ -56,6 +56,20 @@ const aiValidationSchema = new Schema(
   { _id: false }
 );
 
+const aiScoreSchema = new Schema(
+  {
+    score: { type: Number, min: 0, max: 100 },
+    recommendation: {
+      type: String,
+      enum: ['poor_fit', 'moderate_fit', 'good_fit', 'strong_fit'],
+    },
+    summary: { type: String },
+    strengths: { type: [String] },
+    concerns: { type: [String] },
+  },
+  { _id: false }
+);
+
 const applicationSchema = new Schema(
   {
     candidateId: {
@@ -81,6 +95,7 @@ const applicationSchema = new Schema(
     },
 
     aiValidation: { type: aiValidationSchema, default: null },
+    aiScore: { type: aiScoreSchema, default: null },
 
     approvedAt: { type: Date, default: null },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },

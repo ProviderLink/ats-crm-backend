@@ -22,6 +22,13 @@ export interface ICandidateParsedData {
   education: ICandidateEducation[];
 }
 
+export interface ICandidateAiValidation {
+  isValid: boolean;
+  score: number;
+  reason: string;
+  completedAt: Date;
+}
+
 export interface ICandidateAiScore {
   score: number;
   recommendation: string;
@@ -52,7 +59,9 @@ export interface ICandidate {
   videoIntroUrl: string | null;
   videoIntroSource: string | null;
   parsedData: ICandidateParsedData | null;
+  aiValidation: ICandidateAiValidation | null;
   aiScore: ICandidateAiScore | null;
+  appliedJobId: string | null;
   yearsOfExperience: number;
   englishProficiency:
     | 'basic'
@@ -114,6 +123,7 @@ export interface UpdateCandidateInput {
   yearsOfExperience?: number;
   tags?: string[];
   parsedData?: ICandidateParsedData | null;
+  appliedJobId?: string | null;
   englishProficiency?:
     | 'basic'
     | 'conversational'

@@ -1,6 +1,8 @@
 import { createLog } from '../features/activity-logs/activityLog.service';
+import Application from '../features/applications/application.model';
+import * as applicationService from '../features/applications/application.service';
 import Candidate from '../features/candidates/candidate.model';
-import { updateAiScore } from '../features/candidates/candidate.service';
+import * as candidateService from '../features/candidates/candidate.service';
 import Job from '../features/jobs/job.model';
 import { getSettings } from '../features/settings/settings.service';
 import {
@@ -10,6 +12,14 @@ import {
 } from '../shared/utils/ai';
 import logger from '../shared/utils/logger';
 
+/**
+ * TYPE 2 — Candidate Scoring (competency against a specific job)
+ *
+ * Runs when an Application is created (candidate approved).
+ * Evaluates the candidate's competency for this specific job.
+ * Primary result: Application.aiScore
+ * Convenience copy: Candidate.aiScore (shows latest score in list views)
+ */
 export async function runCandidateScoring(
   candidateId: string,
   jobId: string
@@ -18,7 +28,23 @@ export async function runCandidateScoring(
   const job = await Job.findById(jobId);
   if (!candidate || !job) return;
 
-  if (candidate.aiScore !== null) return;
+  // Find the Application that links this candidate to this job
+  const application = await Application.findOne({ candidateId, jobId });
+  if (!application) {
+    logger.debug('No application found for candidate scoring', {
+      candidateId,
+      jobId,
+    });
+    return;
+  }
+
+  // Idempotent: skip if application already has aiScore
+  if (application.aiScore !== null && application.aiScore !== undefined) {
+    logger.debug('Application already has aiScore, skipping', {
+      applicationId: application._id,
+    });
+    return;
+  }
 
   const settings = await getSettings();
   if (!settings.ai.candidateScoring) return;
@@ -61,17 +87,27 @@ Respond with exactly this JSON structure:
     }>(text);
 
     if (result) {
-      await updateAiScore(candidateId, {
+      const scoreData = {
         score: result.score,
         recommendation: result.recommendation,
         summary: result.summary,
         strengths: result.strengths,
         concerns: result.concerns,
-      });
+      };
+
+      // Write to Application.aiScore (primary)
+      await applicationService.updateApplicationAiScore(
+        application._id.toString(),
+        scoreData
+      );
+
+      // Also write to Candidate.aiScore (convenience copy for list views)
+      await candidateService.updateAiScore(candidateId, scoreData);
+
       await createLog({
         type: 'ai_candidate_scoring_completed',
-        resourceType: 'candidate',
-        resourceId: candidateId,
+        resourceType: 'application',
+        resourceId: application._id.toString(),
         relatedType: 'job',
         relatedId: jobId,
         metadata: {
@@ -83,6 +119,7 @@ Respond with exactly this JSON structure:
       logger.info('AI candidate scoring completed', {
         candidateId,
         jobId,
+        applicationId: application._id,
         score: result.score,
         recommendation: result.recommendation,
         provider: provider.name,

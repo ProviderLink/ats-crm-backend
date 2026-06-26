@@ -3,11 +3,15 @@ import type { ICandidate } from './candidate.types';
 
 export interface ICandidateDocument
   extends
-    Omit<ICandidate, '_id' | 'createdBy' | 'updatedBy' | 'tags'>,
+    Omit<
+      ICandidate,
+      '_id' | 'createdBy' | 'updatedBy' | 'tags' | 'appliedJobId'
+    >,
     Document {
   tags: mongoose.Types.ObjectId[];
   createdBy: mongoose.Types.ObjectId | null;
   updatedBy: mongoose.Types.ObjectId | null;
+  appliedJobId: mongoose.Types.ObjectId | null;
   toSafeObject(): ICandidate;
 }
 
@@ -39,6 +43,16 @@ const parsedDataSchema = new Schema(
     certifications: { type: [String], default: [] },
     experience: { type: [experienceSchema], default: [] },
     education: { type: [educationSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const aiValidationSchema = new Schema(
+  {
+    isValid: { type: Boolean },
+    score: { type: Number, min: 0, max: 100 },
+    reason: { type: String },
+    completedAt: { type: Date },
   },
   { _id: false }
 );
@@ -99,7 +113,9 @@ const candidateSchema = new Schema(
     },
 
     parsedData: { type: parsedDataSchema, default: null },
+    aiValidation: { type: aiValidationSchema, default: null },
     aiScore: { type: aiScoreSchema, default: null },
+    appliedJobId: { type: Schema.Types.ObjectId, default: null },
 
     yearsOfExperience: { type: Number, default: 0 },
     englishProficiency: {

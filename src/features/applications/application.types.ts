@@ -12,6 +12,14 @@ export interface IApplicationAiValidation {
   completedAt: Date;
 }
 
+export interface IApplicationAiScore {
+  score: number;
+  recommendation: string;
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+}
+
 export interface IApplication {
   _id: string;
   candidateId: string;
@@ -21,6 +29,7 @@ export interface IApplication {
   currentStage: IApplicationCurrentStage | null;
   source: string;
   aiValidation: IApplicationAiValidation | null;
+  aiScore: IApplicationAiScore | null;
   approvedAt: Date | null;
   approvedBy: string | null;
   rejectedAt: Date | null;

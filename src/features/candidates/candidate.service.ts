@@ -7,6 +7,7 @@ import type {
   CreateCandidateInput,
   ICandidate,
   ICandidateAiScore,
+  ICandidateAiValidation,
   ICandidateParsedData,
   UpdateCandidateInput,
 } from './candidate.types';
@@ -160,6 +161,11 @@ export const updateCandidate = async (
     candidate.parsedData = input.parsedData;
     candidate.markModified('parsedData');
   }
+  if (input.appliedJobId !== undefined) {
+    candidate.appliedJobId = input.appliedJobId
+      ? new mongoose.Types.ObjectId(input.appliedJobId)
+      : null;
+  }
 
   candidate.updatedBy = updatedBy
     ? (new mongoose.Types.ObjectId(
@@ -261,6 +267,20 @@ export const updateAiScore = async (
 
   candidate.aiScore = aiScore;
   candidate.markModified('aiScore');
+  await candidate.save();
+  return candidate.toSafeObject();
+};
+
+export const updateAiValidation = async (
+  id: string,
+  aiValidation: ICandidateAiValidation
+): Promise<ICandidate> => {
+  const candidate = await Candidate.findById(id);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  candidate.aiValidation = aiValidation;
+  candidate.markModified('aiValidation');
   await candidate.save();
   return candidate.toSafeObject();
 };

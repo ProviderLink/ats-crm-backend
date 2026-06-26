@@ -8,12 +8,14 @@ import {
 import { uploadAvatar, uploadResume } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import {
+  approveCandidate,
   assignJob,
   createCandidate,
   deleteCandidate,
   getAllCandidates,
   getCandidateById,
   publicUploadAndParse,
+  rejectCandidate,
   updateCandidate,
   updateTalentPool,
   uploadAvatar as uploadAvatarController,
@@ -98,7 +100,7 @@ const talentPoolSchema = z.object({
 });
 
 const assignJobSchema = z.object({
-  jobId: z.string(),
+  jobId: z.string().optional(),
 });
 
 const router = Router();
@@ -153,6 +155,20 @@ router.post(
   uploadResume,
   validate(createCandidateSchema, 'body'),
   createCandidate
+);
+
+// Specific routes must be registered before /:id to avoid param capture
+router.post(
+  '/:id/approve',
+  requirePermission('candidates', 'write'),
+  validate(assignJobSchema),
+  approveCandidate
+);
+
+router.post(
+  '/:id/reject',
+  requirePermission('candidates', 'write'),
+  rejectCandidate
 );
 
 router.get('/:id', requirePermission('candidates', 'read'), getCandidateById);

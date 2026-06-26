@@ -3,7 +3,7 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from '../../config/cloudinary';
-import { runResumeParsing } from '../../jobs';
+import { runCandidateScoring, runResumeParsing } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { extractResumeText } from '../../shared/utils/extract-resume-text';
@@ -170,7 +170,8 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
     throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
   }
 
-  // Create application
+  // Create Application — the link between candidate and job.
+  // Phase: 'pending' means approved but not yet placed in a pipeline stage.
   const application = await applicationService.createApplication({
     candidateId: id,
     jobId,
@@ -179,6 +180,9 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
     createdBy: updatedBy,
   });
 
+  // Trigger AI candidate scoring against this job (background)
+  runCandidateScoring(id, jobId);
+
   sendSuccess(
     res,
     { candidateId: id, jobId, applicationId: application._id, assigned: true },
@@ -186,6 +190,112 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
     201
   );
 });
+
+export const approveCandidate = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const bodyJobId: string | undefined = req.body.jobId;
+    const updatedBy = req.user!._id;
+
+    // Verify candidate exists
+    const candidate = await candidateService.getCandidateById(id);
+    if (!candidate) {
+      throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+    }
+
+    // Only pending candidates can be approved
+    if (candidate.status !== 'pending') {
+      throw new AppError(
+        400,
+        'CANDIDATE_ALREADY_REVIEWED',
+        'This candidate has already been reviewed'
+      );
+    }
+
+    // Determine jobId — prefer body param, fall back to the candidate's appliedJobId
+    // (set when candidate applied via public job page)
+    const jobId = bodyJobId || candidate.appliedJobId;
+    if (!jobId) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'No job specified — this candidate did not apply via a job posting'
+      );
+    }
+
+    // Get job to determine clientId
+    const job = await getJobById(jobId);
+    if (!job) {
+      throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+    }
+
+    // Change candidate status to approved
+    await candidateService.updateCandidateStatus(id, 'approved');
+
+    // Create Application — the link between candidate and job.
+    // Phase: 'pending' means approved but not yet placed in a pipeline stage.
+    const application = await applicationService.createApplication({
+      candidateId: id,
+      jobId,
+      clientId: job.clientId,
+      source: 'direct_apply',
+      createdBy: updatedBy,
+    });
+
+    // Trigger TYPE-2 AI candidate scoring against this job (background)
+    runCandidateScoring(id, jobId);
+
+    logger.info(
+      `Candidate ${id} approved for job ${jobId}, application: ${application._id}`
+    );
+
+    sendSuccess(
+      res,
+      {
+        candidateId: id,
+        jobId,
+        applicationId: application._id,
+        approved: true,
+      },
+      'Candidate approved',
+      200
+    );
+  }
+);
+
+export const rejectCandidate = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    // Verify candidate exists
+    const candidate = await candidateService.getCandidateById(id);
+    if (!candidate) {
+      throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+    }
+
+    // Only pending (not-yet-reviewed) candidates can be rejected.
+    // Once approved, rejections happen per-application via /applications/:id/reject.
+    if (candidate.status !== 'pending') {
+      throw new AppError(
+        400,
+        'CANDIDATE_ALREADY_REVIEWED',
+        'Use the application reject endpoint for candidates that have been approved'
+      );
+    }
+
+    // Permanently delete the candidate and all data (per BUSINESS_LOGIC.md)
+    await candidateService.deleteCandidate(id);
+
+    logger.info(`Pending candidate ${id} permanently rejected and deleted`);
+
+    sendSuccess(
+      res,
+      { deleted: true },
+      'Candidate rejected and permanently deleted',
+      200
+    );
+  }
+);
 
 export const publicUploadAndParse = catchAsync(
   async (req: Request, res: Response) => {

@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
+import { runCandidacyValidation } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
-import * as applicationService from '../applications/application.service';
 import * as candidateService from '../candidates/candidate.service';
 import * as jobService from './job.service';
 
@@ -92,7 +92,6 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
 
   // If candidateId is provided, update the existing candidate with reviewed data
   if (candidateId) {
-    // Update candidate with reviewed parsedData if provided
     if (body.parsedData) {
       await candidateService.updateCandidate(
         candidateId,
@@ -101,51 +100,47 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
       );
     }
   } else {
-    // Create a new candidate from the form data (resume was already uploaded)
-    // This handles the case where the public flow sends data without a candidateId
-    const existing = await candidateService.getCandidateByEmail(body.email);
-    if (existing) {
-      candidateId = existing._id;
-    } else {
-      const candidate = await candidateService.createCandidate(
-        {
-          firstName: body.firstName,
-          lastName: body.lastName,
-          email: body.email,
-          phone: body.phone,
-          resumeUrl: body.resumeUrl,
-          resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
-          resumeRawText: body.resumeRawText || '',
-          videoIntroUrl: body.videoIntroUrl ?? null,
-          source: 'applied',
-        },
-        null
-      );
-      candidateId = candidate._id;
-    }
+    // Fallback: create a candidate if not already created via publicUploadAndParse
+    const candidate = await candidateService.createCandidate(
+      {
+        firstName: body.firstName,
+        lastName: body.lastName,
+        email: body.email,
+        phone: body.phone,
+        resumeUrl: body.resumeUrl,
+        resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
+        resumeRawText: body.resumeRawText || '',
+        videoIntroUrl: body.videoIntroUrl ?? null,
+        source: 'applied',
+      },
+      null
+    );
+    candidateId = candidate._id;
   }
 
-  // Create the application
-  const application = await applicationService.createApplication({
+  // Store the job they applied to on the candidate — used later when
+  // the recruiter approves (no need to pick a job).
+  await candidateService.updateCandidate(
     candidateId,
-    jobId,
-    clientId: job.clientId,
-    source: 'direct_apply',
-  });
+    { appliedJobId: jobId } as any,
+    null
+  );
+
+  // Trigger TYPE-1 candidacy validation (real / fake / garbage check)
+  runCandidacyValidation(candidateId);
+
+  // No Application is created here — applications are created only when
+  // a recruiter approves the candidate (see candidate.controller.ts approveCandidate).
+  // The candidate stays as status: "pending" until reviewed.
 
   logger.info(
-    `Public application created: ${application._id} for job ${jobId}`
+    `Application received for job ${jobId}, candidate: ${candidateId}`
   );
 
   sendSuccess(
     res,
-    {
-      applicationId: application._id,
-      candidateId,
-      jobId,
-      received: true,
-    },
-    'Application submitted successfully',
+    { candidateId, jobId, received: true },
+    'Application received',
     201
   );
 });

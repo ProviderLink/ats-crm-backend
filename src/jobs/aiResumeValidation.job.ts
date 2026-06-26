@@ -8,7 +8,7 @@ import {
   getAiProvider,
   parseJsonResponse,
   withRetry,
-} from '../shared/utils/ai';
+} from '../shared/utils/ai/index';
 import logger from '../shared/utils/logger';
 
 export async function runResumeValidation(

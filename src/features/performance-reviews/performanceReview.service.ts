@@ -1,5 +1,5 @@
 import { AppError } from '../../shared/utils/AppError';
-import { callClaude, parseJsonResponse } from '../../shared/utils/ai';
+import { callClaude, parseJsonResponse } from '../../shared/utils/ai/index';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';

@@ -1,39 +1,40 @@
-import cron from 'node-cron'
-import { sendEmail } from '../shared/utils/email'
-import { createLog } from '../features/activity-logs/activityLog.service'
-import { createEodReminder } from '../features/eod-reminders/eodReminder.service'
-import Settings from '../features/settings/settings.model'
-import Assignment from '../features/assignments/assignment.model'
-import EodSubmission from '../features/eod-submissions/eodSubmission.model'
-import Candidate from '../features/candidates/candidate.model'
+import cron from 'node-cron';
+import { createLog } from '../features/activity-logs/activityLog.service';
+import Assignment from '../features/assignments/assignment.model';
+import Candidate from '../features/candidates/candidate.model';
+import { createEodReminder } from '../features/eod-reminders/eodReminder.service';
+import EodSubmission from '../features/eod-submissions/eodSubmission.model';
+import Settings from '../features/settings/settings.model';
+import { sendEmail } from '../shared/utils/email';
+import logger from '../shared/utils/logger';
 
 async function runEodComplianceCheck(): Promise<void> {
   try {
-    const settings = await Settings.getSettings()
-    console.log(`Running EOD compliance check`)
+    const settings = await Settings.getSettings();
+    logger.info('Running EOD compliance check');
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const assignments = await Assignment.find({ status: 'active' })
+    const assignments = await Assignment.find({ status: 'active' });
 
     for (const assignment of assignments) {
       const eodExists = await EodSubmission.findOne({
         assignmentId: assignment._id,
         date: { $gte: today, $lt: tomorrow },
-      })
+      });
 
-      if (eodExists) continue
+      if (eodExists) continue;
 
-      const candidate = await Candidate.findById(assignment.candidateId)
-      if (!candidate) continue
+      const candidate = await Candidate.findById(assignment.candidateId);
+      if (!candidate) continue;
 
-      const vaEmail = candidate.email
-      const vaName = `${candidate.firstName} ${candidate.lastName}`
+      const vaEmail = candidate.email;
+      const vaName = `${candidate.firstName} ${candidate.lastName}`;
 
-      let status: 'sent' | 'failed' = 'sent'
+      let status: 'sent' | 'failed' = 'sent';
       try {
         await sendEmail({
           to: [vaEmail],
@@ -44,9 +45,9 @@ async function runEodComplianceCheck(): Promise<void> {
             <p>Please log in and submit your EOD summary as soon as possible.</p>
           `,
           text: `Hi ${vaName}, please submit your EOD report.`,
-        })
+        });
       } catch {
-        status = 'failed'
+        status = 'failed';
       }
 
       await createEodReminder({
@@ -55,7 +56,7 @@ async function runEodComplianceCheck(): Promise<void> {
         reminderDate: new Date(),
         reminderType: 'missing_eod',
         status,
-      })
+      });
 
       createLog({
         type: 'eod_reminder_sent',
@@ -63,17 +64,17 @@ async function runEodComplianceCheck(): Promise<void> {
         resourceId: assignment._id.toString(),
         relatedType: 'candidate',
         relatedId: assignment.candidateId.toString(),
-      })
+      });
     }
 
-    console.log('EOD compliance check completed')
+    logger.info('EOD compliance check completed');
   } catch (error) {
-    console.error('EOD compliance check failed:', error)
+    logger.error('EOD compliance check failed', { error });
   }
 }
 
 export function scheduleEodComplianceJob(): void {
   cron.schedule('0 17 * * *', async () => {
-    await runEodComplianceCheck()
-  })
+    await runEodComplianceCheck();
+  });
 }

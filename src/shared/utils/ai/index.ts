@@ -56,3 +56,15 @@ export async function withRetry<T>(
 
 export { parseJsonResponse } from './parse-json';
 export type { AiJobResult, AiProviderName, IAiProvider } from './types';
+
+/**
+ * Convenience: call Claude directly (bypasses the configured provider).
+ * @deprecated Prefer `getAiProvider().generate(prompt, maxTokens)` for new code.
+ */
+export const callClaude = async (
+  prompt: string,
+  maxTokens = 1024
+): Promise<string> => {
+  const provider = new ClaudeProvider();
+  return provider.generate(prompt, maxTokens);
+};

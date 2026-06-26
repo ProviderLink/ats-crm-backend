@@ -1,4 +1,4 @@
-import { clearAiProviderCache } from '../../shared/utils/ai';
+import { clearAiProviderCache } from '../../shared/utils/ai/index';
 import Settings from './settings.model';
 import type { ISettings, UpdateSettingsInput } from './settings.types';
 

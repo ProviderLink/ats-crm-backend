@@ -70,3 +70,13 @@ export const changePassword = catchAsync(
     sendSuccess(res, { success: true }, 'Password changed successfully', 200);
   }
 );
+
+export const verifyEmail = catchAsync(async (req: Request, res: Response) => {
+  await authService.verifyEmail(req.body.token);
+  sendSuccess(res, {}, 'Email verified successfully', 200);
+});
+
+export const setPassword = catchAsync(async (req: Request, res: Response) => {
+  await authService.setPassword(req.body.token, req.body.password);
+  sendSuccess(res, {}, 'Password set successfully', 200);
+});

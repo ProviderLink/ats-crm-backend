@@ -33,6 +33,8 @@ export const login = async (input: LoginInput) => {
 
   const payload: AuthTokenPayload = {
     _id: String(user._id),
+    firstName: user.firstName,
+    lastName: user.lastName,
     roles: user.roles,
     appAccess: user.appAccess,
     permissions: user.permissions as unknown as Record<
@@ -108,6 +110,8 @@ export const refreshToken = async (
 
   const payload: AuthTokenPayload = {
     _id: String(user._id),
+    firstName: user.firstName,
+    lastName: user.lastName,
     roles: user.roles,
     appAccess: user.appAccess,
     permissions: user.permissions as unknown as Record<
@@ -203,9 +207,18 @@ export const forgotPassword = async (email: string) => {
 };
 
 export const resetPassword = async (token: string, password: string) => {
+  // Accept both passwordResetToken (forgot password flow) and inviteToken (invitation flow)
   const user = await User.findOne({
-    passwordResetToken: token,
-    passwordResetExpires: { $gt: new Date() },
+    $or: [
+      {
+        passwordResetToken: token,
+        passwordResetExpires: { $gt: new Date() },
+      },
+      {
+        inviteToken: token,
+        inviteTokenExpires: { $gt: new Date() },
+      },
+    ],
   });
   if (!user) {
     throw new AppError(
@@ -218,6 +231,11 @@ export const resetPassword = async (token: string, password: string) => {
   user.passwordHash = await bcrypt.hash(password, 12);
   user.passwordResetToken = null;
   user.passwordResetExpires = null;
+  user.inviteToken = null;
+  user.inviteTokenExpires = null;
+  user.emailVerified = true;
+  user.isInviteAccepted = true;
+  user.isActive = true;
   user.refreshTokenAts = null;
   user.refreshTokenCrm = null;
   await user.save();
@@ -245,5 +263,47 @@ export const changePassword = async (
   user.passwordHash = await bcrypt.hash(newPassword, 12);
   user.refreshTokenAts = null;
   user.refreshTokenCrm = null;
+  await user.save();
+};
+
+export const verifyEmail = async (token: string) => {
+  const user = await User.findOne({
+    inviteToken: token,
+    inviteTokenExpires: { $gt: new Date() },
+  });
+  if (!user) {
+    throw new AppError(
+      400,
+      'AUTH_TOKEN_INVALID',
+      'Verification link is invalid or has expired'
+    );
+  }
+
+  // Mark email as verified and invitation as accepted, but do NOT consume
+  // the inviteToken — it's still needed for the subsequent set-password call.
+  user.emailVerified = true;
+  user.isInviteAccepted = true;
+  await user.save();
+};
+
+export const setPassword = async (token: string, password: string) => {
+  const user = await User.findOne({
+    inviteToken: token,
+    inviteTokenExpires: { $gt: new Date() },
+  });
+  if (!user) {
+    throw new AppError(
+      400,
+      'AUTH_TOKEN_INVALID',
+      'Invite link is invalid or has expired'
+    );
+  }
+
+  user.passwordHash = await bcrypt.hash(password, 12);
+  user.emailVerified = true;
+  user.isInviteAccepted = true;
+  user.isActive = true;
+  user.inviteToken = null;
+  user.inviteTokenExpires = null;
   await user.save();
 };

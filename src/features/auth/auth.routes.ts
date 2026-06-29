@@ -26,6 +26,15 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(8),
 });
 
+const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+});
+
+const setPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+
 router.post('/login', validate(loginSchema), authController.login);
 router.post('/logout', authenticate, authController.logout);
 router.post('/refresh-token', authController.refreshToken);
@@ -44,6 +53,16 @@ router.post(
   authenticate,
   validate(changePasswordSchema),
   authController.changePassword
+);
+router.post(
+  '/verify-email',
+  validate(verifyEmailSchema),
+  authController.verifyEmail
+);
+router.post(
+  '/set-password',
+  validate(setPasswordSchema),
+  authController.setPassword
 );
 
 export default router;

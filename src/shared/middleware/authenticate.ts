@@ -26,6 +26,8 @@ const authenticate = catchAsync(
 
     req.user = {
       _id: decoded._id as string,
+      firstName: (decoded.firstName as string) ?? '',
+      lastName: (decoded.lastName as string) ?? '',
       roles: decoded.roles as string[],
       appAccess: decoded.appAccess as string[],
       permissions: decoded.permissions,

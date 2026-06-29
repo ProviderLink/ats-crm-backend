@@ -298,7 +298,7 @@ export const sendTeamMemberInvite = async (params: {
 }): Promise<void> => {
   const { email, firstName, inviteToken, invitedByName } = params;
 
-  const inviteUrl = `${env.ATS_FRONTEND_URL}/verify-email/${inviteToken}`;
+  const inviteUrl = `${env.ATS_FRONTEND_URL}/ats/verify-email/${inviteToken}`;
   const companyName = env.COMPANY_NAME;
   const invitedBy = invitedByName || 'Administrator';
 

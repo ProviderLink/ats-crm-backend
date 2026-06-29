@@ -6,6 +6,8 @@ export interface LoginInput {
 
 export interface AuthTokenPayload {
   _id: string;
+  firstName: string;
+  lastName: string;
   roles: string[];
   appAccess: string[];
   permissions: Record<string, Record<string, boolean>>;

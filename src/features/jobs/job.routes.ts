@@ -72,6 +72,7 @@ const updateStatusSchema = z.object({
 
 const assignPipelineSchema = z.object({
   templateId: z.string(),
+  stageMapping: z.record(z.string(), z.string()).optional(),
 });
 
 const applyToJobSchema = z.object({

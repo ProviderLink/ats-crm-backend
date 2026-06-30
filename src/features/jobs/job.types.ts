@@ -88,4 +88,5 @@ export interface UpdateJobInput {
 
 export interface AssignPipelineInput {
   templateId: string;
+  stageMapping?: Record<string, string>;
 }

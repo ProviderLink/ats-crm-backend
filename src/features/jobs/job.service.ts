@@ -207,6 +207,63 @@ export const assignPipeline = async (
     icon: stage.icon ?? 'ClipboardList',
   }));
 
+  // --- Remap applications to new stages ---
+  const applications = await Application.find({ jobId });
+
+  if (applications.length > 0) {
+    // Build lookup: new stage name (lowercased) → new stage
+    const newStageByName = new Map<string, (typeof copiedStages)[number]>();
+    for (const stage of copiedStages) {
+      newStageByName.set(stage.name.toLowerCase(), stage);
+    }
+
+    // First stage (lowest order) as fallback
+    const firstStage = copiedStages.reduce((min, s) =>
+      s.order < min.order ? s : min
+    );
+
+    // Resolve the target new stage name for a given old stage name
+    const resolveNewStageName = (oldStageName: string): string | undefined => {
+      if (input.stageMapping) {
+        // Use explicit mapping: oldStageName → newStageName
+        return input.stageMapping[oldStageName];
+      }
+      // Auto name-match: keep the same name
+      return oldStageName;
+    };
+
+    const bulkOps = applications.map(app => {
+      const oldStageName = app.currentStage?.stageName;
+      let targetStage: (typeof copiedStages)[number] | undefined;
+
+      if (oldStageName) {
+        const newStageName = resolveNewStageName(oldStageName);
+        if (newStageName) {
+          targetStage = newStageByName.get(newStageName.toLowerCase());
+        }
+      }
+
+      // Fallback to first stage if no match found
+      const resolvedStage = targetStage ?? firstStage;
+
+      return {
+        updateOne: {
+          filter: { _id: app._id },
+          update: {
+            $set: {
+              'currentStage.stageId': resolvedStage._id,
+              'currentStage.stageName': resolvedStage.name,
+              'currentStage.assignedAt': new Date(),
+              'currentStage.assignedBy': new mongoose.Types.ObjectId(updatedBy),
+            },
+          },
+        },
+      };
+    });
+
+    await Application.bulkWrite(bulkOps);
+  }
+
   job.pipeline = {
     templateId: template._id as mongoose.Types.ObjectId,
     stages: copiedStages,

@@ -9,7 +9,10 @@ export type ActivityLogResourceType =
   | 'assignment'
   | 'eod'
   | 'performance_review'
-  | 'survey';
+  | 'survey'
+  | 'tag'
+  | 'work_entry'
+  | 'settings';
 
 export interface IActivityLog {
   _id: string;

@@ -1,4 +1,5 @@
 import { clearAiProviderCache } from '../../shared/utils/ai/index';
+import { createLog } from '../activity-logs/activityLog.service';
 import Settings from './settings.model';
 import type { ISettings, UpdateSettingsInput } from './settings.types';
 
@@ -44,5 +45,12 @@ export const updateSettings = async (
   }
 
   await settings.save();
+
+  createLog({
+    type: 'settings_updated',
+    resourceType: 'settings',
+    resourceId: settings._id.toString(),
+  });
+
   return settings.toSafeObject();
 };

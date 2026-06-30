@@ -5,6 +5,7 @@ import {
   sendEmail as sendEmailUtil,
   substituteVariables,
 } from '../../shared/utils/email';
+import { createLog } from '../activity-logs/activityLog.service';
 import Email from './email.model';
 import type { IEmail, SendEmailInput } from './email.types';
 
@@ -105,6 +106,14 @@ export const sendEmail = async (input: SendEmailInput): Promise<IEmail> => {
     await email.save();
   }
 
+  createLog({
+    type: 'email_sent',
+    resourceType: 'email',
+    resourceId: email._id.toString(),
+    metadata: { status: email.status },
+    performedBy: input.sentBy ?? null,
+  });
+
   return email.toSafeObject();
 };
 
@@ -115,12 +124,25 @@ export const markEmailAsRead = async (id: string): Promise<IEmail> => {
     { new: true }
   );
   if (!email) throw new AppError(404, 'EMAIL_NOT_FOUND', 'Email not found');
+
+  createLog({
+    type: 'email_read',
+    resourceType: 'email',
+    resourceId: id,
+  });
+
   return email.toSafeObject();
 };
 
 export const deleteEmail = async (id: string): Promise<void> => {
   const email = await Email.findByIdAndDelete(id);
   if (!email) throw new AppError(404, 'EMAIL_NOT_FOUND', 'Email not found');
+
+  createLog({
+    type: 'email_deleted',
+    resourceType: 'email',
+    resourceId: id,
+  });
 };
 
 export const resendEmail = async (id: string): Promise<IEmail> => {
@@ -157,6 +179,13 @@ export const resendEmail = async (id: string): Promise<IEmail> => {
       error instanceof Error ? error.message : 'Unknown error';
     await email.save();
   }
+
+  createLog({
+    type: 'email_resent',
+    resourceType: 'email',
+    resourceId: id,
+    metadata: { status: email.status },
+  });
 
   return email.toSafeObject();
 };

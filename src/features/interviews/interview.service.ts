@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { createZoomMeeting, deleteZoomMeeting } from '../../shared/utils/zoom';
+import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Interview from './interview.model';
 import type {
@@ -134,6 +135,16 @@ export const createInterview = async (
     meetingDetails,
   });
 
+  createLog({
+    type: 'interview_scheduled',
+    resourceType: 'interview',
+    resourceId: interview._id.toString(),
+    relatedType: 'candidate',
+    relatedId: input.candidateId,
+    metadata: { type: input.type, round: input.round },
+    performedBy: input.organizerId,
+  });
+
   return interview.toSafeObject();
 };
 
@@ -175,6 +186,13 @@ export const updateInterview = async (
   }
 
   await interview.save();
+
+  createLog({
+    type: 'interview_updated',
+    resourceType: 'interview',
+    resourceId: id,
+  });
+
   return interview.toSafeObject();
 };
 
@@ -198,6 +216,13 @@ export const cancelInterview = async (id: string): Promise<IInterview> => {
   }
 
   await interview.save();
+
+  createLog({
+    type: 'interview_cancelled',
+    resourceType: 'interview',
+    resourceId: id,
+  });
+
   return interview.toSafeObject();
 };
 
@@ -239,5 +264,14 @@ export const submitFeedback = async (
   } as unknown as (typeof interview.feedbacks)[0]);
 
   await interview.save();
+
+  createLog({
+    type: 'interview_feedback_submitted',
+    resourceType: 'interview',
+    resourceId: id,
+    metadata: { rating: input.rating, recommendation: input.recommendation },
+    performedBy: input.interviewerId,
+  });
+
   return interview.toSafeObject();
 };

@@ -5,6 +5,7 @@ import { env } from '../../config/env';
 import { AppError } from '../../shared/utils/AppError';
 import { sendEmail } from '../../shared/utils/email';
 import logger from '../../shared/utils/logger';
+import { createLog } from '../activity-logs/activityLog.service';
 import User from './user.model';
 import type {
   AppAccess,
@@ -217,6 +218,14 @@ export const createUser = async (
     createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
   });
 
+  createLog({
+    type: 'user_created',
+    resourceType: 'user',
+    resourceId: user._id.toString(),
+    metadata: { roles: input.roles },
+    performedBy: createdBy ?? null,
+  });
+
   return { user: user.toSafeObject(), inviteToken };
 };
 
@@ -349,6 +358,13 @@ export const updateUser = async (
   if (input.isActive !== undefined) user.isActive = input.isActive;
 
   await user.save();
+
+  createLog({
+    type: 'user_updated',
+    resourceType: 'user',
+    resourceId: id,
+  });
+
   return user.toSafeObject();
 };
 
@@ -374,6 +390,13 @@ export const updatePermissions = async (
   user.permissions = merged as unknown as UserPermissions;
   user.markModified('permissions');
   await user.save();
+
+  createLog({
+    type: 'user_permissions_updated',
+    resourceType: 'user',
+    resourceId: id,
+  });
+
   return user.toSafeObject();
 };
 
@@ -383,6 +406,13 @@ export const deactivateUser = async (id: string): Promise<SafeUser> => {
 
   const safeUser = user.toSafeObject();
   await User.findByIdAndDelete(id);
+
+  createLog({
+    type: 'user_deactivated',
+    resourceType: 'user',
+    resourceId: id,
+  });
+
   return safeUser;
 };
 
@@ -435,6 +465,14 @@ export const provisionVA = async (
     createdBy: null,
   });
 
+  createLog({
+    type: 'user_provisioned_va',
+    resourceType: 'user',
+    resourceId: user._id.toString(),
+    relatedType: 'candidate',
+    relatedId: candidateId,
+  });
+
   return { user: user.toSafeObject(), inviteToken };
 };
 
@@ -470,6 +508,14 @@ export const provisionClient = async (
     inviteTokenExpires,
     clientRef: new mongoose.Types.ObjectId(clientId),
     createdBy: null,
+  });
+
+  createLog({
+    type: 'user_provisioned_client',
+    resourceType: 'user',
+    resourceId: user._id.toString(),
+    relatedType: 'client',
+    relatedId: clientId,
   });
 
   return { user: user.toSafeObject(), inviteToken };

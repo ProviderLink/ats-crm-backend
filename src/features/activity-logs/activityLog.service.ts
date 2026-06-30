@@ -1,3 +1,4 @@
+import logger from '../../shared/utils/logger';
 import ActivityLog from './activityLog.model';
 import type { CreateActivityLogInput, IActivityLog } from './activityLog.types';
 
@@ -15,7 +16,12 @@ export const createLog = async (
       performedBy: input.performedBy ?? null,
     });
   } catch (error) {
-    console.error('Activity log failed:', error);
+    logger.error('Activity log creation failed', {
+      type: input.type,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+      error,
+    });
   }
 };
 

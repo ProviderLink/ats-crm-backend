@@ -1,4 +1,5 @@
 import AppError from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import Tag from './tag.model';
 import type { CreateTagInput, ITag, UpdateTagInput } from './tag.types';
 
@@ -23,6 +24,14 @@ export const createTag = async (
   }
   const tag = new Tag({ ...input, createdBy });
   await tag.save();
+
+  createLog({
+    type: 'tag_created',
+    resourceType: 'tag',
+    resourceId: tag._id.toString(),
+    performedBy: createdBy,
+  });
+
   return tag.toSafeObject();
 };
 
@@ -50,6 +59,13 @@ export const updateTag = async (
   if (input.name !== undefined) tag.name = input.name;
   if (input.color !== undefined) tag.color = input.color;
   await tag.save();
+
+  createLog({
+    type: 'tag_updated',
+    resourceType: 'tag',
+    resourceId: id,
+  });
+
   return tag.toSafeObject();
 };
 
@@ -59,5 +75,12 @@ export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
     throw new AppError(404, 'TAG_NOT_FOUND', 'Tag not found');
   }
   await tag.deleteOne();
+
+  createLog({
+    type: 'tag_deleted',
+    resourceType: 'tag',
+    resourceId: id,
+  });
+
   return { deleted: true };
 };

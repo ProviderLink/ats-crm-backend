@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import Application from '../applications/application.model';
 import Client from '../clients/client.model';
 import PipelineTemplate from '../pipeline-templates/pipelineTemplate.model';
@@ -112,6 +113,14 @@ export const createJob = async (
     },
     createdBy,
   });
+
+  createLog({
+    type: 'job_created',
+    resourceType: 'job',
+    resourceId: job._id.toString(),
+    performedBy: createdBy,
+  });
+
   return job.toSafeObject();
 };
 
@@ -134,6 +143,14 @@ export const updateJob = async (
   ) as unknown as mongoose.Types.ObjectId;
 
   await job.save();
+
+  createLog({
+    type: 'job_updated',
+    resourceType: 'job',
+    resourceId: id,
+    performedBy: updatedBy,
+  });
+
   return job.toSafeObject();
 };
 
@@ -154,6 +171,13 @@ export const deleteJob = async (id: string): Promise<{ deleted: boolean }> => {
   }
 
   await job.deleteOne();
+
+  createLog({
+    type: 'job_deleted',
+    resourceType: 'job',
+    resourceId: id,
+  });
+
   return { deleted: true };
 };
 
@@ -192,6 +216,15 @@ export const assignPipeline = async (
   ) as unknown as mongoose.Types.ObjectId;
 
   await job.save();
+
+  createLog({
+    type: 'job_pipeline_assigned',
+    resourceType: 'job',
+    resourceId: jobId,
+    metadata: { templateId: input.templateId },
+    performedBy: updatedBy,
+  });
+
   return job.toSafeObject();
 };
 
@@ -218,5 +251,14 @@ export const updateJobStatus = async (
   ) as unknown as mongoose.Types.ObjectId;
 
   await job.save();
+
+  createLog({
+    type: 'job_status_changed',
+    resourceType: 'job',
+    resourceId: id,
+    metadata: { status },
+    performedBy: updatedBy,
+  });
+
   return job.toSafeObject();
 };

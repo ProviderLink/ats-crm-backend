@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { deleteFromCloudinary } from '../../config/cloudinary';
 import { runResumeParsing } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from './candidate.model';
 import type {
   CreateCandidateInput,
@@ -121,6 +122,14 @@ export const createCandidate = async (
     runResumeParsing(candidate._id.toString());
   }
 
+  createLog({
+    type: 'candidate_created',
+    resourceType: 'candidate',
+    resourceId: candidate._id.toString(),
+    metadata: { source: input.source, status },
+    performedBy: createdBy,
+  });
+
   return candidate.toSafeObject();
 };
 
@@ -174,6 +183,14 @@ export const updateCandidate = async (
     : null;
 
   await candidate.save();
+
+  createLog({
+    type: 'candidate_updated',
+    resourceType: 'candidate',
+    resourceId: id,
+    performedBy: updatedBy,
+  });
+
   return candidate.toSafeObject();
 };
 
@@ -195,6 +212,13 @@ export const deleteCandidate = async (
   }
 
   await candidate.deleteOne();
+
+  createLog({
+    type: 'candidate_deleted',
+    resourceType: 'candidate',
+    resourceId: id,
+  });
+
   return { deleted: true };
 };
 
@@ -218,6 +242,16 @@ export const updateTalentPool = async (
   }
 
   await candidate.save();
+
+  createLog({
+    type:
+      action === 'add'
+        ? 'candidate_talent_pool_added'
+        : 'candidate_talent_pool_removed',
+    resourceType: 'candidate',
+    resourceId: id,
+  });
+
   return candidate.toSafeObject();
 };
 
@@ -231,6 +265,14 @@ export const updateCandidateStatus = async (
 
   candidate.status = status;
   await candidate.save();
+
+  createLog({
+    type: 'candidate_status_changed',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: { status },
+  });
+
   return candidate.toSafeObject();
 };
 
@@ -254,6 +296,13 @@ export const updateParsedData = async (
   }
 
   await candidate.save();
+
+  createLog({
+    type: 'candidate_parsed_data_updated',
+    resourceType: 'candidate',
+    resourceId: id,
+  });
+
   return candidate.toSafeObject();
 };
 
@@ -268,6 +317,13 @@ export const updateAiScore = async (
   candidate.aiScore = aiScore;
   candidate.markModified('aiScore');
   await candidate.save();
+
+  createLog({
+    type: 'candidate_ai_score_updated',
+    resourceType: 'candidate',
+    resourceId: id,
+  });
+
   return candidate.toSafeObject();
 };
 

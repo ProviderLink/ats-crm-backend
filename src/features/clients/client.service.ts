@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import Job from '../jobs/job.model';
 import Client from './client.model';
 import type {
@@ -77,6 +78,13 @@ export const createClient = async (
     createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
   });
 
+  createLog({
+    type: 'client_created',
+    resourceType: 'client',
+    resourceId: client._id.toString(),
+    performedBy: createdBy ?? null,
+  });
+
   return client.toSafeObject();
 };
 
@@ -104,6 +112,14 @@ export const updateClient = async (
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
 
   await client.save();
+
+  createLog({
+    type: 'client_updated',
+    resourceType: 'client',
+    resourceId: id,
+    performedBy: updatedBy ?? null,
+  });
+
   return client.toSafeObject();
 };
 
@@ -132,6 +148,15 @@ export const addContact = async (
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
 
   await client.save();
+
+  createLog({
+    type: 'client_contact_added',
+    resourceType: 'client',
+    resourceId: clientId,
+    metadata: { contactName: input.name, contactEmail: input.email },
+    performedBy: updatedBy ?? null,
+  });
+
   return client.toSafeObject();
 };
 
@@ -165,6 +190,15 @@ export const updateContact = async (
   client.markModified('contacts');
 
   await client.save();
+
+  createLog({
+    type: 'client_contact_updated',
+    resourceType: 'client',
+    resourceId: clientId,
+    metadata: { contactId },
+    performedBy: updatedBy ?? null,
+  });
+
   return client.toSafeObject();
 };
 
@@ -185,6 +219,15 @@ export const removeContact = async (
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
 
   await client.save();
+
+  createLog({
+    type: 'client_contact_removed',
+    resourceType: 'client',
+    resourceId: clientId,
+    metadata: { contactId },
+    performedBy: updatedBy ?? null,
+  });
+
   return client.toSafeObject();
 };
 
@@ -207,6 +250,13 @@ export const deleteClient = async (
   }
 
   await Client.findByIdAndDelete(id);
+
+  createLog({
+    type: 'client_deleted',
+    resourceType: 'client',
+    resourceId: id,
+  });
+
   return { deleted: true };
 };
 
@@ -266,6 +316,14 @@ export const updateCrmProfile = async (
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
 
   await client.save();
+
+  createLog({
+    type: 'client_crm_profile_updated',
+    resourceType: 'client',
+    resourceId: clientId,
+    performedBy: updatedBy ?? null,
+  });
+
   return client.toSafeObject();
 };
 
@@ -301,6 +359,14 @@ export const addNote = async (
   if (authorId) client.updatedBy = new mongoose.Types.ObjectId(authorId);
   await client.save();
 
+  createLog({
+    type: 'client_note_added',
+    resourceType: 'client',
+    resourceId: clientId,
+    metadata: { method: input.method },
+    performedBy: authorId ?? null,
+  });
+
   const saved = note as unknown as ClientNote & {
     _id: mongoose.Types.ObjectId;
     author: mongoose.Types.ObjectId | null;
@@ -334,6 +400,14 @@ export const updateNote = async (
   client.markModified('notes');
   await client.save();
 
+  createLog({
+    type: 'client_note_updated',
+    resourceType: 'client',
+    resourceId: clientId,
+    metadata: { noteId },
+    performedBy: updatedBy ?? null,
+  });
+
   return {
     _id: String(note._id),
     method: note.method,
@@ -360,5 +434,14 @@ export const deleteNote = async (
   client.notes.splice(index, 1);
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await client.save();
+
+  createLog({
+    type: 'client_note_deleted',
+    resourceType: 'client',
+    resourceId: clientId,
+    metadata: { noteId },
+    performedBy: updatedBy ?? null,
+  });
+
   return { deleted: true };
 };

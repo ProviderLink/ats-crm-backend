@@ -5,6 +5,7 @@ import {
   runResumeValidation,
 } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import * as candidateService from '../candidates/candidate.service';
 import Job from '../jobs/job.model';
@@ -150,6 +151,16 @@ export const createApplication = async (
     runResumeParsing(candidate._id.toString());
   }
 
+  createLog({
+    type: 'application_created',
+    resourceType: 'application',
+    resourceId: application._id.toString(),
+    relatedType: 'candidate',
+    relatedId: input.candidateId,
+    metadata: { source: input.source, phase },
+    performedBy: input.createdBy ?? null,
+  });
+
   return application.toSafeObject();
 };
 
@@ -203,6 +214,15 @@ export const approveApplication = async (
     'approved'
   );
 
+  createLog({
+    type: 'application_approved',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    performedBy: input.approvedBy,
+  });
+
   return application.toSafeObject();
 };
 
@@ -242,6 +262,16 @@ export const rejectApplication = async (
     }
   }
 
+  createLog({
+    type: 'application_rejected',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    metadata: { reason: input.rejectionReason },
+    performedBy: input.rejectedBy,
+  });
+
   return application.toSafeObject();
 };
 
@@ -276,6 +306,14 @@ export const moveStage = async (
     assignedBy: new mongoose.Types.ObjectId(input.movedBy),
   };
   await application.save();
+
+  createLog({
+    type: 'application_stage_moved',
+    resourceType: 'application',
+    resourceId: id,
+    metadata: { stageName: targetStage.name },
+    performedBy: input.movedBy,
+  });
 
   return application.toSafeObject();
 };
@@ -331,6 +369,15 @@ export const hireApplication = async (
       });
   }
 
+  createLog({
+    type: 'application_hired',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    performedBy: input.hiredBy,
+  });
+
   return application.toSafeObject();
 };
 
@@ -347,6 +394,13 @@ export const updateApplicationNotes = async (
   application.notes = notes;
   application.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await application.save();
+
+  createLog({
+    type: 'application_notes_updated',
+    resourceType: 'application',
+    resourceId: id,
+    performedBy: updatedBy,
+  });
 
   return application.toSafeObject();
 };

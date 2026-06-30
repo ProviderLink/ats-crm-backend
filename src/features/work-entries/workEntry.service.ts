@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
 import WorkEntry from './workEntry.model';
 import type {
@@ -99,6 +100,13 @@ export const createWorkEntry = async (
     notes: input.notes ?? null,
   });
 
+  createLog({
+    type: 'work_entry_created',
+    resourceType: 'work_entry',
+    resourceId: workEntry._id.toString(),
+    performedBy: createdBy,
+  });
+
   return workEntry.toSafeObject();
 };
 
@@ -124,6 +132,14 @@ export const updateWorkEntry = async (
   if (input.notes !== undefined) workEntry.notes = input.notes ?? null;
 
   await workEntry.save();
+
+  createLog({
+    type: 'work_entry_updated',
+    resourceType: 'work_entry',
+    resourceId: id,
+    performedBy: updatedBy,
+  });
+
   return workEntry.toSafeObject();
 };
 
@@ -134,5 +150,12 @@ export const deleteWorkEntry = async (
   if (!workEntry)
     throw new AppError(404, 'WORK_ENTRY_NOT_FOUND', 'Work entry not found');
   await workEntry.deleteOne();
+
+  createLog({
+    type: 'work_entry_deleted',
+    resourceType: 'work_entry',
+    resourceId: id,
+  });
+
   return { deleted: true };
 };

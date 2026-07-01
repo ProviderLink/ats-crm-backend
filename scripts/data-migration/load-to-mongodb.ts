@@ -64,7 +64,7 @@ const REFERENCE_MAP: Record<string, string[]> = {
   emailTemplates: ['createdBy', 'updatedBy'],
   pipelines: ['createdBy', 'updatedBy'],
   clients: ['createdBy', 'updatedBy'],
-  jobs: ['clientId', 'createdBy', 'updatedBy'], // tags[] already ObjectId?
+  jobs: ['clientId', 'createdBy', 'updatedBy', 'pipeline.templateId'], // tags[] already ObjectId?
   candidates: ['tags[]', 'createdBy', 'updatedBy', 'appliedJobId'],
   applications: [
     'candidateId',
@@ -159,6 +159,28 @@ async function main() {
 
   // Phase 2: Replace all references with real ObjectIds
   console.log('🔄 Replacing references with ObjectIds...');
+
+  // Build email → _id map from candidates collection for email-based
+  // resolution. In the source data, applications reference candidates by
+  // email (not by _migrationOldId), so the idMap alone cannot resolve them.
+  const emailToCandidateId = new Map<string, mongoose.Types.ObjectId>();
+  try {
+    const candidateCol = db.collection('candidates');
+    const allCandidates = await candidateCol
+      .find({}, { projection: { _id: 1, email: 1 } })
+      .toArray();
+    for (const c of allCandidates) {
+      if (c.email && typeof c.email === 'string') {
+        emailToCandidateId.set(c.email.toLowerCase(), c._id);
+      }
+    }
+    console.log(`   Email→Candidate map: ${emailToCandidateId.size} entries`);
+  } catch {
+    console.log(
+      '   ⚠️  Could not build email→candidate map (candidates collection may not exist yet)'
+    );
+  }
+
   let totalUpdates = 0;
 
   for (const def of COLLECTION_DEFS) {
@@ -177,9 +199,14 @@ async function main() {
         const isArray = field.endsWith('[]');
         const cleanField = isArray ? field.slice(0, -2) : field;
 
+        // Handle nested dot-path fields (e.g. 'pipeline.templateId')
+        const isNested = cleanField.includes('.');
+
         if (isArray) {
           // Array of old IDs → array of ObjectIds
-          const arr = doc[cleanField];
+          const arr = isNested
+            ? undefined // nested arrays not supported
+            : doc[cleanField];
           if (Array.isArray(arr) && arr.length > 0) {
             const mapped = arr
               .map((id: any) => (typeof id === 'string' ? idMap.get(id) : null))
@@ -192,11 +219,47 @@ async function main() {
               hasChanges = true;
             }
           }
+        } else if (isNested) {
+          // Nested dot-path reference (e.g. pipeline.templateId)
+          const parts = cleanField.split('.');
+          let val = doc;
+          for (const part of parts) {
+            if (val && typeof val === 'object') val = val[part];
+            else {
+              val = undefined;
+              break;
+            }
+          }
+
+          if (val && typeof val === 'string') {
+            const newId = idMap.get(val);
+            if (newId) {
+              updates[cleanField] = newId;
+              hasChanges = true;
+            } else {
+              // Unresolvable nested reference → null it out
+              updates[cleanField] = null;
+              hasChanges = true;
+            }
+          }
         } else {
           // Single scalar reference
           const val = doc[cleanField];
           if (val && typeof val === 'string') {
-            const newId = idMap.get(val);
+            let newId = idMap.get(val);
+
+            // Fallback: resolve email-based references (e.g. candidateId)
+            // The source data uses emails instead of _migrationOldId for
+            // some reference fields — look up the target collection by email.
+            if (!newId && cleanField === 'candidateId' && val.includes('@')) {
+              newId = emailToCandidateId.get(val.toLowerCase());
+              if (newId) {
+                console.log(
+                  `   ✉️  Resolved candidateId email "${val}" → ${newId}`
+                );
+              }
+            }
+
             if (newId) {
               updates[cleanField] = newId;
               hasChanges = true;
@@ -236,6 +299,46 @@ async function main() {
 
   console.log(`   Total updates: ${totalUpdates}`);
   console.log('');
+
+  // Phase 2.5: Generate ObjectIds for pipeline stages
+  // The raw MongoDB driver does not auto-generate _id for subdocuments.
+  // Every pipeline stage in every job must have a real ObjectId so the
+  // frontend pipeline board can match applications to columns.
+  console.log('🆔 Generating stage _id values...');
+  const jobCol = db.collection('jobs');
+  const allJobs = await jobCol
+    .find({ pipeline: { $ne: null } }, { projection: { 'pipeline.stages': 1 } })
+    .toArray();
+
+  let stageIdsGenerated = 0;
+  const stageBulkOps: any[] = [];
+  for (const job of allJobs) {
+    const stages = job.pipeline?.stages;
+    if (!Array.isArray(stages)) continue;
+
+    const stagesNeedingId = stages.filter(s => !s._id);
+    if (stagesNeedingId.length === 0) continue;
+
+    const setOps: Record<string, any> = {};
+    for (let i = 0; i < stages.length; i++) {
+      if (!stages[i]._id) {
+        setOps[`pipeline.stages.${i}._id`] = new mongoose.Types.ObjectId();
+        stageIdsGenerated++;
+      }
+    }
+
+    stageBulkOps.push({
+      updateOne: {
+        filter: { _id: job._id },
+        update: { $set: setOps },
+      },
+    });
+  }
+
+  if (stageBulkOps.length > 0) {
+    await jobCol.bulkWrite(stageBulkOps);
+  }
+  console.log(`   ${stageIdsGenerated} stage _id values assigned`);
 
   // Phase 3: Remove migration metadata fields
   console.log('🧹 Removing migration metadata...');

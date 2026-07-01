@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
+import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
 import * as applicationService from './application.service';
 
@@ -7,6 +8,16 @@ export const getAllApplications = catchAsync(
   async (req: Request, res: Response) => {
     const { jobId, candidateId, clientId, phase, page, limit } =
       req.query as Record<string, string | undefined>;
+
+    logger.info('GET /applications query', {
+      jobId,
+      candidateId,
+      clientId,
+      phase,
+      page,
+      limit,
+    });
+
     const result = await applicationService.getAllApplications({
       jobId,
       candidateId,
@@ -15,6 +26,11 @@ export const getAllApplications = catchAsync(
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
+
+    logger.info(
+      `GET /applications result: ${result.total} total, returning ${result.applications.length}`
+    );
+
     sendSuccess(res, result.applications, 'Applications retrieved', 200, {
       total: result.total,
       page: result.page,

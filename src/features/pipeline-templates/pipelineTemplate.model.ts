@@ -40,7 +40,15 @@ const pipelineTemplateSchema = new Schema(
 );
 
 pipelineTemplateSchema.index({ isActive: 1 });
-pipelineTemplateSchema.index({ isDefault: 1 });
+// Only one template may be marked as default. Partial unique index allows
+// many documents with isDefault: false while preventing more than one true.
+pipelineTemplateSchema.index(
+  { isDefault: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { isDefault: true },
+  }
+);
 
 pipelineTemplateSchema.methods.toSafeObject = function (): IPipelineTemplate {
   const raw = this.toObject({ versionKey: false }) as Record<string, unknown>;

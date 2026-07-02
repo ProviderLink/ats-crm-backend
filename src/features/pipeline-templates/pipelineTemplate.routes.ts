@@ -26,7 +26,10 @@ const stageSchema = z.object({
     .default('#3b82f6'),
   order: z.number().int().min(1),
   isActive: z.boolean().optional().default(true),
-  icon: z.enum(PIPELINE_STAGE_ICONS).optional().default('ClipboardList'),
+  icon: z
+    .enum(PIPELINE_STAGE_ICONS)
+    .nullish()
+    .transform(value => value ?? 'ClipboardList'),
 });
 
 const createTemplateSchema = z.object({

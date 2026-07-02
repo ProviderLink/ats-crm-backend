@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { runCandidacyValidation } from '../../jobs';
+import { runCandidacyValidation, runResumeParsing } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import logger from '../../shared/utils/logger';
@@ -116,6 +116,16 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
       null
     );
     candidateId = candidate._id;
+
+    // Trigger AI resume parsing for the newly created candidate (background)
+    if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+      runResumeParsing(candidateId).catch(err => {
+        logger.error('AI resume parsing failed during job apply', {
+          candidateId,
+          error: (err as Error).message,
+        });
+      });
+    }
   }
 
   // Store the job they applied to on the candidate — used later when

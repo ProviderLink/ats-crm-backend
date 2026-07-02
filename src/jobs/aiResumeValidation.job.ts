@@ -52,7 +52,9 @@ Respond with exactly this JSON structure:
 
   try {
     const provider = await getAiProvider();
-    const text = await withRetry(() => provider.generate(prompt));
+    const text = await withRetry(() =>
+      provider.generate(prompt, { maxTokens: 500, prefillAssistant: '{' })
+    );
     const result = parseJsonResponse<{
       isValid: boolean;
       score: number;

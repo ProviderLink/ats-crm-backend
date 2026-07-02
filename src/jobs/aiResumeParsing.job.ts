@@ -14,12 +14,30 @@ export async function runResumeParsing(candidateId: string): Promise<void> {
   const candidate = await Candidate.findById(candidateId);
   if (!candidate) return;
 
-  // Idempotent: skip if already parsed
-  if (candidate.parsedData !== null && candidate.parsedData !== undefined) {
-    logger.debug('Candidate already has parsed data, skipping', {
+  // Idempotent: skip only if parsed data has meaningful content.
+  // A hollow parse (empty skills AND empty experience AND empty education)
+  // is treated as "not yet parsed" so the AI gets another chance.
+  const pd = candidate.parsedData;
+  if (
+    pd !== null &&
+    pd !== undefined &&
+    ((pd.skills && pd.skills.length > 0) ||
+      (pd.experience && pd.experience.length > 0) ||
+      (pd.education && pd.education.length > 0))
+  ) {
+    logger.debug('Candidate already has meaningful parsed data, skipping', {
       candidateId,
     });
     return;
+  }
+
+  if (pd) {
+    logger.info('Re-parsing candidate with hollow parsed data', {
+      candidateId,
+      hadSummary: !!pd.summary,
+      hadSkills: pd.skills?.length ?? 0,
+      hadExperience: pd.experience?.length ?? 0,
+    });
   }
 
   if (!candidate.resumeRawText || candidate.resumeRawText.trim() === '') {
@@ -185,7 +203,18 @@ CALCULATING yearsOfExperience:
 
   try {
     const provider = await getAiProvider();
-    const text = await withRetry(() => provider.generate(prompt, 4000));
+    const text = await withRetry(() =>
+      provider.generate(prompt, { maxTokens: 4000, prefillAssistant: '{' })
+    );
+
+    // Log the raw AI response for debugging
+    logger.debug('Raw AI resume parsing response', {
+      candidateId,
+      provider: provider.name,
+      responseLength: text.length,
+      responsePreview: text.slice(0, 500),
+    });
+
     const result = parseJsonResponse<ICandidateParsedData>(text);
 
     if (result) {
@@ -219,6 +248,9 @@ CALCULATING yearsOfExperience:
     } else {
       logger.error('Failed to parse AI resume parsing response', {
         candidateId,
+        provider: provider.name,
+        responseLength: text.length,
+        responsePreview: text.slice(0, 500),
       });
     }
   } catch (error) {

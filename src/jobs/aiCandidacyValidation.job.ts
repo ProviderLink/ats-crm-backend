@@ -75,7 +75,9 @@ Be conservative — only mark as invalid (isValid: false) if clearly fake/garbag
 
   try {
     const provider = await getAiProvider();
-    const text = await withRetry(() => provider.generate(prompt, 1000));
+    const text = await withRetry(() =>
+      provider.generate(prompt, { maxTokens: 1000, prefillAssistant: '{' })
+    );
     const result = parseJsonResponse<{
       isValid: boolean;
       score: number;

@@ -146,9 +146,18 @@ export const createApplication = async (
     runResumeValidation(application._id.toString());
   }
 
-  // Trigger resume parsing for any source if candidate has raw text but no structured data
-  if (candidate.resumeRawText && !candidate.parsedData) {
-    runResumeParsing(candidate._id.toString());
+  // Trigger resume parsing for any source if candidate has raw text
+  // but parsedData is missing or hollow (empty skills + experience + education)
+  if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+    const pd = candidate.parsedData;
+    const hasContent =
+      pd &&
+      ((pd.skills && pd.skills.length > 0) ||
+        (pd.experience && pd.experience.length > 0) ||
+        (pd.education && pd.education.length > 0));
+    if (!hasContent) {
+      runResumeParsing(candidate._id.toString());
+    }
   }
 
   createLog({

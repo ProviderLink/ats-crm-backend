@@ -1,11 +1,16 @@
 import { env } from '../../../config/env';
 import { AppError } from '../AppError';
-import type { IAiProvider } from './types';
+import type { IAiProvider, IAiProviderGenerateOptions } from './types';
 
 export class ClaudeProvider implements IAiProvider {
   readonly name = 'claude';
 
-  async generate(prompt: string, maxTokens = 1024): Promise<string> {
+  async generate(
+    prompt: string,
+    options: IAiProviderGenerateOptions = {}
+  ): Promise<string> {
+    const { maxTokens = 1024, prefillAssistant } = options;
+
     if (!env.ANTHROPIC_API_KEY) {
       throw new AppError(
         500,
@@ -18,6 +23,15 @@ export class ClaudeProvider implements IAiProvider {
     const timeout = setTimeout(() => controller.abort(), 30_000);
 
     try {
+      const messages: Array<{ role: string; content: string }> = [
+        { role: 'user', content: prompt },
+      ];
+
+      // Prefill assistant response to force a specific output format (e.g., '{' for JSON)
+      if (prefillAssistant) {
+        messages.push({ role: 'assistant', content: prefillAssistant });
+      }
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -28,7 +42,7 @@ export class ClaudeProvider implements IAiProvider {
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: maxTokens,
-          messages: [{ role: 'user', content: prompt }],
+          messages,
         }),
         signal: controller.signal,
       });
@@ -46,7 +60,9 @@ export class ClaudeProvider implements IAiProvider {
         content: Array<{ type: string; text: string }>;
       };
 
-      return data.content[0].text;
+      // If we prefilled, prepend the prefill text back to get the complete response
+      const responseText = data.content[0].text;
+      return prefillAssistant ? prefillAssistant + responseText : responseText;
     } catch (error) {
       if (error instanceof AppError) throw error;
       if (error instanceof DOMException && error.name === 'AbortError') {

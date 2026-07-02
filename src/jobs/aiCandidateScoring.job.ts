@@ -77,7 +77,9 @@ Respond with exactly this JSON structure:
 
   try {
     const provider = await getAiProvider();
-    const text = await withRetry(() => provider.generate(prompt, 1500));
+    const text = await withRetry(() =>
+      provider.generate(prompt, { maxTokens: 1500, prefillAssistant: '{' })
+    );
     const result = parseJsonResponse<{
       score: number;
       recommendation: string;

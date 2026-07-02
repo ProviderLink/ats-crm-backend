@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
-import { createZoomMeeting, deleteZoomMeeting } from '../../shared/utils/zoom';
+import logger from '../../shared/utils/logger';
+import {
+  createZoomMeeting,
+  deleteZoomMeeting,
+  updateZoomMeeting,
+} from '../../shared/utils/zoom';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Interview from './interview.model';
@@ -11,6 +16,11 @@ import type {
   SubmitFeedbackInput,
   UpdateInterviewInput,
 } from './interview.types';
+import {
+  sendInterviewCancelledEmails,
+  sendInterviewScheduledEmails,
+  sendInterviewUpdatedEmails,
+} from './interviewEmail.service';
 
 export const getAllInterviews = async (filters: {
   candidateId?: string;
@@ -145,7 +155,14 @@ export const createInterview = async (
     performedBy: input.organizerId,
   });
 
-  return interview.toSafeObject();
+  const safeInterview = interview.toSafeObject();
+
+  // Fire-and-forget email notifications (don't block the response)
+  sendInterviewScheduledEmails(safeInterview).catch(err => {
+    logger.error('Failed to send interview scheduled emails', err);
+  });
+
+  return safeInterview;
 };
 
 export const updateInterview = async (
@@ -164,18 +181,62 @@ export const updateInterview = async (
     );
   }
 
-  if (input.title !== undefined) interview.title = input.title;
+  const changes: string[] = [];
+
+  if (input.title !== undefined && input.title !== interview.title) {
+    changes.push(`Title changed from "${interview.title}" to "${input.title}"`);
+    interview.title = input.title;
+  }
   if (input.scheduledAt !== undefined) {
-    interview.scheduledAt = new Date(input.scheduledAt);
-    if (interview.type === 'zoom') {
-      console.log(
-        'TODO: update Zoom meeting when Zoom update API is integrated'
-      );
+    const newDate = new Date(input.scheduledAt);
+    if (newDate.getTime() !== interview.scheduledAt.getTime()) {
+      changes.push('Date & time updated');
+      interview.scheduledAt = newDate;
+
+      // Update Zoom meeting if the interview is a Zoom call
+      if (interview.type === 'zoom' && interview.meetingDetails?.meetingId) {
+        updateZoomMeeting(interview.meetingDetails.meetingId, {
+          topic: interview.title,
+          scheduledAt: input.scheduledAt as string,
+          duration: input.duration ?? interview.duration,
+          timezone: input.timezone ?? interview.timezone,
+        }).catch(err => {
+          logger.error('Failed to update Zoom meeting on reschedule', err);
+        });
+      }
     }
   }
-  if (input.duration !== undefined) interview.duration = input.duration;
-  if (input.timezone !== undefined) interview.timezone = input.timezone;
+  if (input.duration !== undefined && input.duration !== interview.duration) {
+    changes.push(
+      `Duration changed from ${interview.duration} to ${input.duration} minutes`
+    );
+    interview.duration = input.duration;
+
+    // Also update Zoom if duration changed and no date change triggered it above
+    if (
+      interview.type === 'zoom' &&
+      interview.meetingDetails?.meetingId &&
+      input.scheduledAt === undefined
+    ) {
+      updateZoomMeeting(interview.meetingDetails.meetingId, {
+        duration: input.duration,
+      }).catch(err => {
+        logger.error('Failed to update Zoom meeting duration', err);
+      });
+    }
+  }
+  if (input.timezone !== undefined && input.timezone !== interview.timezone) {
+    changes.push(
+      `Timezone changed from "${interview.timezone}" to "${input.timezone}"`
+    );
+    interview.timezone = input.timezone;
+  }
   if (input.interviewerIds !== undefined) {
+    const oldIds = interview.interviewerIds.map(String).sort().join(',');
+    const newIds = [...input.interviewerIds].sort().join(',');
+    if (oldIds !== newIds) {
+      changes.push('Interviewer(s) updated');
+    }
     interview.interviewerIds = input.interviewerIds.map(
       id => new mongoose.Types.ObjectId(id)
     ) as unknown as mongoose.Types.ObjectId[];
@@ -183,6 +244,7 @@ export const updateInterview = async (
   if (input.meetingDetails !== undefined && interview.meetingDetails !== null) {
     Object.assign(interview.meetingDetails, input.meetingDetails);
     interview.markModified('meetingDetails');
+    changes.push('Meeting details updated');
   }
 
   await interview.save();
@@ -191,9 +253,19 @@ export const updateInterview = async (
     type: 'interview_updated',
     resourceType: 'interview',
     resourceId: id,
+    metadata: changes.length > 0 ? { changes } : undefined,
   });
 
-  return interview.toSafeObject();
+  const safeInterview = interview.toSafeObject();
+
+  // Fire-and-forget update emails if there were meaningful changes
+  if (changes.length > 0) {
+    sendInterviewUpdatedEmails(safeInterview, changes).catch(err => {
+      logger.error('Failed to send interview updated emails', err);
+    });
+  }
+
+  return safeInterview;
 };
 
 export const cancelInterview = async (id: string): Promise<IInterview> => {
@@ -223,7 +295,14 @@ export const cancelInterview = async (id: string): Promise<IInterview> => {
     resourceId: id,
   });
 
-  return interview.toSafeObject();
+  const safeInterview = interview.toSafeObject();
+
+  // Fire-and-forget cancellation emails
+  sendInterviewCancelledEmails(safeInterview).catch(err => {
+    logger.error('Failed to send interview cancelled emails', err);
+  });
+
+  return safeInterview;
 };
 
 export const submitFeedback = async (

@@ -25,7 +25,11 @@ const getZoomToken = async (): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new AppError(500, 'ZOOM_API_ERROR', 'Failed to create Zoom meeting');
+    throw new AppError(
+      500,
+      'ZOOM_API_ERROR',
+      'Failed to authenticate with Zoom'
+    );
   }
 
   const data = (await response.json()) as {
@@ -87,6 +91,56 @@ export const createZoomMeeting = async (params: {
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'ZOOM_API_ERROR', 'Failed to create Zoom meeting');
+  }
+};
+
+export const updateZoomMeeting = async (
+  meetingId: string,
+  params: {
+    topic?: string;
+    scheduledAt?: string;
+    duration?: number;
+    timezone?: string;
+  }
+): Promise<void> => {
+  try {
+    const token = await getZoomToken();
+
+    const body: Record<string, unknown> = {};
+    if (params.topic !== undefined) body['topic'] = params.topic;
+    if (params.scheduledAt !== undefined)
+      body['start_time'] = params.scheduledAt;
+    if (params.duration !== undefined) body['duration'] = params.duration;
+    if (params.timezone !== undefined) body['timezone'] = params.timezone;
+
+    const response = await fetch(
+      `https://api.zoom.us/v2/meetings/${meetingId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(
+        `Failed to update Zoom meeting ${meetingId}: ${response.status}`,
+        errorBody
+      );
+      throw new AppError(
+        500,
+        'ZOOM_API_ERROR',
+        'Failed to update Zoom meeting'
+      );
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    console.error(`Error updating Zoom meeting ${meetingId}:`, err);
+    throw new AppError(500, 'ZOOM_API_ERROR', 'Failed to update Zoom meeting');
   }
 };
 

@@ -1,11 +1,16 @@
 import { env } from '../../../config/env';
 import { AppError } from '../AppError';
-import type { IAiProvider } from './types';
+import type { IAiProvider, IAiProviderGenerateOptions } from './types';
 
 export class OpenAIProvider implements IAiProvider {
   readonly name = 'openai';
 
-  async generate(prompt: string, maxTokens = 1024): Promise<string> {
+  async generate(
+    prompt: string,
+    options: IAiProviderGenerateOptions = {}
+  ): Promise<string> {
+    const { maxTokens = 1024 } = options;
+
     if (!env.OPENAI_API_KEY) {
       throw new AppError(
         500,
@@ -30,6 +35,7 @@ export class OpenAIProvider implements IAiProvider {
             model: 'gpt-4o',
             max_tokens: maxTokens,
             messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' },
           }),
           signal: controller.signal,
         }

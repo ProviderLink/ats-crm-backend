@@ -1,4 +1,5 @@
 import AppError from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import EmailTemplate from './emailTemplate.model';
 import type {
   CreateEmailTemplateInput,
@@ -34,7 +35,20 @@ export const createTemplate = async (
   createdBy: string
 ): Promise<IEmailTemplate> => {
   if (input.isDefault) {
-    await EmailTemplate.updateMany({ type: input.type }, { isDefault: false });
+    const unDefaulted = await EmailTemplate.find({
+      type: input.type,
+      isDefault: true,
+    });
+    await EmailTemplate.updateMany(
+      { type: input.type, isDefault: true },
+      { isDefault: false }
+    );
+    for (const t of unDefaulted) {
+      emitToAts('email-templates', 'email_template:patch', {
+        _id: String(t._id),
+        isDefault: false,
+      });
+    }
   }
   const template = new EmailTemplate({ ...input, createdBy });
   await template.save();
@@ -55,10 +69,23 @@ export const updateTemplate = async (
     );
   }
   if (input.isDefault) {
+    // Use the NEW type if it's being changed, so we un-default the right group.
+    const effectiveType = input.type ?? template.type;
+    const unDefaulted = await EmailTemplate.find({
+      type: effectiveType,
+      isDefault: true,
+      _id: { $ne: id },
+    });
     await EmailTemplate.updateMany(
-      { type: template.type, _id: { $ne: id } },
+      { type: effectiveType, isDefault: true, _id: { $ne: id } },
       { isDefault: false }
     );
+    for (const t of unDefaulted) {
+      emitToAts('email-templates', 'email_template:patch', {
+        _id: String(t._id),
+        isDefault: false,
+      });
+    }
   }
   if (input.name !== undefined) template.name = input.name;
   if (input.subject !== undefined) template.subject = input.subject;

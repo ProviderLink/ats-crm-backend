@@ -33,6 +33,7 @@ export const initializeAtsSocket = (io: Server): void => {
     }
 
     socket.join('applications');
+    socket.join('email-templates');
     socket.join(`user:${decoded._id}`);
 
     socket.on('join:job', (jobId: string) => {

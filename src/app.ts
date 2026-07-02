@@ -31,7 +31,6 @@ import userRouter from './features/users/user.routes';
 import webhookRouter from './features/webhooks/webhook.routes';
 import workEntryRouter from './features/work-entries/workEntry.routes';
 import { startBackgroundJobs } from './jobs';
-import { migrateClientCompanySize } from './scripts/migrateClientCompanySize';
 import errorHandler from './shared/middleware/errorHandler';
 import AppError from './shared/utils/AppError';
 import logger from './shared/utils/logger';
@@ -137,9 +136,11 @@ app.use((_req, _res, next) => {
 
 app.use(errorHandler);
 
-// Connect first, then run one-off self-healing migration for companySize.
+// Connect first, then start background jobs.
 connectDB()
-  .then(() => migrateClientCompanySize())
+  .then(() => {
+    logger.info('Database connected');
+  })
   .catch(error => {
     logger.error('companySize migration failed', { error });
   });

@@ -14,6 +14,7 @@ import {
   deleteCandidate,
   getAllCandidates,
   getCandidateById,
+  publicParse,
   publicUploadAndParse,
   rejectCandidate,
   updateCandidate,
@@ -106,6 +107,13 @@ const assignJobSchema = z.object({
 const router = Router();
 
 // ── PUBLIC ROUTES (no authentication required) ──
+
+/**
+ * @route   POST /api/v1/ats/candidates/public/parse
+ * @desc    Parse resume and return structured JSON (NO Cloudinary upload, NO DB save)
+ * @access  Public
+ */
+router.post('/public/parse', uploadResume, publicParse);
 
 /**
  * @route   POST /api/v1/ats/candidates/public/upload-and-parse

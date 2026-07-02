@@ -12,6 +12,7 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { extractResumeText } from '../../shared/utils/extract-resume-text';
 import logger from '../../shared/utils/logger';
+import { parseResumeTextWithAI } from '../../shared/utils/parseResumeWithAI';
 import { sendSuccess } from '../../shared/utils/response';
 import * as applicationService from '../applications/application.service';
 import { getJobById } from '../jobs/job.service';
@@ -300,6 +301,29 @@ export const rejectCandidate = catchAsync(
     );
   }
 );
+
+export const publicParse = catchAsync(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
+  }
+
+  logger.info(`Public parse resume: ${req.file.originalname}`);
+
+  // Extract raw text from the uploaded PDF/DOCX (NO Cloudinary upload, NO DB save)
+  const resumeRawText = await extractResumeText(
+    req.file.buffer,
+    req.file.mimetype
+  );
+
+  // Run AI parsing on the extracted text (stateless — no candidate saved)
+  const parsedData = await parseResumeTextWithAI(resumeRawText);
+
+  logger.info(
+    `Public parse complete: skills=${parsedData?.skills?.length ?? 0}, experience=${parsedData?.experience?.length ?? 0}`
+  );
+
+  sendSuccess(res, parsedData, 'Resume parsed successfully');
+});
 
 export const publicUploadAndParse = catchAsync(
   async (req: Request, res: Response) => {

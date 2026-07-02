@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { deleteFromCloudinary } from '../../config/cloudinary';
 import { runResumeParsing } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from './candidate.model';
 import type {
@@ -130,7 +131,9 @@ export const createCandidate = async (
     performedBy: createdBy,
   });
 
-  return candidate.toSafeObject();
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:created', result);
+  return result;
 };
 
 export const updateCandidate = async (
@@ -191,7 +194,9 @@ export const updateCandidate = async (
     performedBy: updatedBy,
   });
 
-  return candidate.toSafeObject();
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };
 
 export const deleteCandidate = async (
@@ -219,6 +224,7 @@ export const deleteCandidate = async (
     resourceId: id,
   });
 
+  emitToAts('candidates', 'candidate:deleted', { _id: id });
   return { deleted: true };
 };
 
@@ -252,7 +258,9 @@ export const updateTalentPool = async (
     resourceId: id,
   });
 
-  return candidate.toSafeObject();
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };
 
 export const updateCandidateStatus = async (
@@ -273,7 +281,9 @@ export const updateCandidateStatus = async (
     metadata: { status },
   });
 
-  return candidate.toSafeObject();
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };
 
 export const updateParsedData = async (
@@ -303,7 +313,9 @@ export const updateParsedData = async (
     resourceId: id,
   });
 
-  return candidate.toSafeObject();
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };
 
 export const updateAiScore = async (
@@ -324,7 +336,9 @@ export const updateAiScore = async (
     resourceId: id,
   });
 
-  return candidate.toSafeObject();
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };
 
 export const updateAiValidation = async (

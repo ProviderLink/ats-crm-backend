@@ -1,5 +1,6 @@
 import { AppError } from '../../shared/utils/AppError';
 import { callClaude, parseJsonResponse } from '../../shared/utils/ai/index';
+import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
@@ -181,7 +182,9 @@ Generate 6-8 relevant performance categories for this role.
     performedBy: input.generatedByUserId,
   });
 
-  return review.toSafeObject();
+  const reviewData = review.toSafeObject();
+  emitToCrm('assignments', 'performanceReview:created', reviewData);
+  return reviewData;
 };
 
 export const updateReview = async (
@@ -250,7 +253,9 @@ export const updateReview = async (
   }
 
   await review.save();
-  return review.toSafeObject();
+  const result = review.toSafeObject();
+  emitToCrm('assignments', 'performanceReview:updated', result);
+  return result;
 };
 
 export const completeReview = async (
@@ -282,7 +287,9 @@ export const completeReview = async (
     performedBy: completedBy,
   });
 
-  return review.toSafeObject();
+  const result = review.toSafeObject();
+  emitToCrm('assignments', 'performanceReview:updated', result);
+  return result;
 };
 
 export const regenerateSection = async (

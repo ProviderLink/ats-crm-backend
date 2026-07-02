@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Application from '../applications/application.model';
 import Client from '../clients/client.model';
@@ -121,7 +122,9 @@ export const createJob = async (
     performedBy: createdBy,
   });
 
-  return job.toSafeObject();
+  const result = job.toSafeObject();
+  emitToAts('jobs', 'job:created', result);
+  return result;
 };
 
 export const updateJob = async (
@@ -151,7 +154,9 @@ export const updateJob = async (
     performedBy: updatedBy,
   });
 
-  return job.toSafeObject();
+  const result = job.toSafeObject();
+  emitToAts('jobs', 'job:updated', result);
+  return result;
 };
 
 export const deleteJob = async (id: string): Promise<{ deleted: boolean }> => {
@@ -178,6 +183,7 @@ export const deleteJob = async (id: string): Promise<{ deleted: boolean }> => {
     resourceId: id,
   });
 
+  emitToAts('jobs', 'job:deleted', { _id: id });
   return { deleted: true };
 };
 
@@ -282,7 +288,9 @@ export const assignPipeline = async (
     performedBy: updatedBy,
   });
 
-  return job.toSafeObject();
+  const result = job.toSafeObject();
+  emitToAts('jobs', 'job:updated', result);
+  return result;
 };
 
 export const updateJobStatus = async (
@@ -317,5 +325,7 @@ export const updateJobStatus = async (
     performedBy: updatedBy,
   });
 
-  return job.toSafeObject();
+  const result = job.toSafeObject();
+  emitToAts('jobs', 'job:updated', result);
+  return result;
 };

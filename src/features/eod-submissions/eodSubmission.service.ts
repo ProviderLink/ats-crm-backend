@@ -156,5 +156,7 @@ export const updateEodSubmission = async (
   if (input.notes !== undefined) eodSubmission.notes = input.notes ?? null;
 
   await eodSubmission.save();
-  return eodSubmission.toSafeObject();
+  const result = eodSubmission.toSafeObject();
+  emitToCrm('assignments', 'eod:updated', result);
+  return result;
 };

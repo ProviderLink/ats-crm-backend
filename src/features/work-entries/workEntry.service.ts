@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
 import WorkEntry from './workEntry.model';
@@ -107,7 +108,9 @@ export const createWorkEntry = async (
     performedBy: createdBy,
   });
 
-  return workEntry.toSafeObject();
+  const result = workEntry.toSafeObject();
+  emitToCrm('assignments', 'workEntry:created', result);
+  return result;
 };
 
 export const updateWorkEntry = async (
@@ -140,7 +143,9 @@ export const updateWorkEntry = async (
     performedBy: updatedBy,
   });
 
-  return workEntry.toSafeObject();
+  const result = workEntry.toSafeObject();
+  emitToCrm('assignments', 'workEntry:updated', result);
+  return result;
 };
 
 export const deleteWorkEntry = async (
@@ -157,5 +162,6 @@ export const deleteWorkEntry = async (
     resourceId: id,
   });
 
+  emitToCrm('assignments', 'workEntry:deleted', { _id: id });
   return { deleted: true };
 };

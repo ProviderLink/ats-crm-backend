@@ -6,6 +6,7 @@ import {
   deleteZoomMeeting,
   updateZoomMeeting,
 } from '../../shared/utils/zoom';
+import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Interview from './interview.model';
@@ -162,6 +163,7 @@ export const createInterview = async (
     logger.error('Failed to send interview scheduled emails', err);
   });
 
+  emitToAts('applications', 'interview:created', safeInterview);
   return safeInterview;
 };
 
@@ -265,6 +267,7 @@ export const updateInterview = async (
     });
   }
 
+  emitToAts('applications', 'interview:updated', safeInterview);
   return safeInterview;
 };
 
@@ -302,6 +305,7 @@ export const cancelInterview = async (id: string): Promise<IInterview> => {
     logger.error('Failed to send interview cancelled emails', err);
   });
 
+  emitToAts('applications', 'interview:updated', safeInterview);
   return safeInterview;
 };
 
@@ -352,5 +356,7 @@ export const submitFeedback = async (
     performedBy: input.interviewerId,
   });
 
-  return interview.toSafeObject();
+  const result = interview.toSafeObject();
+  emitToAts('applications', 'interview:updated', result);
+  return result;
 };

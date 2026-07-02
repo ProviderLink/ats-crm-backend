@@ -5,6 +5,7 @@ import {
   runResumeValidation,
 } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import * as candidateService from '../candidates/candidate.service';
@@ -170,7 +171,9 @@ export const createApplication = async (
     performedBy: input.createdBy ?? null,
   });
 
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:created', result);
+  return result;
 };
 
 export const approveApplication = async (
@@ -232,7 +235,9 @@ export const approveApplication = async (
     performedBy: input.approvedBy,
   });
 
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  return result;
 };
 
 export const rejectApplication = async (
@@ -281,7 +286,9 @@ export const rejectApplication = async (
     performedBy: input.rejectedBy,
   });
 
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:deleted', result);
+  return result;
 };
 
 export const moveStage = async (
@@ -324,7 +331,9 @@ export const moveStage = async (
     performedBy: input.movedBy,
   });
 
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  return result;
 };
 
 export const hireApplication = async (
@@ -387,7 +396,9 @@ export const hireApplication = async (
     performedBy: input.hiredBy,
   });
 
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  return result;
 };
 
 export const updateApplicationNotes = async (
@@ -411,7 +422,9 @@ export const updateApplicationNotes = async (
     performedBy: updatedBy,
   });
 
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  return result;
 };
 
 export const updateApplicationAiScore = async (
@@ -432,7 +445,9 @@ export const updateApplicationAiScore = async (
   application.aiScore = aiScore;
   application.markModified('aiScore');
   await application.save();
-  return application.toSafeObject();
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  return result;
 };
 
 export const updateAiValidation = async (

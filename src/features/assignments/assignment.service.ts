@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
@@ -130,7 +131,9 @@ export const createAssignment = async (
     performedBy: createdBy,
   });
 
-  return assignment.toSafeObject();
+  const result = assignment.toSafeObject();
+  emitToCrm('assignments', 'assignment:created', result);
+  return result;
 };
 
 export const updateAssignment = async (
@@ -165,7 +168,9 @@ export const updateAssignment = async (
 
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
-  return assignment.toSafeObject();
+  const result = assignment.toSafeObject();
+  emitToCrm('assignments', 'assignment:updated', result);
+  return result;
 };
 
 export const endAssignment = async (
@@ -192,7 +197,9 @@ export const endAssignment = async (
     performedBy: updatedBy,
   });
 
-  return assignment.toSafeObject();
+  const result = assignment.toSafeObject();
+  emitToCrm('assignments', 'assignment:updated', result);
+  return result;
 };
 
 export const updateAssignmentStatus = async (
@@ -215,5 +222,7 @@ export const updateAssignmentStatus = async (
   assignment.status = status;
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
-  return assignment.toSafeObject();
+  const result = assignment.toSafeObject();
+  emitToCrm('assignments', 'assignment:updated', result);
+  return result;
 };

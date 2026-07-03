@@ -187,6 +187,32 @@ CALCULATING yearsOfExperience:
   const result = parseJsonResponse<ICandidateParsedData>(text);
 
   if (result) {
+    if (result.education) {
+      result.education = result.education.map(edu => {
+        if (edu.degree && edu.field) {
+          const suffix = ` in ${edu.field}`;
+          if (edu.degree.toLowerCase().endsWith(suffix.toLowerCase())) {
+            const occurrences = (
+              edu.degree
+                .toLowerCase()
+                .match(
+                  new RegExp(
+                    ` in ${edu.field.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+                    'gi'
+                  )
+                ) || []
+            ).length;
+            if (occurrences > 1) {
+              edu.degree = edu.degree.slice(
+                0,
+                edu.degree.toLowerCase().lastIndexOf(suffix.toLowerCase())
+              );
+            }
+          }
+        }
+        return edu;
+      });
+    }
     logger.info('AI resume parsing completed', {
       skillsCount: result.skills?.length ?? 0,
       provider: provider.name,

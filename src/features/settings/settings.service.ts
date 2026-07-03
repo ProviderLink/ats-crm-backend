@@ -40,6 +40,19 @@ export const updateSettings = async (
     clearAiProviderCache();
   }
 
+  if (input.applicationConfirmation) {
+    if (input.applicationConfirmation.enabled !== undefined) {
+      settings.applicationConfirmation.enabled =
+        input.applicationConfirmation.enabled;
+    }
+    if (input.applicationConfirmation.templateId !== undefined) {
+      settings.applicationConfirmation.templateId = input
+        .applicationConfirmation
+        .templateId as unknown as typeof settings.applicationConfirmation.templateId;
+    }
+    settings.markModified('applicationConfirmation');
+  }
+
   if (input.companyTimezone) {
     settings.companyTimezone = input.companyTimezone;
   }

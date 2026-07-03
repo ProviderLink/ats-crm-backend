@@ -23,6 +23,12 @@ const updateSettingsSchema = z.object({
     })
     .optional(),
   companyTimezone: z.string().min(1).optional(),
+  applicationConfirmation: z
+    .object({
+      enabled: z.boolean().optional(),
+      templateId: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 router.use(authenticate);

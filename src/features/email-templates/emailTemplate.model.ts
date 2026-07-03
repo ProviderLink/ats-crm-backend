@@ -26,6 +26,7 @@ const emailTemplateSchema = new Schema(
         'eod_reminder',
         'survey_reminder',
         'general',
+        'application_confirmation',
       ],
     },
     variables: {

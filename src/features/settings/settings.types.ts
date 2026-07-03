@@ -10,6 +10,10 @@ export interface ISettings {
     candidateScoring: boolean;
     resumeParsing: boolean;
   };
+  applicationConfirmation: {
+    enabled: boolean;
+    templateId: string | null;
+  };
   companyTimezone: string;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +29,10 @@ export interface UpdateSettingsInput {
     resumeValidation?: boolean;
     candidateScoring?: boolean;
     resumeParsing?: boolean;
+  };
+  applicationConfirmation?: {
+    enabled?: boolean;
+    templateId?: string | null;
   };
   companyTimezone?: string;
 }

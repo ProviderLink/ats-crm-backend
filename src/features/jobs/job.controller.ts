@@ -5,6 +5,9 @@ import catchAsync from '../../shared/utils/catchAsync';
 import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
 import * as candidateService from '../candidates/candidate.service';
+import EmailTemplate from '../email-templates/emailTemplate.model';
+import * as emailService from '../emails/email.service';
+import * as settingsService from '../settings/settings.service';
 import * as jobService from './job.service';
 
 export const getAllJobs = catchAsync(async (req: Request, res: Response) => {
@@ -138,6 +141,54 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
 
   // Trigger TYPE-1 candidacy validation (real / fake / garbage check)
   runCandidacyValidation(candidateId);
+
+  // Send application confirmation email if enabled in settings (fire-and-forget)
+  settingsService
+    .getSettings()
+    .then(async settings => {
+      const { enabled, templateId } = settings.applicationConfirmation;
+      if (!enabled || !templateId) return;
+
+      const template = await EmailTemplate.findById(templateId);
+      if (!template || !template.isActive) return;
+
+      const candidate = await candidateService.getCandidateById(candidateId);
+      if (!candidate.email) return;
+
+      emailService
+        .sendEmail({
+          to: [candidate.email],
+          subject: template.subject,
+          bodyHtml: template.bodyHtml,
+          bodyText: template.bodyText,
+          templateId: templateId,
+          context: {
+            type: 'application_confirmation',
+            candidateId,
+            jobId,
+            applicationId: null,
+            interviewId: null,
+          },
+          variables: {
+            candidateName:
+              `${candidate.firstName} ${candidate.lastName}`.trim(),
+            candidateEmail: candidate.email,
+            jobTitle: job.title,
+            companyName: settings.email.fromName,
+          },
+        })
+        .catch(err => {
+          logger.error('Application confirmation email failed', {
+            candidateId,
+            error: (err as Error).message,
+          });
+        });
+    })
+    .catch(err => {
+      logger.error('Failed to load settings for confirmation email', {
+        error: (err as Error).message,
+      });
+    });
 
   // No Application is created here — applications are created only when
   // a recruiter approves the candidate (see candidate.controller.ts approveCandidate).

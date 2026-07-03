@@ -5,7 +5,8 @@ export type EmailTemplateType =
   | 'follow_up'
   | 'eod_reminder'
   | 'survey_reminder'
-  | 'general';
+  | 'general'
+  | 'application_confirmation';
 
 export const SYSTEM_VARIABLES = [
   'candidateName',

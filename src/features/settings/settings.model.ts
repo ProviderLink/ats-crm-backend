@@ -27,10 +27,26 @@ const aiSchema = new Schema(
   { _id: false }
 );
 
+const applicationConfirmationSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    templateId: {
+      type: Schema.Types.ObjectId,
+      ref: 'EmailTemplate',
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
 const settingsSchema = new Schema<ISettingsDocument, ISettingsModel>(
   {
     email: { type: emailSchema, default: () => ({}) },
     ai: { type: aiSchema, default: () => ({}) },
+    applicationConfirmation: {
+      type: applicationConfirmationSchema,
+      default: () => ({}),
+    },
     companyTimezone: { type: String, default: 'America/New_York' },
   },
   { timestamps: true }

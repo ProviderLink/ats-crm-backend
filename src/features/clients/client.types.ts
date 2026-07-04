@@ -98,6 +98,7 @@ export interface UpdateClientInput {
   status?: string;
   description?: string;
   address?: Partial<ClientAddress>;
+  tags?: string[];
 }
 
 export interface CreateContactInput {

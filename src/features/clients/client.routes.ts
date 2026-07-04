@@ -47,6 +47,7 @@ const createClientSchema = z.object({
 
 const updateClientSchema = createClientSchema.partial().extend({
   status: z.enum(['active', 'inactive', 'suspended']).optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 const createContactSchema = z.object({

@@ -109,6 +109,10 @@ export const updateClient = async (
     client.address = { ...client.address, ...input.address };
     client.markModified('address');
   }
+  if (input.tags !== undefined) {
+    client.tags = input.tags.map(id => new mongoose.Types.ObjectId(id));
+    client.markModified('tags');
+  }
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
 
   await client.save();

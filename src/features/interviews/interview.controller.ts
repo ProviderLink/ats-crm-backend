@@ -58,7 +58,12 @@ export const updateInterview = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const body = req.body;
-    const interview = await interviewService.updateInterview(id, body);
+    const updatedBy = req.user!._id;
+    const interview = await interviewService.updateInterview(
+      id,
+      body,
+      updatedBy
+    );
     sendSuccess(res, interview, 'Interview updated', 200);
   }
 );
@@ -66,7 +71,8 @@ export const updateInterview = catchAsync(
 export const cancelInterview = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const interview = await interviewService.cancelInterview(id);
+    const cancelledBy = req.user!._id;
+    const interview = await interviewService.cancelInterview(id, cancelledBy);
     sendSuccess(res, interview, 'Interview cancelled', 200);
   }
 );

@@ -112,7 +112,8 @@ export const updateCandidate = catchAsync(
 export const deleteCandidate = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    await candidateService.deleteCandidate(id);
+    const deletedBy = req.user!._id;
+    await candidateService.deleteCandidate(id, deletedBy);
     sendSuccess(res, { deleted: true }, 'Candidate deleted', 200);
   }
 );
@@ -144,10 +145,12 @@ export const updateTalentPool = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const { action, notes } = req.body;
+    const performedBy = req.user!._id;
     const candidate = await candidateService.updateTalentPool(
       id,
       action,
-      notes
+      notes,
+      performedBy
     );
     sendSuccess(
       res,
@@ -294,7 +297,7 @@ export const rejectCandidate = catchAsync(
     }
 
     // Permanently delete the candidate and all data (per BUSINESS_LOGIC.md)
-    await candidateService.deleteCandidate(id);
+    await candidateService.deleteCandidate(id, req.user!._id);
 
     logger.info(`Pending candidate ${id} permanently rejected and deleted`);
 

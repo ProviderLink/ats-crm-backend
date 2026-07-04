@@ -96,20 +96,67 @@ export const updateClient = async (
   const client = await Client.findById(id);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
 
-  if (input.companyName !== undefined) client.companyName = input.companyName;
-  if (input.email !== undefined) client.email = input.email;
-  if (input.phone !== undefined) client.phone = input.phone;
-  if (input.website !== undefined) client.website = input.website;
-  if (input.logo !== undefined) client.logo = input.logo;
-  if (input.industry !== undefined) client.industry = input.industry;
-  if (input.companySize !== undefined) client.companySize = input.companySize;
-  if (input.status !== undefined) client.status = input.status;
-  if (input.description !== undefined) client.description = input.description;
+  const changes: string[] = [];
+
+  if (input.companyName !== undefined && input.companyName !== client.companyName) {
+    changes.push(`Company name changed from "${client.companyName}" to "${input.companyName}"`);
+    client.companyName = input.companyName;
+  } else if (input.companyName !== undefined) {
+    client.companyName = input.companyName;
+  }
+  if (input.email !== undefined && input.email !== client.email) {
+    changes.push(`Email changed from "${client.email}" to "${input.email}"`);
+    client.email = input.email;
+  } else if (input.email !== undefined) {
+    client.email = input.email;
+  }
+  if (input.phone !== undefined && input.phone !== client.phone) {
+    changes.push('Phone number updated');
+    client.phone = input.phone;
+  } else if (input.phone !== undefined) {
+    client.phone = input.phone;
+  }
+  if (input.website !== undefined && input.website !== client.website) {
+    changes.push('Website updated');
+    client.website = input.website;
+  } else if (input.website !== undefined) {
+    client.website = input.website;
+  }
+  if (input.logo !== undefined) {
+    changes.push('Logo updated');
+    client.logo = input.logo;
+  }
+  if (input.industry !== undefined && input.industry !== client.industry) {
+    changes.push(`Industry changed from "${client.industry}" to "${input.industry}"`);
+    client.industry = input.industry;
+  } else if (input.industry !== undefined) {
+    client.industry = input.industry;
+  }
+  if (input.companySize !== undefined && input.companySize !== client.companySize) {
+    changes.push(`Company size changed from "${client.companySize}" to "${input.companySize}"`);
+    client.companySize = input.companySize;
+  } else if (input.companySize !== undefined) {
+    client.companySize = input.companySize;
+  }
+  if (input.status !== undefined && input.status !== client.status) {
+    changes.push(`Status changed from "${client.status}" to "${input.status}"`);
+    client.status = input.status;
+  } else if (input.status !== undefined) {
+    client.status = input.status;
+  }
+  if (input.description !== undefined && input.description !== client.description) {
+    changes.push('Description updated');
+    client.description = input.description;
+  } else if (input.description !== undefined) {
+    client.description = input.description;
+  }
   if (input.address !== undefined) {
+    changes.push('Address updated');
     client.address = { ...client.address, ...input.address };
     client.markModified('address');
   }
   if (input.tags !== undefined) {
+    changes.push('Tags updated');
     client.tags = input.tags.map(id => new mongoose.Types.ObjectId(id));
     client.markModified('tags');
   }
@@ -121,6 +168,7 @@ export const updateClient = async (
     type: 'client_updated',
     resourceType: 'client',
     resourceId: id,
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy ?? null,
   });
 
@@ -178,17 +226,45 @@ export const updateContact = async (
     throw new AppError(404, 'CONTACT_NOT_FOUND', 'Contact not found');
   }
 
+  const changes: string[] = [];
+  const contactNameBefore = contact.name;
+
   if (input.isPrimary) {
     client.contacts.forEach(c => {
       c.isPrimary = false;
     });
   }
 
-  if (input.name !== undefined) contact.name = input.name;
-  if (input.email !== undefined) contact.email = input.email;
-  if (input.phone !== undefined) contact.phone = input.phone;
-  if (input.position !== undefined) contact.position = input.position;
-  if (input.isPrimary !== undefined) contact.isPrimary = input.isPrimary;
+  if (input.name !== undefined && input.name !== contact.name) {
+    changes.push(`Name changed from "${contact.name}" to "${input.name}"`);
+    contact.name = input.name;
+  } else if (input.name !== undefined) {
+    contact.name = input.name;
+  }
+  if (input.email !== undefined && input.email !== contact.email) {
+    changes.push(`Email changed from "${contact.email}" to "${input.email}"`);
+    contact.email = input.email;
+  } else if (input.email !== undefined) {
+    contact.email = input.email;
+  }
+  if (input.phone !== undefined && input.phone !== contact.phone) {
+    changes.push('Phone number updated');
+    contact.phone = input.phone;
+  } else if (input.phone !== undefined) {
+    contact.phone = input.phone;
+  }
+  if (input.position !== undefined && input.position !== contact.position) {
+    changes.push(`Position changed from "${contact.position}" to "${input.position}"`);
+    contact.position = input.position;
+  } else if (input.position !== undefined) {
+    contact.position = input.position;
+  }
+  if (input.isPrimary !== undefined && input.isPrimary !== contact.isPrimary) {
+    changes.push(input.isPrimary ? 'Set as primary contact' : 'Removed as primary contact');
+    contact.isPrimary = input.isPrimary;
+  } else if (input.isPrimary !== undefined) {
+    contact.isPrimary = input.isPrimary;
+  }
 
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   client.markModified('contacts');
@@ -199,7 +275,7 @@ export const updateContact = async (
     type: 'client_contact_updated',
     resourceType: 'client',
     resourceId: clientId,
-    metadata: { contactId },
+    metadata: { contactName: contactNameBefore, contactId, changes },
     performedBy: updatedBy ?? null,
   });
 
@@ -299,22 +375,62 @@ export const updateCrmProfile = async (
   }
 
   const profile = client.crmProfile;
-  if (input.healthStatus !== undefined)
+  const changes: string[] = [];
+
+  if (input.healthStatus !== undefined && input.healthStatus !== profile.healthStatus) {
+    changes.push(`Health status changed from "${profile.healthStatus}" to "${input.healthStatus}"`);
     profile.healthStatus = input.healthStatus;
-  if (input.baaSign !== undefined) profile.baaSign = input.baaSign;
-  if (input.baaSignedDate !== undefined)
+  } else if (input.healthStatus !== undefined) {
+    profile.healthStatus = input.healthStatus;
+  }
+  if (input.baaSign !== undefined && input.baaSign !== profile.baaSign) {
+    changes.push(input.baaSign ? 'BAA marked as signed' : 'BAA marked as unsigned');
+    profile.baaSign = input.baaSign;
+  } else if (input.baaSign !== undefined) {
+    profile.baaSign = input.baaSign;
+  }
+  if (input.baaSignedDate !== undefined) {
+    changes.push(input.baaSignedDate ? 'BAA signed date updated' : 'BAA signed date cleared');
     profile.baaSignedDate = input.baaSignedDate;
-  if (input.emrSystem !== undefined) profile.emrSystem = input.emrSystem;
-  if (input.onboardingComplete !== undefined)
+  }
+  if (input.emrSystem !== undefined && input.emrSystem !== profile.emrSystem) {
+    changes.push(`EMR system changed from "${profile.emrSystem}" to "${input.emrSystem}"`);
+    profile.emrSystem = input.emrSystem;
+  } else if (input.emrSystem !== undefined) {
+    profile.emrSystem = input.emrSystem;
+  }
+  if (input.onboardingComplete !== undefined && input.onboardingComplete !== profile.onboardingComplete) {
+    changes.push(`Onboarding ${input.onboardingComplete ? 'marked complete' : 'marked incomplete'}`);
     profile.onboardingComplete = input.onboardingComplete;
-  if (input.sopReceived !== undefined) profile.sopReceived = input.sopReceived;
-  if (input.satisfactionScore !== undefined)
+  } else if (input.onboardingComplete !== undefined) {
+    profile.onboardingComplete = input.onboardingComplete;
+  }
+  if (input.sopReceived !== undefined && input.sopReceived !== profile.sopReceived) {
+    changes.push(`SOP ${input.sopReceived ? 'marked as received' : 'marked as not received'}`);
+    profile.sopReceived = input.sopReceived;
+  } else if (input.sopReceived !== undefined) {
+    profile.sopReceived = input.sopReceived;
+  }
+  if (input.satisfactionScore !== undefined && input.satisfactionScore !== profile.satisfactionScore) {
+    changes.push(`Satisfaction score updated to ${input.satisfactionScore}`);
     profile.satisfactionScore = input.satisfactionScore;
-  if (input.openIssuesCount !== undefined)
+  } else if (input.satisfactionScore !== undefined) {
+    profile.satisfactionScore = input.satisfactionScore;
+  }
+  if (input.openIssuesCount !== undefined && input.openIssuesCount !== profile.openIssuesCount) {
+    changes.push(`Open issues count changed from ${profile.openIssuesCount} to ${input.openIssuesCount}`);
     profile.openIssuesCount = input.openIssuesCount;
-  if (input.lastClientCheckin !== undefined)
+  } else if (input.openIssuesCount !== undefined) {
+    profile.openIssuesCount = input.openIssuesCount;
+  }
+  if (input.lastClientCheckin !== undefined) {
+    changes.push('Last client check-in date updated');
     profile.lastClientCheckin = input.lastClientCheckin;
-  if (input.notes !== undefined) profile.notes = input.notes;
+  }
+  if (input.notes !== undefined) {
+    changes.push('CRM notes updated');
+    profile.notes = input.notes;
+  }
 
   client.markModified('crmProfile');
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
@@ -325,6 +441,7 @@ export const updateCrmProfile = async (
     type: 'client_crm_profile_updated',
     resourceType: 'client',
     resourceId: clientId,
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy ?? null,
   });
 

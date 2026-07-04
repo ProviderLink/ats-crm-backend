@@ -135,9 +135,40 @@ export const updateJob = async (
   const job = await Job.findById(id);
   if (!job) throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
 
+  const fieldLabels: Partial<Record<keyof UpdateJobInput, string>> = {
+    title: 'Title',
+    description: 'Description',
+    jobType: 'Job type',
+    locationType: 'Location type',
+    location: 'Location',
+    experienceLevel: 'Experience level',
+    priority: 'Priority',
+    openings: 'Number of openings',
+    requirements: 'Requirements',
+    responsibilities: 'Responsibilities',
+    skills: 'Required skills',
+    tags: 'Tags',
+    salaryRange: 'Salary range',
+    applicationDeadline: 'Application deadline',
+    startDate: 'Start date',
+    benefits: 'Benefits',
+  };
+
+  const changes: string[] = [];
   const fields = Object.keys(input) as (keyof UpdateJobInput)[];
+
   for (const field of fields) {
     if (input[field] !== undefined) {
+      const oldVal = (job as unknown as Record<string, unknown>)[field];
+      const newVal = input[field];
+      const label = fieldLabels[field] ?? field;
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        if (Array.isArray(newVal) || typeof newVal === 'object') {
+          changes.push(`${label} updated`);
+        } else {
+          changes.push(`${label} changed from "${String(oldVal)}" to "${String(newVal)}"`);
+        }
+      }
       (job as unknown as Record<string, unknown>)[field] = input[field];
     }
   }
@@ -151,6 +182,7 @@ export const updateJob = async (
     type: 'job_updated',
     resourceType: 'job',
     resourceId: id,
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy,
   });
 
@@ -159,7 +191,10 @@ export const updateJob = async (
   return result;
 };
 
-export const deleteJob = async (id: string): Promise<{ deleted: boolean }> => {
+export const deleteJob = async (
+  id: string,
+  deletedBy?: string
+): Promise<{ deleted: boolean }> => {
   const job = await Job.findById(id);
   if (!job) throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
 
@@ -181,6 +216,7 @@ export const deleteJob = async (id: string): Promise<{ deleted: boolean }> => {
     type: 'job_deleted',
     resourceType: 'job',
     resourceId: id,
+    performedBy: deletedBy ?? null,
   });
 
   emitToAts('jobs', 'job:deleted', { _id: id });
@@ -284,7 +320,10 @@ export const assignPipeline = async (
     type: 'job_pipeline_assigned',
     resourceType: 'job',
     resourceId: jobId,
-    metadata: { templateId: input.templateId },
+    metadata: {
+      templateName: template.name,
+      applicationsRemapped: applications.length,
+    },
     performedBy: updatedBy,
   });
 
@@ -310,12 +349,21 @@ export const updateJobStatus = async (
     );
   }
 
+  const previousStatus = job.status;
   job.status = status;
   job.updatedBy = new mongoose.Types.ObjectId(
     updatedBy
   ) as unknown as mongoose.Types.ObjectId;
 
   await job.save();
+
+  createLog({
+    type: 'job_status_changed',
+    resourceType: 'job',
+    resourceId: id,
+    metadata: { from: previousStatus, to: status },
+    performedBy: updatedBy,
+  });
 
   const result = job.toSafeObject();
   emitToAts('jobs', 'job:updated', result);

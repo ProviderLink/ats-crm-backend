@@ -153,21 +153,47 @@ export const updateAssignment = async (
     );
   }
 
-  if (input.serviceType !== undefined)
+  const changes: string[] = [];
+
+  if (input.serviceType !== undefined && input.serviceType !== assignment.serviceType) {
+    changes.push(`Service type changed from "${assignment.serviceType}" to "${input.serviceType}"`);
     assignment.serviceType = input.serviceType;
-  if (input.startDate !== undefined)
-    assignment.startDate = new Date(input.startDate);
-  if (input.endDate !== undefined)
-    assignment.endDate = input.endDate ? new Date(input.endDate) : null;
-  if (input.accountManagerId !== undefined) {
-    assignment.accountManagerId = new mongoose.Types.ObjectId(
-      input.accountManagerId
-    );
+  } else if (input.serviceType !== undefined) {
+    assignment.serviceType = input.serviceType;
   }
-  if (input.notes !== undefined) assignment.notes = input.notes ?? null;
+  if (input.startDate !== undefined) {
+    changes.push('Start date updated');
+    assignment.startDate = new Date(input.startDate);
+  }
+  if (input.endDate !== undefined) {
+    changes.push(input.endDate ? 'End date updated' : 'End date removed');
+    assignment.endDate = input.endDate ? new Date(input.endDate) : null;
+  }
+  if (input.accountManagerId !== undefined &&
+      String(assignment.accountManagerId) !== input.accountManagerId) {
+    changes.push('Account manager changed');
+    assignment.accountManagerId = new mongoose.Types.ObjectId(input.accountManagerId);
+  } else if (input.accountManagerId !== undefined) {
+    assignment.accountManagerId = new mongoose.Types.ObjectId(input.accountManagerId);
+  }
+  if (input.notes !== undefined) {
+    changes.push('Notes updated');
+    assignment.notes = input.notes ?? null;
+  }
 
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
+
+  createLog({
+    type: 'assignment_updated',
+    resourceType: 'assignment',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(assignment.candidateId),
+    metadata: changes.length > 0 ? { changes } : {},
+    performedBy: updatedBy,
+  });
+
   const result = assignment.toSafeObject();
   emitToCrm('assignments', 'assignment:updated', result);
   return result;
@@ -219,9 +245,21 @@ export const updateAssignmentStatus = async (
     );
   }
 
+  const previousStatus = assignment.status;
   assignment.status = status;
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
+
+  createLog({
+    type: 'assignment_status_changed',
+    resourceType: 'assignment',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(assignment.candidateId),
+    metadata: { from: previousStatus, to: status },
+    performedBy: updatedBy,
+  });
+
   const result = assignment.toSafeObject();
   emitToCrm('assignments', 'assignment:updated', result);
   return result;

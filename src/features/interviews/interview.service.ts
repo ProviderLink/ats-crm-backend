@@ -169,7 +169,8 @@ export const createInterview = async (
 
 export const updateInterview = async (
   id: string,
-  input: UpdateInterviewInput
+  input: UpdateInterviewInput,
+  updatedBy?: string
 ): Promise<IInterview> => {
   const interview = await Interview.findById(id);
   if (!interview)
@@ -256,6 +257,7 @@ export const updateInterview = async (
     resourceType: 'interview',
     resourceId: id,
     metadata: changes.length > 0 ? { changes } : undefined,
+    performedBy: updatedBy ?? null,
   });
 
   const safeInterview = interview.toSafeObject();
@@ -271,7 +273,10 @@ export const updateInterview = async (
   return safeInterview;
 };
 
-export const cancelInterview = async (id: string): Promise<IInterview> => {
+export const cancelInterview = async (
+  id: string,
+  cancelledBy?: string
+): Promise<IInterview> => {
   const interview = await Interview.findById(id);
   if (!interview)
     throw new AppError(404, 'INTERVIEW_NOT_FOUND', 'Interview not found');
@@ -296,6 +301,7 @@ export const cancelInterview = async (id: string): Promise<IInterview> => {
     type: 'interview_cancelled',
     resourceType: 'interview',
     resourceId: id,
+    performedBy: cancelledBy ?? null,
   });
 
   const safeInterview = interview.toSafeObject();

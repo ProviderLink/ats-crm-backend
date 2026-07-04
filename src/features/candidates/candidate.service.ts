@@ -145,31 +145,82 @@ export const updateCandidate = async (
   if (!candidate)
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
 
-  if (input.firstName !== undefined) candidate.firstName = input.firstName;
-  if (input.lastName !== undefined) candidate.lastName = input.lastName;
-  if (input.phone !== undefined) candidate.phone = input.phone;
-  if (input.avatar !== undefined) candidate.avatar = input.avatar;
-  if (input.videoIntroUrl !== undefined)
+  const changes: string[] = [];
+
+  if (input.firstName !== undefined && input.firstName !== candidate.firstName) {
+    changes.push(`First name changed from "${candidate.firstName}" to "${input.firstName}"`);
+    candidate.firstName = input.firstName;
+  } else if (input.firstName !== undefined) {
+    candidate.firstName = input.firstName;
+  }
+  if (input.lastName !== undefined && input.lastName !== candidate.lastName) {
+    changes.push(`Last name changed from "${candidate.lastName}" to "${input.lastName}"`);
+    candidate.lastName = input.lastName;
+  } else if (input.lastName !== undefined) {
+    candidate.lastName = input.lastName;
+  }
+  if (input.phone !== undefined && input.phone !== candidate.phone) {
+    changes.push('Phone number updated');
+    candidate.phone = input.phone;
+  } else if (input.phone !== undefined) {
+    candidate.phone = input.phone;
+  }
+  if (input.avatar !== undefined) {
+    changes.push('Profile photo updated');
+    candidate.avatar = input.avatar;
+  }
+  if (input.videoIntroUrl !== undefined && input.videoIntroUrl !== candidate.videoIntroUrl) {
+    changes.push(input.videoIntroUrl ? 'Video intro updated' : 'Video intro removed');
     candidate.videoIntroUrl = input.videoIntroUrl;
+  } else if (input.videoIntroUrl !== undefined) {
+    candidate.videoIntroUrl = input.videoIntroUrl;
+  }
   if (input.videoIntroSource !== undefined)
     candidate.videoIntroSource = input.videoIntroSource;
-  if (input.yearsOfExperience !== undefined)
+  if (input.yearsOfExperience !== undefined && input.yearsOfExperience !== candidate.yearsOfExperience) {
+    changes.push(`Years of experience changed from ${candidate.yearsOfExperience} to ${input.yearsOfExperience}`);
     candidate.yearsOfExperience = input.yearsOfExperience;
-  if (input.englishProficiency !== undefined)
+  } else if (input.yearsOfExperience !== undefined) {
+    candidate.yearsOfExperience = input.yearsOfExperience;
+  }
+  if (input.englishProficiency !== undefined && input.englishProficiency !== candidate.englishProficiency) {
+    changes.push(`English proficiency changed from "${candidate.englishProficiency}" to "${input.englishProficiency}"`);
     candidate.englishProficiency = input.englishProficiency;
-  if (input.currentSalaryPHP !== undefined)
+  } else if (input.englishProficiency !== undefined) {
+    candidate.englishProficiency = input.englishProficiency;
+  }
+  if (input.currentSalaryPHP !== undefined && input.currentSalaryPHP !== candidate.currentSalaryPHP) {
+    changes.push('Current salary (PHP) updated');
     candidate.currentSalaryPHP = input.currentSalaryPHP;
-  if (input.currentSalaryUSD !== undefined)
+  } else if (input.currentSalaryPHP !== undefined) {
+    candidate.currentSalaryPHP = input.currentSalaryPHP;
+  }
+  if (input.currentSalaryUSD !== undefined && input.currentSalaryUSD !== candidate.currentSalaryUSD) {
+    changes.push('Current salary (USD) updated');
     candidate.currentSalaryUSD = input.currentSalaryUSD;
-  if (input.reasonForLeaving !== undefined)
+  } else if (input.currentSalaryUSD !== undefined) {
+    candidate.currentSalaryUSD = input.currentSalaryUSD;
+  }
+  if (input.reasonForLeaving !== undefined && input.reasonForLeaving !== candidate.reasonForLeaving) {
+    changes.push('Reason for leaving updated');
     candidate.reasonForLeaving = input.reasonForLeaving;
-  if (input.cityOfResidence !== undefined)
+  } else if (input.reasonForLeaving !== undefined) {
+    candidate.reasonForLeaving = input.reasonForLeaving;
+  }
+  if (input.cityOfResidence !== undefined && input.cityOfResidence !== candidate.cityOfResidence) {
+    changes.push(`City of residence changed from "${candidate.cityOfResidence ?? 'unset'}" to "${input.cityOfResidence}"`);
     candidate.cityOfResidence = input.cityOfResidence;
-  if (input.tags !== undefined)
+  } else if (input.cityOfResidence !== undefined) {
+    candidate.cityOfResidence = input.cityOfResidence;
+  }
+  if (input.tags !== undefined) {
+    changes.push('Tags updated');
     candidate.tags = input.tags.map(
       t => new mongoose.Types.ObjectId(t)
     ) as unknown as mongoose.Types.ObjectId[];
+  }
   if (input.parsedData !== undefined) {
+    changes.push('Profile data updated');
     candidate.parsedData = input.parsedData;
     candidate.markModified('parsedData');
   }
@@ -191,6 +242,7 @@ export const updateCandidate = async (
     type: 'candidate_updated',
     resourceType: 'candidate',
     resourceId: id,
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy,
   });
 
@@ -200,7 +252,8 @@ export const updateCandidate = async (
 };
 
 export const deleteCandidate = async (
-  id: string
+  id: string,
+  deletedBy?: string | null
 ): Promise<{ deleted: boolean }> => {
   const candidate = await Candidate.findById(id);
   if (!candidate)
@@ -222,6 +275,7 @@ export const deleteCandidate = async (
     type: 'candidate_deleted',
     resourceType: 'candidate',
     resourceId: id,
+    performedBy: deletedBy ?? null,
   });
 
   emitToAts('candidates', 'candidate:deleted', { _id: id });
@@ -231,7 +285,8 @@ export const deleteCandidate = async (
 export const updateTalentPool = async (
   id: string,
   action: 'add' | 'remove',
-  notes?: string
+  notes?: string,
+  performedBy?: string | null
 ): Promise<ICandidate> => {
   const candidate = await Candidate.findById(id);
   if (!candidate)
@@ -256,6 +311,7 @@ export const updateTalentPool = async (
         : 'candidate_talent_pool_removed',
     resourceType: 'candidate',
     resourceId: id,
+    performedBy: performedBy ?? null,
   });
 
   const result = candidate.toSafeObject();
@@ -265,12 +321,14 @@ export const updateTalentPool = async (
 
 export const updateCandidateStatus = async (
   id: string,
-  status: 'pending' | 'approved' | 'hired'
+  status: 'pending' | 'approved' | 'hired',
+  performedBy?: string | null
 ): Promise<ICandidate> => {
   const candidate = await Candidate.findById(id);
   if (!candidate)
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
 
+  const previousStatus = candidate.status;
   candidate.status = status;
   await candidate.save();
 
@@ -278,7 +336,8 @@ export const updateCandidateStatus = async (
     type: 'candidate_status_changed',
     resourceType: 'candidate',
     resourceId: id,
-    metadata: { status },
+    metadata: { from: previousStatus, to: status },
+    performedBy: performedBy ?? null,
   });
 
   const result = candidate.toSafeObject();
@@ -312,6 +371,16 @@ export const updateParsedData = async (
     type: 'candidate_parsed_data_updated',
     resourceType: 'candidate',
     resourceId: id,
+    metadata: {
+      sections: [
+        (parsedData.skills?.length ?? 0) > 0 ? 'skills' : null,
+        (parsedData.experience?.length ?? 0) > 0 ? 'experience' : null,
+        (parsedData.education?.length ?? 0) > 0 ? 'education' : null,
+      ].filter(Boolean),
+      skillsCount: parsedData.skills?.length ?? 0,
+      experienceCount: parsedData.experience?.length ?? 0,
+      educationCount: parsedData.education?.length ?? 0,
+    },
   });
 
   const result = candidate.toSafeObject();
@@ -335,6 +404,7 @@ export const updateAiScore = async (
     type: 'candidate_ai_score_updated',
     resourceType: 'candidate',
     resourceId: id,
+    metadata: { score: aiScore.score, recommendation: aiScore.recommendation },
   });
 
   const result = candidate.toSafeObject();
@@ -353,5 +423,17 @@ export const updateAiValidation = async (
   candidate.aiValidation = aiValidation;
   candidate.markModified('aiValidation');
   await candidate.save();
+
+  createLog({
+    type: 'candidate_ai_validation_updated',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: {
+      isValid: aiValidation.isValid,
+      score: aiValidation.score,
+      reason: aiValidation.reason,
+    },
+  });
+
   return candidate.toSafeObject();
 };

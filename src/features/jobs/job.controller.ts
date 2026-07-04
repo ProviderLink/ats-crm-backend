@@ -53,7 +53,8 @@ export const updateJob = catchAsync(async (req: Request, res: Response) => {
 
 export const deleteJob = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  await jobService.deleteJob(id);
+  const deletedBy = req.user!._id;
+  await jobService.deleteJob(id, deletedBy);
   sendSuccess(res, { deleted: true }, 'Job deleted', 200);
 });
 

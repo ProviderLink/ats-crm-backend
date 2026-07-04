@@ -232,6 +232,7 @@ export const approveApplication = async (
     resourceId: id,
     relatedType: 'candidate',
     relatedId: String(application.candidateId),
+    metadata: { stageName: firstStage.name },
     performedBy: input.approvedBy,
   });
 
@@ -317,6 +318,8 @@ export const moveStage = async (
     throw new AppError(404, 'STAGE_NOT_FOUND', 'Pipeline stage not found');
   }
 
+  const previousStageName = application.currentStage?.stageName ?? null;
+
   application.currentStage = {
     stageId: targetStage._id,
     stageName: targetStage.name,
@@ -329,7 +332,9 @@ export const moveStage = async (
     type: 'application_stage_moved',
     resourceType: 'application',
     resourceId: id,
-    metadata: { stageName: targetStage.name },
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    metadata: { from: previousStageName, to: targetStage.name },
     performedBy: input.movedBy,
   });
 
@@ -422,6 +427,8 @@ export const updateApplicationNotes = async (
     type: 'application_notes_updated',
     resourceType: 'application',
     resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
     performedBy: updatedBy,
   });
 
@@ -448,6 +455,16 @@ export const updateApplicationAiScore = async (
   application.aiScore = aiScore;
   application.markModified('aiScore');
   await application.save();
+
+  createLog({
+    type: 'application_ai_score_updated',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    metadata: { score: aiScore.score, recommendation: aiScore.recommendation },
+  });
+
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);
   return result;
@@ -472,6 +489,19 @@ export const updateAiValidation = async (
   };
   application.markModified('aiValidation');
   await application.save();
+
+  createLog({
+    type: 'application_ai_validation_updated',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    metadata: {
+      isValid: aiValidation.isValid,
+      score: aiValidation.score,
+      reason: aiValidation.reason,
+    },
+  });
 
   return application.toSafeObject();
 };

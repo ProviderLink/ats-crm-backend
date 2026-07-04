@@ -317,15 +317,8 @@ export const updateJobStatus = async (
 
   await job.save();
 
-  createLog({
-    type: 'job_status_changed',
-    resourceType: 'job',
-    resourceId: id,
-    metadata: { status },
-    performedBy: updatedBy,
-  });
-
   const result = job.toSafeObject();
   emitToAts('jobs', 'job:updated', result);
+  emitToAts('jobs', 'job:statusChanged', { _id: result._id, status });
   return result;
 };

@@ -169,6 +169,8 @@ candidateSchema.methods.toSafeObject = function (): ICandidate {
   raw['tags'] = Array.isArray(raw['tags'])
     ? (raw['tags'] as mongoose.Types.ObjectId[]).map(String)
     : [];
+  // Guard against legacy documents with null/missing status
+  if (!raw['status']) raw['status'] = 'pending';
   return raw as unknown as ICandidate;
 };
 

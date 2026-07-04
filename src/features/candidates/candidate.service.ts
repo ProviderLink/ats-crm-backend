@@ -283,6 +283,7 @@ export const updateCandidateStatus = async (
 
   const result = candidate.toSafeObject();
   emitToAts('candidates', 'candidate:updated', result);
+  emitToAts('candidates', 'candidate:statusChanged', { _id: result._id, status });
   return result;
 };
 

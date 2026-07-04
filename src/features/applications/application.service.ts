@@ -237,6 +237,7 @@ export const approveApplication = async (
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);
+  emitToAts('applications', 'application:phaseChanged', { _id: result._id, phase: 'approved' });
   return result;
 };
 
@@ -288,6 +289,7 @@ export const rejectApplication = async (
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:deleted', result);
+  emitToAts('applications', 'application:phaseChanged', { _id: result._id, phase: 'rejected' });
   return result;
 };
 
@@ -398,6 +400,7 @@ export const hireApplication = async (
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);
+  emitToAts('applications', 'application:phaseChanged', { _id: result._id, phase: 'hired' });
   return result;
 };
 

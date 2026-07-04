@@ -16,6 +16,10 @@ export const getDashboardStats = async () => {
     totalApplications,
     pendingApplications,
     approvedApplications,
+    hiredCount,
+    totalInterviews,
+    scheduledInterviews,
+    completedInterviews,
   ] = await Promise.all([
     Candidate.countDocuments({}),
     Candidate.countDocuments({ status: 'approved' }),
@@ -27,6 +31,10 @@ export const getDashboardStats = async () => {
     Application.countDocuments({}),
     Application.countDocuments({ phase: 'pending' }),
     Application.countDocuments({ phase: 'approved' }),
+    Application.countDocuments({ phase: 'hired' }),
+    Interview.countDocuments({}),
+    Interview.countDocuments({ status: 'scheduled' }),
+    Interview.countDocuments({ status: 'completed' }),
   ]);
 
   const recentApplications = await Application.find({})
@@ -84,6 +92,12 @@ export const getDashboardStats = async () => {
       totalApplications,
       pendingApplications,
       approvedApplications,
+      // Fields required by frontend dashboard
+      hiredCount,
+      activeCandidates: approvedCandidates,
+      totalInterviews,
+      scheduledInterviews,
+      completedInterviews,
     },
     recentApplications,
     upcomingInterviews,

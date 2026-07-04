@@ -238,7 +238,6 @@ export const approveCandidate = catchAsync(
     await candidateService.updateCandidateStatus(id, 'approved');
 
     // Create Application — the link between candidate and job.
-    // Phase: 'pending' means approved but not yet placed in a pipeline stage.
     const application = await applicationService.createApplication({
       candidateId: id,
       jobId,
@@ -247,8 +246,14 @@ export const approveCandidate = catchAsync(
       createdBy: updatedBy,
     });
 
-    // Trigger TYPE-2 AI candidate scoring against this job (background)
-    runCandidateScoring(id, jobId);
+    // Immediately approve the application so the candidate lands in the
+    // pipeline at the job's first stage (In Pipeline tab) rather than
+    // staying in a 'pending' limbo state with no stage assigned.
+    if (job.pipeline && job.pipeline.stages.length > 0) {
+      await applicationService.approveApplication(application._id.toString(), {
+        approvedBy: updatedBy.toString(),
+      });
+    }
 
     logger.info(
       `Candidate ${id} approved for job ${jobId}, application: ${application._id}`

@@ -32,6 +32,7 @@ const TEMPLATE_TYPE_ENUM = z.enum([
   'eod_reminder',
   'survey_reminder',
   'general',
+  'application_confirmation',
 ]);
 
 const createTemplateSchema = z.object({

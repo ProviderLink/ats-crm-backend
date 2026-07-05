@@ -75,6 +75,7 @@ export const createClient = async (
     companySize: input.companySize ?? '1-10',
     description: input.description ?? '',
     address: input.address ?? {},
+    tags: input.tags?.map(id => new mongoose.Types.ObjectId(id)) ?? [],
     createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
   });
 
@@ -98,8 +99,13 @@ export const updateClient = async (
 
   const changes: string[] = [];
 
-  if (input.companyName !== undefined && input.companyName !== client.companyName) {
-    changes.push(`Company name changed from "${client.companyName}" to "${input.companyName}"`);
+  if (
+    input.companyName !== undefined &&
+    input.companyName !== client.companyName
+  ) {
+    changes.push(
+      `Company name changed from "${client.companyName}" to "${input.companyName}"`
+    );
     client.companyName = input.companyName;
   } else if (input.companyName !== undefined) {
     client.companyName = input.companyName;
@@ -127,13 +133,20 @@ export const updateClient = async (
     client.logo = input.logo;
   }
   if (input.industry !== undefined && input.industry !== client.industry) {
-    changes.push(`Industry changed from "${client.industry}" to "${input.industry}"`);
+    changes.push(
+      `Industry changed from "${client.industry}" to "${input.industry}"`
+    );
     client.industry = input.industry;
   } else if (input.industry !== undefined) {
     client.industry = input.industry;
   }
-  if (input.companySize !== undefined && input.companySize !== client.companySize) {
-    changes.push(`Company size changed from "${client.companySize}" to "${input.companySize}"`);
+  if (
+    input.companySize !== undefined &&
+    input.companySize !== client.companySize
+  ) {
+    changes.push(
+      `Company size changed from "${client.companySize}" to "${input.companySize}"`
+    );
     client.companySize = input.companySize;
   } else if (input.companySize !== undefined) {
     client.companySize = input.companySize;
@@ -144,7 +157,10 @@ export const updateClient = async (
   } else if (input.status !== undefined) {
     client.status = input.status;
   }
-  if (input.description !== undefined && input.description !== client.description) {
+  if (
+    input.description !== undefined &&
+    input.description !== client.description
+  ) {
     changes.push('Description updated');
     client.description = input.description;
   } else if (input.description !== undefined) {
@@ -254,13 +270,17 @@ export const updateContact = async (
     contact.phone = input.phone;
   }
   if (input.position !== undefined && input.position !== contact.position) {
-    changes.push(`Position changed from "${contact.position}" to "${input.position}"`);
+    changes.push(
+      `Position changed from "${contact.position}" to "${input.position}"`
+    );
     contact.position = input.position;
   } else if (input.position !== undefined) {
     contact.position = input.position;
   }
   if (input.isPrimary !== undefined && input.isPrimary !== contact.isPrimary) {
-    changes.push(input.isPrimary ? 'Set as primary contact' : 'Removed as primary contact');
+    changes.push(
+      input.isPrimary ? 'Set as primary contact' : 'Removed as primary contact'
+    );
     contact.isPrimary = input.isPrimary;
   } else if (input.isPrimary !== undefined) {
     contact.isPrimary = input.isPrimary;
@@ -377,48 +397,79 @@ export const updateCrmProfile = async (
   const profile = client.crmProfile;
   const changes: string[] = [];
 
-  if (input.healthStatus !== undefined && input.healthStatus !== profile.healthStatus) {
-    changes.push(`Health status changed from "${profile.healthStatus}" to "${input.healthStatus}"`);
+  if (
+    input.healthStatus !== undefined &&
+    input.healthStatus !== profile.healthStatus
+  ) {
+    changes.push(
+      `Health status changed from "${profile.healthStatus}" to "${input.healthStatus}"`
+    );
     profile.healthStatus = input.healthStatus;
   } else if (input.healthStatus !== undefined) {
     profile.healthStatus = input.healthStatus;
   }
   if (input.baaSign !== undefined && input.baaSign !== profile.baaSign) {
-    changes.push(input.baaSign ? 'BAA marked as signed' : 'BAA marked as unsigned');
+    changes.push(
+      input.baaSign ? 'BAA marked as signed' : 'BAA marked as unsigned'
+    );
     profile.baaSign = input.baaSign;
   } else if (input.baaSign !== undefined) {
     profile.baaSign = input.baaSign;
   }
   if (input.baaSignedDate !== undefined) {
-    changes.push(input.baaSignedDate ? 'BAA signed date updated' : 'BAA signed date cleared');
+    changes.push(
+      input.baaSignedDate
+        ? 'BAA signed date updated'
+        : 'BAA signed date cleared'
+    );
     profile.baaSignedDate = input.baaSignedDate;
   }
   if (input.emrSystem !== undefined && input.emrSystem !== profile.emrSystem) {
-    changes.push(`EMR system changed from "${profile.emrSystem}" to "${input.emrSystem}"`);
+    changes.push(
+      `EMR system changed from "${profile.emrSystem}" to "${input.emrSystem}"`
+    );
     profile.emrSystem = input.emrSystem;
   } else if (input.emrSystem !== undefined) {
     profile.emrSystem = input.emrSystem;
   }
-  if (input.onboardingComplete !== undefined && input.onboardingComplete !== profile.onboardingComplete) {
-    changes.push(`Onboarding ${input.onboardingComplete ? 'marked complete' : 'marked incomplete'}`);
+  if (
+    input.onboardingComplete !== undefined &&
+    input.onboardingComplete !== profile.onboardingComplete
+  ) {
+    changes.push(
+      `Onboarding ${input.onboardingComplete ? 'marked complete' : 'marked incomplete'}`
+    );
     profile.onboardingComplete = input.onboardingComplete;
   } else if (input.onboardingComplete !== undefined) {
     profile.onboardingComplete = input.onboardingComplete;
   }
-  if (input.sopReceived !== undefined && input.sopReceived !== profile.sopReceived) {
-    changes.push(`SOP ${input.sopReceived ? 'marked as received' : 'marked as not received'}`);
+  if (
+    input.sopReceived !== undefined &&
+    input.sopReceived !== profile.sopReceived
+  ) {
+    changes.push(
+      `SOP ${input.sopReceived ? 'marked as received' : 'marked as not received'}`
+    );
     profile.sopReceived = input.sopReceived;
   } else if (input.sopReceived !== undefined) {
     profile.sopReceived = input.sopReceived;
   }
-  if (input.satisfactionScore !== undefined && input.satisfactionScore !== profile.satisfactionScore) {
+  if (
+    input.satisfactionScore !== undefined &&
+    input.satisfactionScore !== profile.satisfactionScore
+  ) {
     changes.push(`Satisfaction score updated to ${input.satisfactionScore}`);
     profile.satisfactionScore = input.satisfactionScore;
   } else if (input.satisfactionScore !== undefined) {
     profile.satisfactionScore = input.satisfactionScore;
   }
-  if (input.openIssuesCount !== undefined && input.openIssuesCount !== profile.openIssuesCount) {
-    changes.push(`Open issues count changed from ${profile.openIssuesCount} to ${input.openIssuesCount}`);
+  if (
+    input.openIssuesCount !== undefined &&
+    input.openIssuesCount !== profile.openIssuesCount
+  ) {
+    changes.push(
+      `Open issues count changed from ${profile.openIssuesCount} to ${input.openIssuesCount}`
+    );
     profile.openIssuesCount = input.openIssuesCount;
   } else if (input.openIssuesCount !== undefined) {
     profile.openIssuesCount = input.openIssuesCount;

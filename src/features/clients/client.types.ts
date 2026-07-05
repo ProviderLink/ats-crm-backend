@@ -85,6 +85,7 @@ export interface CreateClientInput {
   companySize?: string;
   description?: string;
   address?: Partial<ClientAddress>;
+  tags?: string[];
 }
 
 export interface UpdateClientInput {

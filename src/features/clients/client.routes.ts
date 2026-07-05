@@ -43,6 +43,7 @@ const createClientSchema = z.object({
       postalCode: z.string().optional(),
     })
     .optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 const updateClientSchema = createClientSchema.partial().extend({

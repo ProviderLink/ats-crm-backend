@@ -170,7 +170,7 @@ function normalizeCompanySizeOnDoc(doc: { get(name: string): unknown; set(name: 
 }
 
 clientSchema.pre('save', function (next) {
-  normalizeCompanySizeOnDoc(this as IClientDocument);
+  normalizeCompanySizeOnDoc(this);
   next();
 });
 

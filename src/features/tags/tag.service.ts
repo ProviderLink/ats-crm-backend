@@ -1,4 +1,5 @@
 import AppError from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Tag from './tag.model';
 import type { CreateTagInput, ITag, UpdateTagInput } from './tag.types';
@@ -32,7 +33,9 @@ export const createTag = async (
     performedBy: createdBy,
   });
 
-  return tag.toSafeObject();
+  const result = tag.toSafeObject();
+  emitToAts('tags', 'tag:created', result);
+  return result;
 };
 
 export const updateTag = async (
@@ -66,7 +69,9 @@ export const updateTag = async (
     resourceId: id,
   });
 
-  return tag.toSafeObject();
+  const result = tag.toSafeObject();
+  emitToAts('tags', 'tag:updated', result);
+  return result;
 };
 
 export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
@@ -82,5 +87,6 @@ export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
     resourceId: id,
   });
 
+  emitToAts('tags', 'tag:deleted', { _id: id });
   return { deleted: true };
 };

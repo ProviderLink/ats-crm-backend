@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import Job from '../jobs/job.model';
 import PipelineTemplate from './pipelineTemplate.model';
 import type {
@@ -102,7 +103,9 @@ export const createTemplate = async (
   } catch (err) {
     handleDefaultGuardError(err);
   }
-  return template!.toSafeObject();
+  const result = template!.toSafeObject();
+  emitToAts('pipeline-templates', 'pipeline_template:created', result);
+  return result;
 };
 
 export const updateTemplate = async (
@@ -175,7 +178,9 @@ export const updateTemplate = async (
   } catch (err) {
     handleDefaultGuardError(err);
   }
-  return template.toSafeObject();
+  const result = template.toSafeObject();
+  emitToAts('pipeline-templates', 'pipeline_template:updated', result);
+  return result;
 };
 
 export const deleteTemplate = async (
@@ -208,5 +213,6 @@ export const deleteTemplate = async (
     );
   }
   await template.deleteOne();
+  emitToAts('pipeline-templates', 'pipeline_template:deleted', { _id: id });
   return { deleted: true };
 };

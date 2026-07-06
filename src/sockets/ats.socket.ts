@@ -35,6 +35,9 @@ export const initializeAtsSocket = (io: Server): void => {
     socket.join('applications');
     socket.join('candidates');
     socket.join('jobs');
+    socket.join('clients');
+    socket.join('tags');
+    socket.join('pipeline-templates');
     socket.join('email-templates');
     socket.join(`user:${decoded._id}`);
 

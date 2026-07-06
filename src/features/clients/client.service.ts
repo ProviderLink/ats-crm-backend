@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Job from '../jobs/job.model';
 import Client from './client.model';
@@ -86,7 +87,9 @@ export const createClient = async (
     performedBy: createdBy ?? null,
   });
 
-  return client.toSafeObject();
+  const result = client.toSafeObject();
+  emitToAts('clients', 'client:created', result);
+  return result;
 };
 
 export const updateClient = async (
@@ -188,7 +191,9 @@ export const updateClient = async (
     performedBy: updatedBy ?? null,
   });
 
-  return client.toSafeObject();
+  const result = client.toSafeObject();
+  emitToAts('clients', 'client:updated', result);
+  return result;
 };
 
 export const addContact = async (
@@ -225,7 +230,9 @@ export const addContact = async (
     performedBy: updatedBy ?? null,
   });
 
-  return client.toSafeObject();
+  const result = client.toSafeObject();
+  emitToAts('clients', 'client:updated', result);
+  return result;
 };
 
 export const updateContact = async (
@@ -299,7 +306,9 @@ export const updateContact = async (
     performedBy: updatedBy ?? null,
   });
 
-  return client.toSafeObject();
+  const result = client.toSafeObject();
+  emitToAts('clients', 'client:updated', result);
+  return result;
 };
 
 export const removeContact = async (
@@ -328,7 +337,9 @@ export const removeContact = async (
     performedBy: updatedBy ?? null,
   });
 
-  return client.toSafeObject();
+  const result = client.toSafeObject();
+  emitToAts('clients', 'client:updated', result);
+  return result;
 };
 
 export const deleteClient = async (
@@ -357,6 +368,7 @@ export const deleteClient = async (
     resourceId: id,
   });
 
+  emitToAts('clients', 'client:deleted', { _id: id });
   return { deleted: true };
 };
 
@@ -496,7 +508,9 @@ export const updateCrmProfile = async (
     performedBy: updatedBy ?? null,
   });
 
-  return client.toSafeObject();
+  const result = client.toSafeObject();
+  emitToAts('clients', 'client:updated', result);
+  return result;
 };
 
 // ---------------------------------------------------------------------------

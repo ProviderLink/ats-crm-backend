@@ -44,15 +44,17 @@ export const createTemplate = async (
       { isDefault: false }
     );
     for (const t of unDefaulted) {
-      emitToAts('email-templates', 'email_template:patch', {
-        _id: String(t._id),
+      emitToAts('email-templates', 'email_template:updated', {
+        ...t.toSafeObject(),
         isDefault: false,
       });
     }
   }
   const template = new EmailTemplate({ ...input, createdBy });
   await template.save();
-  return template.toSafeObject();
+  const result = template.toSafeObject();
+  emitToAts('email-templates', 'email_template:created', result);
+  return result;
 };
 
 export const updateTemplate = async (
@@ -81,8 +83,8 @@ export const updateTemplate = async (
       { isDefault: false }
     );
     for (const t of unDefaulted) {
-      emitToAts('email-templates', 'email_template:patch', {
-        _id: String(t._id),
+      emitToAts('email-templates', 'email_template:updated', {
+        ...t.toSafeObject(),
         isDefault: false,
       });
     }
@@ -97,7 +99,9 @@ export const updateTemplate = async (
   if (input.isActive !== undefined) template.isActive = input.isActive;
   template.updatedBy = updatedBy as unknown as typeof template.updatedBy;
   await template.save();
-  return template.toSafeObject();
+  const result = template.toSafeObject();
+  emitToAts('email-templates', 'email_template:updated', result);
+  return result;
 };
 
 export const deleteTemplate = async (
@@ -112,5 +116,6 @@ export const deleteTemplate = async (
     );
   }
   await template.deleteOne();
+  emitToAts('email-templates', 'email_template:deleted', { _id: id });
   return { deleted: true };
 };

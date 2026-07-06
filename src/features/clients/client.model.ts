@@ -156,7 +156,12 @@ clientSchema.index({ status: 1 });
 // mongoose update) can ever persist a value outside COMPANY_SIZE_ENUM.
 // Known typos are silently remapped; anything else is unset.
 
-function normalizeCompanySizeOnDoc(doc: { get(name: string): unknown; set(name: string, value: unknown): void; isModified(path: string): boolean; isNew: boolean }): void {
+function normalizeCompanySizeOnDoc(doc: {
+  get(name: string): unknown;
+  set(name: string, value: unknown): void;
+  isModified(path: string): boolean;
+  isNew: boolean;
+}): void {
   if (!doc) return;
   if (doc.isModified('companySize') || doc.isNew) {
     const normalized = normalizeCompanySize(doc.get('companySize'));

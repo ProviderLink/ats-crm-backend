@@ -2,8 +2,10 @@ import mongoose from 'mongoose';
 import { deleteFromCloudinary } from '../../config/cloudinary';
 import { runResumeParsing } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
+import logger from '../../shared/utils/logger';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
+import Interview from '../interviews/interview.model';
 import Candidate from './candidate.model';
 import type {
   CreateCandidateInput,
@@ -303,6 +305,14 @@ export const deleteCandidate = async (
   if (candidate.avatar) {
     const publicId = extractCloudinaryPublicId(candidate.avatar);
     if (publicId) await deleteFromCloudinary(publicId, 'image');
+  }
+
+  // Delete all interviews associated with this candidate
+  const interviewResult = await Interview.deleteMany({ candidateId: id });
+  if (interviewResult.deletedCount > 0) {
+    logger.info(
+      `Deleted ${interviewResult.deletedCount} interview(s) for candidate ${id}`
+    );
   }
 
   await candidate.deleteOne();

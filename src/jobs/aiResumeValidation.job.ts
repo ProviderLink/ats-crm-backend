@@ -68,7 +68,7 @@ Respond with exactly this JSON structure:
         reason: result.reason,
       });
       await createLog({
-        type: 'ai_resume_validation_completed',
+        action: 'ai_validation_updated',
         resourceType: 'application',
         resourceId: applicationId,
         metadata: {

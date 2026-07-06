@@ -219,7 +219,7 @@ export const createUser = async (
   });
 
   createLog({
-    type: 'user_created',
+    action: 'created',
     resourceType: 'user',
     resourceId: user._id.toString(),
     metadata: { roles: input.roles },
@@ -360,7 +360,7 @@ export const updateUser = async (
   await user.save();
 
   createLog({
-    type: 'user_updated',
+    action: 'updated',
     resourceType: 'user',
     resourceId: id,
   });
@@ -392,7 +392,7 @@ export const updatePermissions = async (
   await user.save();
 
   createLog({
-    type: 'user_permissions_updated',
+    action: 'permissions_updated',
     resourceType: 'user',
     resourceId: id,
   });
@@ -408,7 +408,7 @@ export const deactivateUser = async (id: string): Promise<SafeUser> => {
   await User.findByIdAndDelete(id);
 
   createLog({
-    type: 'user_deactivated',
+    action: 'deactivated',
     resourceType: 'user',
     resourceId: id,
   });
@@ -466,7 +466,7 @@ export const provisionVA = async (
   });
 
   createLog({
-    type: 'user_provisioned_va',
+    action: 'provisioned_va',
     resourceType: 'user',
     resourceId: user._id.toString(),
     relatedType: 'candidate',
@@ -511,7 +511,7 @@ export const provisionClient = async (
   });
 
   createLog({
-    type: 'user_provisioned_client',
+    action: 'provisioned_client',
     resourceType: 'user',
     resourceId: user._id.toString(),
     relatedType: 'client',

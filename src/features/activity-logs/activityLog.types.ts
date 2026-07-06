@@ -4,7 +4,6 @@ export type ActivityLogResourceType =
   | 'client'
   | 'application'
   | 'interview'
-  | 'email'
   | 'user'
   | 'assignment'
   | 'eod'
@@ -14,9 +13,61 @@ export type ActivityLogResourceType =
   | 'work_entry'
   | 'settings';
 
+export type ActivityAction =
+  // ── Generic ────────────────────────────────────────────
+  | 'created'
+  | 'updated'
+  | 'deleted'
+  // ── Candidate ──────────────────────────────────────────
+  | 'talent_pool_added'
+  | 'talent_pool_removed'
+  | 'status_changed'
+  | 'ai_score_updated'
+  | 'ai_validation_updated'
+  | 'parsed_data_updated'
+  // ── Application ────────────────────────────────────────
+  | 'applied'
+  | 'rejected'
+  | 'hired'
+  | 'approved'
+  | 'stage_changed'
+  | 'notes_updated'
+  // ── Interview (logged under application resource) ──────
+  | 'interview_scheduled'
+  | 'interview_updated'
+  | 'interview_cancelled'
+  | 'interview_completed'
+  | 'interview_no_show'
+  | 'interview_feedback_submitted'
+  // ── Job ────────────────────────────────────────────────
+  | 'pipeline_changed'
+  // ── Client ─────────────────────────────────────────────
+  | 'contact_added'
+  | 'contact_updated'
+  | 'contact_removed'
+  | 'crm_profile_updated'
+  | 'note_added'
+  | 'note_updated'
+  | 'note_deleted'
+  // ── User ───────────────────────────────────────────────
+  | 'deactivated'
+  | 'permissions_updated'
+  | 'provisioned_va'
+  | 'provisioned_client'
+  // ── Assignment ─────────────────────────────────────────
+  | 'ended'
+  // ── Performance Review ─────────────────────────────────
+  | 'review_generated'
+  | 'review_completed'
+  // ── EOD / Survey / Settings ────────────────────────────
+  | 'eod_compliance_checked'
+  | 'eod_submitted'
+  | 'survey_dispatched'
+  | 'settings_updated';
+
 export interface IActivityLog {
   _id: string;
-  type: string;
+  action: ActivityAction;
   resourceType: ActivityLogResourceType;
   resourceId: string;
   relatedType: string | null;
@@ -28,7 +79,7 @@ export interface IActivityLog {
 }
 
 export interface CreateActivityLogInput {
-  type: string;
+  action: ActivityAction;
   resourceType: ActivityLogResourceType;
   resourceId: string;
   relatedType?: string | null;

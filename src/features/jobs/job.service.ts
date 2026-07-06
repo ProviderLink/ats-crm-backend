@@ -116,7 +116,7 @@ export const createJob = async (
   });
 
   createLog({
-    type: 'job_created',
+    action: 'created',
     resourceType: 'job',
     resourceId: job._id.toString(),
     performedBy: createdBy,
@@ -166,7 +166,9 @@ export const updateJob = async (
         if (Array.isArray(newVal) || typeof newVal === 'object') {
           changes.push(`${label} updated`);
         } else {
-          changes.push(`${label} changed from "${String(oldVal)}" to "${String(newVal)}"`);
+          changes.push(
+            `${label} changed from "${String(oldVal)}" to "${String(newVal)}"`
+          );
         }
       }
       (job as unknown as Record<string, unknown>)[field] = input[field];
@@ -179,7 +181,7 @@ export const updateJob = async (
   await job.save();
 
   createLog({
-    type: 'job_updated',
+    action: 'updated',
     resourceType: 'job',
     resourceId: id,
     metadata: changes.length > 0 ? { changes } : {},
@@ -213,7 +215,7 @@ export const deleteJob = async (
   await job.deleteOne();
 
   createLog({
-    type: 'job_deleted',
+    action: 'deleted',
     resourceType: 'job',
     resourceId: id,
     performedBy: deletedBy ?? null,
@@ -317,7 +319,7 @@ export const assignPipeline = async (
   await job.save();
 
   createLog({
-    type: 'job_pipeline_assigned',
+    action: 'pipeline_changed',
     resourceType: 'job',
     resourceId: jobId,
     metadata: {
@@ -358,7 +360,7 @@ export const updateJobStatus = async (
   await job.save();
 
   createLog({
-    type: 'job_status_changed',
+    action: 'status_changed',
     resourceType: 'job',
     resourceId: id,
     metadata: { from: previousStatus, to: status },

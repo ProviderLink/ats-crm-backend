@@ -60,7 +60,7 @@ export const updateSettings = async (
   await settings.save();
 
   createLog({
-    type: 'settings_updated',
+    action: 'settings_updated',
     resourceType: 'settings',
     resourceId: settings._id.toString(),
   });

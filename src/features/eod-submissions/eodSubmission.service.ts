@@ -124,7 +124,7 @@ export const createEodSubmission = async (
   });
 
   createLog({
-    type: 'eod_submitted',
+    action: 'eod_submitted',
     resourceType: 'eod',
     resourceId: eodSubmission._id.toString(),
     relatedType: 'assignment',

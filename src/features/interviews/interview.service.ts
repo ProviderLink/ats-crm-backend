@@ -12,6 +12,7 @@ import {
 } from '../../shared/utils/zoom';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
+import type { ActivityAction } from '../activity-logs/activityLog.types';
 import Application from '../applications/application.model';
 import Candidate from '../candidates/candidate.model';
 import Interview from './interview.model';
@@ -153,7 +154,7 @@ export const createInterview = async (
   });
 
   createLog({
-    type: 'interview_scheduled',
+    action: 'interview_scheduled',
     resourceType: 'application',
     resourceId: input.applicationId,
     relatedType: 'interview',
@@ -314,7 +315,7 @@ export const updateInterview = async (
 
   // Log under the APPLICATION so it shows in the app's activity timeline.
   // Include the interview ID in metadata for reference.
-  const logType =
+  const logAction =
     input.status === 'completed'
       ? 'interview_completed'
       : input.status === 'no_show'
@@ -322,7 +323,7 @@ export const updateInterview = async (
         : 'interview_updated';
 
   createLog({
-    type: logType,
+    action: logAction as ActivityAction,
     resourceType: 'application',
     resourceId: interview.applicationId.toString(),
     description:
@@ -380,7 +381,7 @@ export const cancelInterview = async (
   await interview.save();
 
   createLog({
-    type: 'interview_cancelled',
+    action: 'interview_cancelled',
     resourceType: 'application',
     resourceId: interview.applicationId.toString(),
     description: 'Interview cancelled',
@@ -439,7 +440,7 @@ export const submitFeedback = async (
   await interview.save();
 
   createLog({
-    type: 'interview_feedback_submitted',
+    action: 'interview_feedback_submitted',
     resourceType: 'application',
     resourceId: interview.applicationId.toString(),
     description: 'Feedback submitted',

@@ -80,7 +80,7 @@ export const createClient = async (
   });
 
   createLog({
-    type: 'client_created',
+    action: 'created',
     resourceType: 'client',
     resourceId: client._id.toString(),
     performedBy: createdBy ?? null,
@@ -181,7 +181,7 @@ export const updateClient = async (
   await client.save();
 
   createLog({
-    type: 'client_updated',
+    action: 'updated',
     resourceType: 'client',
     resourceId: id,
     metadata: changes.length > 0 ? { changes } : {},
@@ -218,7 +218,7 @@ export const addContact = async (
   await client.save();
 
   createLog({
-    type: 'client_contact_added',
+    action: 'contact_added',
     resourceType: 'client',
     resourceId: clientId,
     metadata: { contactName: input.name, contactEmail: input.email },
@@ -292,7 +292,7 @@ export const updateContact = async (
   await client.save();
 
   createLog({
-    type: 'client_contact_updated',
+    action: 'contact_updated',
     resourceType: 'client',
     resourceId: clientId,
     metadata: { contactName: contactNameBefore, contactId, changes },
@@ -321,7 +321,7 @@ export const removeContact = async (
   await client.save();
 
   createLog({
-    type: 'client_contact_removed',
+    action: 'contact_removed',
     resourceType: 'client',
     resourceId: clientId,
     metadata: { contactId },
@@ -352,7 +352,7 @@ export const deleteClient = async (
   await Client.findByIdAndDelete(id);
 
   createLog({
-    type: 'client_deleted',
+    action: 'deleted',
     resourceType: 'client',
     resourceId: id,
   });
@@ -489,7 +489,7 @@ export const updateCrmProfile = async (
   await client.save();
 
   createLog({
-    type: 'client_crm_profile_updated',
+    action: 'crm_profile_updated',
     resourceType: 'client',
     resourceId: clientId,
     metadata: changes.length > 0 ? { changes } : {},
@@ -532,7 +532,7 @@ export const addNote = async (
   await client.save();
 
   createLog({
-    type: 'client_note_added',
+    action: 'note_added',
     resourceType: 'client',
     resourceId: clientId,
     metadata: { method: input.method },
@@ -573,7 +573,7 @@ export const updateNote = async (
   await client.save();
 
   createLog({
-    type: 'client_note_updated',
+    action: 'note_updated',
     resourceType: 'client',
     resourceId: clientId,
     metadata: { noteId },
@@ -608,7 +608,7 @@ export const deleteNote = async (
   await client.save();
 
   createLog({
-    type: 'client_note_deleted',
+    action: 'note_deleted',
     resourceType: 'client',
     resourceId: clientId,
     metadata: { noteId },

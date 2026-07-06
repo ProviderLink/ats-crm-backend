@@ -92,7 +92,7 @@ Be conservative — only mark as invalid (isValid: false) if clearly fake/garbag
         completedAt: new Date(),
       });
       await createLog({
-        type: 'ai_candidacy_validation_completed',
+        action: 'ai_validation_updated',
         resourceType: 'candidate',
         resourceId: candidateId,
         metadata: {

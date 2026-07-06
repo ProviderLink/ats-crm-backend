@@ -102,7 +102,7 @@ export const createWorkEntry = async (
   });
 
   createLog({
-    type: 'work_entry_created',
+    action: 'created',
     resourceType: 'work_entry',
     resourceId: workEntry._id.toString(),
     performedBy: createdBy,
@@ -137,7 +137,7 @@ export const updateWorkEntry = async (
   await workEntry.save();
 
   createLog({
-    type: 'work_entry_updated',
+    action: 'updated',
     resourceType: 'work_entry',
     resourceId: id,
     performedBy: updatedBy,
@@ -157,7 +157,7 @@ export const deleteWorkEntry = async (
   await workEntry.deleteOne();
 
   createLog({
-    type: 'work_entry_deleted',
+    action: 'deleted',
     resourceType: 'work_entry',
     resourceId: id,
   });

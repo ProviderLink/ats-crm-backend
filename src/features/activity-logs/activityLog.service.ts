@@ -7,7 +7,7 @@ export const createLog = async (
 ): Promise<void> => {
   try {
     await ActivityLog.create({
-      type: input.type,
+      action: input.action,
       resourceType: input.resourceType,
       resourceId: input.resourceId,
       relatedType: input.relatedType ?? null,
@@ -18,7 +18,7 @@ export const createLog = async (
     });
   } catch (error) {
     logger.error('Activity log creation failed', {
-      type: input.type,
+      action: input.action,
       resourceType: input.resourceType,
       resourceId: input.resourceId,
       error,
@@ -29,7 +29,7 @@ export const createLog = async (
 export const getAllLogs = async (filters: {
   resourceType?: string;
   resourceId?: string;
-  type?: string;
+  action?: string;
   performedBy?: string;
   page?: number;
   limit?: number;
@@ -43,7 +43,7 @@ export const getAllLogs = async (filters: {
   const {
     resourceType,
     resourceId,
-    type,
+    action,
     performedBy,
     page = 1,
     limit = 50,
@@ -52,7 +52,7 @@ export const getAllLogs = async (filters: {
 
   if (resourceType !== undefined) query['resourceType'] = resourceType;
   if (resourceId !== undefined) query['resourceId'] = resourceId;
-  if (type !== undefined) query['type'] = type;
+  if (action !== undefined) query['action'] = action;
   if (performedBy !== undefined) query['performedBy'] = performedBy;
 
   const skip = (page - 1) * limit;

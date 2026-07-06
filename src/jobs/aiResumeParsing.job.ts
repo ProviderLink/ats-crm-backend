@@ -55,7 +55,7 @@ export async function runResumeParsing(candidateId: string): Promise<void> {
       education: result.education ?? [],
     });
     await createLog({
-      type: 'ai_resume_parsing_completed',
+      action: 'parsed_data_updated',
       resourceType: 'candidate',
       resourceId: candidateId,
       metadata: {

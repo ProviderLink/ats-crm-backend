@@ -37,7 +37,7 @@ async function runSurveyDispatcher(): Promise<void> {
         await reminder.save();
 
         createLog({
-          type: 'survey_reminder_sent',
+          action: 'survey_dispatched',
           resourceType: 'survey',
           resourceId: reminder._id.toString(),
           relatedType: reminder.relatedType,

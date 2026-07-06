@@ -162,7 +162,7 @@ export const createApplication = async (
   }
 
   createLog({
-    type: 'application_created',
+    action: 'applied',
     resourceType: 'application',
     resourceId: application._id.toString(),
     relatedType: 'candidate',
@@ -227,7 +227,7 @@ export const approveApplication = async (
   );
 
   createLog({
-    type: 'application_approved',
+    action: 'approved',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -238,7 +238,10 @@ export const approveApplication = async (
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);
-  emitToAts('applications', 'application:phaseChanged', { _id: result._id, phase: 'approved' });
+  emitToAts('applications', 'application:phaseChanged', {
+    _id: result._id,
+    phase: 'approved',
+  });
   return result;
 };
 
@@ -279,7 +282,7 @@ export const rejectApplication = async (
   }
 
   createLog({
-    type: 'application_rejected',
+    action: 'rejected',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -290,7 +293,10 @@ export const rejectApplication = async (
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:deleted', result);
-  emitToAts('applications', 'application:phaseChanged', { _id: result._id, phase: 'rejected' });
+  emitToAts('applications', 'application:phaseChanged', {
+    _id: result._id,
+    phase: 'rejected',
+  });
   return result;
 };
 
@@ -329,7 +335,7 @@ export const moveStage = async (
   await application.save();
 
   createLog({
-    type: 'application_stage_moved',
+    action: 'stage_changed',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -395,7 +401,7 @@ export const hireApplication = async (
   }
 
   createLog({
-    type: 'application_hired',
+    action: 'hired',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -405,7 +411,10 @@ export const hireApplication = async (
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);
-  emitToAts('applications', 'application:phaseChanged', { _id: result._id, phase: 'hired' });
+  emitToAts('applications', 'application:phaseChanged', {
+    _id: result._id,
+    phase: 'hired',
+  });
   return result;
 };
 
@@ -424,7 +433,7 @@ export const updateApplicationNotes = async (
   await application.save();
 
   createLog({
-    type: 'application_notes_updated',
+    action: 'notes_updated',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -457,7 +466,7 @@ export const updateApplicationAiScore = async (
   await application.save();
 
   createLog({
-    type: 'application_ai_score_updated',
+    action: 'ai_score_updated',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -491,7 +500,7 @@ export const updateAiValidation = async (
   await application.save();
 
   createLog({
-    type: 'application_ai_validation_updated',
+    action: 'ai_validation_updated',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',

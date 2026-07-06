@@ -4,13 +4,13 @@ import { sendSuccess } from '../../shared/utils/response';
 import * as activityLogService from './activityLog.service';
 
 export const getAllLogs = catchAsync(async (req: Request, res: Response) => {
-  const { resourceType, resourceId, type, performedBy, page, limit } =
+  const { resourceType, resourceId, action, performedBy, page, limit } =
     req.query as Record<string, string | undefined>;
 
   const result = await activityLogService.getAllLogs({
     resourceType,
     resourceId,
-    type,
+    action,
     performedBy,
     page: page !== undefined ? Number(page) : undefined,
     limit: limit !== undefined ? Number(limit) : undefined,

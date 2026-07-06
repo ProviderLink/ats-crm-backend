@@ -107,7 +107,7 @@ Respond with exactly this JSON structure:
       await candidateService.updateAiScore(candidateId, scoreData);
 
       await createLog({
-        type: 'ai_candidate_scoring_completed',
+        action: 'ai_score_updated',
         resourceType: 'application',
         resourceId: application._id.toString(),
         relatedType: 'job',

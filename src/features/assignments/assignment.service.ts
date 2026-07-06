@@ -123,7 +123,7 @@ export const createAssignment = async (
   );
 
   createLog({
-    type: 'assignment_created',
+    action: 'created',
     resourceType: 'assignment',
     resourceId: assignment._id.toString(),
     relatedType: 'candidate',
@@ -155,8 +155,13 @@ export const updateAssignment = async (
 
   const changes: string[] = [];
 
-  if (input.serviceType !== undefined && input.serviceType !== assignment.serviceType) {
-    changes.push(`Service type changed from "${assignment.serviceType}" to "${input.serviceType}"`);
+  if (
+    input.serviceType !== undefined &&
+    input.serviceType !== assignment.serviceType
+  ) {
+    changes.push(
+      `Service type changed from "${assignment.serviceType}" to "${input.serviceType}"`
+    );
     assignment.serviceType = input.serviceType;
   } else if (input.serviceType !== undefined) {
     assignment.serviceType = input.serviceType;
@@ -169,12 +174,18 @@ export const updateAssignment = async (
     changes.push(input.endDate ? 'End date updated' : 'End date removed');
     assignment.endDate = input.endDate ? new Date(input.endDate) : null;
   }
-  if (input.accountManagerId !== undefined &&
-      String(assignment.accountManagerId) !== input.accountManagerId) {
+  if (
+    input.accountManagerId !== undefined &&
+    String(assignment.accountManagerId) !== input.accountManagerId
+  ) {
     changes.push('Account manager changed');
-    assignment.accountManagerId = new mongoose.Types.ObjectId(input.accountManagerId);
+    assignment.accountManagerId = new mongoose.Types.ObjectId(
+      input.accountManagerId
+    );
   } else if (input.accountManagerId !== undefined) {
-    assignment.accountManagerId = new mongoose.Types.ObjectId(input.accountManagerId);
+    assignment.accountManagerId = new mongoose.Types.ObjectId(
+      input.accountManagerId
+    );
   }
   if (input.notes !== undefined) {
     changes.push('Notes updated');
@@ -185,7 +196,7 @@ export const updateAssignment = async (
   await assignment.save();
 
   createLog({
-    type: 'assignment_updated',
+    action: 'updated',
     resourceType: 'assignment',
     resourceId: id,
     relatedType: 'candidate',
@@ -217,7 +228,7 @@ export const endAssignment = async (
   await assignment.save();
 
   createLog({
-    type: 'assignment_ended',
+    action: 'ended',
     resourceType: 'assignment',
     resourceId: id,
     performedBy: updatedBy,
@@ -251,7 +262,7 @@ export const updateAssignmentStatus = async (
   await assignment.save();
 
   createLog({
-    type: 'assignment_status_changed',
+    action: 'status_changed',
     resourceType: 'assignment',
     resourceId: id,
     relatedType: 'candidate',

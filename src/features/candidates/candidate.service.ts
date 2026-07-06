@@ -124,7 +124,7 @@ export const createCandidate = async (
   }
 
   createLog({
-    type: 'candidate_created',
+    action: 'created',
     resourceType: 'candidate',
     resourceId: candidate._id.toString(),
     metadata: { source: input.source, status },
@@ -147,14 +147,21 @@ export const updateCandidate = async (
 
   const changes: string[] = [];
 
-  if (input.firstName !== undefined && input.firstName !== candidate.firstName) {
-    changes.push(`First name changed from "${candidate.firstName}" to "${input.firstName}"`);
+  if (
+    input.firstName !== undefined &&
+    input.firstName !== candidate.firstName
+  ) {
+    changes.push(
+      `First name changed from "${candidate.firstName}" to "${input.firstName}"`
+    );
     candidate.firstName = input.firstName;
   } else if (input.firstName !== undefined) {
     candidate.firstName = input.firstName;
   }
   if (input.lastName !== undefined && input.lastName !== candidate.lastName) {
-    changes.push(`Last name changed from "${candidate.lastName}" to "${input.lastName}"`);
+    changes.push(
+      `Last name changed from "${candidate.lastName}" to "${input.lastName}"`
+    );
     candidate.lastName = input.lastName;
   } else if (input.lastName !== undefined) {
     candidate.lastName = input.lastName;
@@ -169,46 +176,75 @@ export const updateCandidate = async (
     changes.push('Profile photo updated');
     candidate.avatar = input.avatar;
   }
-  if (input.videoIntroUrl !== undefined && input.videoIntroUrl !== candidate.videoIntroUrl) {
-    changes.push(input.videoIntroUrl ? 'Video intro updated' : 'Video intro removed');
+  if (
+    input.videoIntroUrl !== undefined &&
+    input.videoIntroUrl !== candidate.videoIntroUrl
+  ) {
+    changes.push(
+      input.videoIntroUrl ? 'Video intro updated' : 'Video intro removed'
+    );
     candidate.videoIntroUrl = input.videoIntroUrl;
   } else if (input.videoIntroUrl !== undefined) {
     candidate.videoIntroUrl = input.videoIntroUrl;
   }
   if (input.videoIntroSource !== undefined)
     candidate.videoIntroSource = input.videoIntroSource;
-  if (input.yearsOfExperience !== undefined && input.yearsOfExperience !== candidate.yearsOfExperience) {
-    changes.push(`Years of experience changed from ${candidate.yearsOfExperience} to ${input.yearsOfExperience}`);
+  if (
+    input.yearsOfExperience !== undefined &&
+    input.yearsOfExperience !== candidate.yearsOfExperience
+  ) {
+    changes.push(
+      `Years of experience changed from ${candidate.yearsOfExperience} to ${input.yearsOfExperience}`
+    );
     candidate.yearsOfExperience = input.yearsOfExperience;
   } else if (input.yearsOfExperience !== undefined) {
     candidate.yearsOfExperience = input.yearsOfExperience;
   }
-  if (input.englishProficiency !== undefined && input.englishProficiency !== candidate.englishProficiency) {
-    changes.push(`English proficiency changed from "${candidate.englishProficiency}" to "${input.englishProficiency}"`);
+  if (
+    input.englishProficiency !== undefined &&
+    input.englishProficiency !== candidate.englishProficiency
+  ) {
+    changes.push(
+      `English proficiency changed from "${candidate.englishProficiency}" to "${input.englishProficiency}"`
+    );
     candidate.englishProficiency = input.englishProficiency;
   } else if (input.englishProficiency !== undefined) {
     candidate.englishProficiency = input.englishProficiency;
   }
-  if (input.currentSalaryPHP !== undefined && input.currentSalaryPHP !== candidate.currentSalaryPHP) {
+  if (
+    input.currentSalaryPHP !== undefined &&
+    input.currentSalaryPHP !== candidate.currentSalaryPHP
+  ) {
     changes.push('Current salary (PHP) updated');
     candidate.currentSalaryPHP = input.currentSalaryPHP;
   } else if (input.currentSalaryPHP !== undefined) {
     candidate.currentSalaryPHP = input.currentSalaryPHP;
   }
-  if (input.currentSalaryUSD !== undefined && input.currentSalaryUSD !== candidate.currentSalaryUSD) {
+  if (
+    input.currentSalaryUSD !== undefined &&
+    input.currentSalaryUSD !== candidate.currentSalaryUSD
+  ) {
     changes.push('Current salary (USD) updated');
     candidate.currentSalaryUSD = input.currentSalaryUSD;
   } else if (input.currentSalaryUSD !== undefined) {
     candidate.currentSalaryUSD = input.currentSalaryUSD;
   }
-  if (input.reasonForLeaving !== undefined && input.reasonForLeaving !== candidate.reasonForLeaving) {
+  if (
+    input.reasonForLeaving !== undefined &&
+    input.reasonForLeaving !== candidate.reasonForLeaving
+  ) {
     changes.push('Reason for leaving updated');
     candidate.reasonForLeaving = input.reasonForLeaving;
   } else if (input.reasonForLeaving !== undefined) {
     candidate.reasonForLeaving = input.reasonForLeaving;
   }
-  if (input.cityOfResidence !== undefined && input.cityOfResidence !== candidate.cityOfResidence) {
-    changes.push(`City of residence changed from "${candidate.cityOfResidence ?? 'unset'}" to "${input.cityOfResidence}"`);
+  if (
+    input.cityOfResidence !== undefined &&
+    input.cityOfResidence !== candidate.cityOfResidence
+  ) {
+    changes.push(
+      `City of residence changed from "${candidate.cityOfResidence ?? 'unset'}" to "${input.cityOfResidence}"`
+    );
     candidate.cityOfResidence = input.cityOfResidence;
   } else if (input.cityOfResidence !== undefined) {
     candidate.cityOfResidence = input.cityOfResidence;
@@ -239,7 +275,7 @@ export const updateCandidate = async (
   await candidate.save();
 
   createLog({
-    type: 'candidate_updated',
+    action: 'updated',
     resourceType: 'candidate',
     resourceId: id,
     metadata: changes.length > 0 ? { changes } : {},
@@ -272,7 +308,7 @@ export const deleteCandidate = async (
   await candidate.deleteOne();
 
   createLog({
-    type: 'candidate_deleted',
+    action: 'deleted',
     resourceType: 'candidate',
     resourceId: id,
     performedBy: deletedBy ?? null,
@@ -305,10 +341,7 @@ export const updateTalentPool = async (
   await candidate.save();
 
   createLog({
-    type:
-      action === 'add'
-        ? 'candidate_talent_pool_added'
-        : 'candidate_talent_pool_removed',
+    action: action === 'add' ? 'talent_pool_added' : 'talent_pool_removed',
     resourceType: 'candidate',
     resourceId: id,
     performedBy: performedBy ?? null,
@@ -333,7 +366,7 @@ export const updateCandidateStatus = async (
   await candidate.save();
 
   createLog({
-    type: 'candidate_status_changed',
+    action: 'status_changed',
     resourceType: 'candidate',
     resourceId: id,
     metadata: { from: previousStatus, to: status },
@@ -342,7 +375,10 @@ export const updateCandidateStatus = async (
 
   const result = candidate.toSafeObject();
   emitToAts('candidates', 'candidate:updated', result);
-  emitToAts('candidates', 'candidate:statusChanged', { _id: result._id, status });
+  emitToAts('candidates', 'candidate:statusChanged', {
+    _id: result._id,
+    status,
+  });
   return result;
 };
 
@@ -368,7 +404,7 @@ export const updateParsedData = async (
   await candidate.save();
 
   createLog({
-    type: 'candidate_parsed_data_updated',
+    action: 'parsed_data_updated',
     resourceType: 'candidate',
     resourceId: id,
     metadata: {
@@ -401,7 +437,7 @@ export const updateAiScore = async (
   await candidate.save();
 
   createLog({
-    type: 'candidate_ai_score_updated',
+    action: 'ai_score_updated',
     resourceType: 'candidate',
     resourceId: id,
     metadata: { score: aiScore.score, recommendation: aiScore.recommendation },
@@ -425,7 +461,7 @@ export const updateAiValidation = async (
   await candidate.save();
 
   createLog({
-    type: 'candidate_ai_validation_updated',
+    action: 'ai_validation_updated',
     resourceType: 'candidate',
     resourceId: id,
     metadata: {

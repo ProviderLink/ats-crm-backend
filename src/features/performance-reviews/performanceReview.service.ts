@@ -174,7 +174,7 @@ Generate 6-8 relevant performance categories for this role.
   });
 
   createLog({
-    type: 'performance_review_generated',
+    action: 'review_generated',
     resourceType: 'performance_review',
     resourceId: review._id.toString(),
     relatedType: 'candidate',
@@ -281,7 +281,7 @@ export const completeReview = async (
   await review.save();
 
   createLog({
-    type: 'performance_review_completed',
+    action: 'review_completed',
     resourceType: 'performance_review',
     resourceId: id,
     performedBy: completedBy,

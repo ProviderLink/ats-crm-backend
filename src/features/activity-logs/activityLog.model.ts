@@ -13,7 +13,7 @@ export interface IActivityLogDocument
 
 const activityLogSchema = new Schema(
   {
-    type: { type: String, required: true },
+    action: { type: String, required: true },
     resourceType: { type: String, required: true },
     resourceId: { type: Schema.Types.ObjectId, required: true },
     relatedType: { type: String, default: null },
@@ -28,7 +28,7 @@ const activityLogSchema = new Schema(
 activityLogSchema.index({ resourceType: 1, resourceId: 1 });
 activityLogSchema.index({ resourceType: 1, resourceId: 1, createdAt: -1 });
 activityLogSchema.index({ performedBy: 1 });
-activityLogSchema.index({ type: 1 });
+activityLogSchema.index({ action: 1 });
 activityLogSchema.index({ createdAt: -1 });
 
 activityLogSchema.methods.toSafeObject = function (): IActivityLog {

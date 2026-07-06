@@ -26,7 +26,7 @@ export const createTag = async (
   await tag.save();
 
   createLog({
-    type: 'tag_created',
+    action: 'created',
     resourceType: 'tag',
     resourceId: tag._id.toString(),
     performedBy: createdBy,
@@ -61,7 +61,7 @@ export const updateTag = async (
   await tag.save();
 
   createLog({
-    type: 'tag_updated',
+    action: 'updated',
     resourceType: 'tag',
     resourceId: id,
   });
@@ -77,7 +77,7 @@ export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
   await tag.deleteOne();
 
   createLog({
-    type: 'tag_deleted',
+    action: 'deleted',
     resourceType: 'tag',
     resourceId: id,
   });

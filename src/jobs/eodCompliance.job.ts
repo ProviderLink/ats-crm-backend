@@ -59,7 +59,7 @@ async function runEodComplianceCheck(): Promise<void> {
       });
 
       createLog({
-        type: 'eod_reminder_sent',
+        action: 'eod_compliance_checked',
         resourceType: 'eod',
         resourceId: assignment._id.toString(),
         relatedType: 'candidate',

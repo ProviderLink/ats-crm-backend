@@ -118,13 +118,13 @@ const applyToJobSchema = z.object({
 
 const router = Router();
 
-// Public route — must be registered before authenticate middleware
+// Public routes — must be registered before authenticate middleware
+router.get('/', getAllJobs);
+router.get('/:id', getJobById);
 router.post('/:id/apply', validate(applyToJobSchema), applyToJob);
 
 router.use(authenticate);
 router.use(requireAppAccess('ats'));
-
-router.get('/', requirePermission('jobs', 'read'), getAllJobs);
 
 router.post(
   '/',
@@ -132,8 +132,6 @@ router.post(
   validate(createJobSchema),
   createJob
 );
-
-router.get('/:id', requirePermission('jobs', 'read'), getJobById);
 
 router.patch(
   '/:id',

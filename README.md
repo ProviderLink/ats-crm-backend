@@ -18,13 +18,13 @@ pnpm dev
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server with hot reload |
-| `pnpm build` | Compile TypeScript |
-| `pnpm start` | Run production build |
-| `pnpm seed:admin` | Seed admin user |
-| `pnpm seed:demo` | Seed demo data |
+| Command           | Description                              |
+| ----------------- | ---------------------------------------- |
+| `pnpm dev`        | Start development server with hot reload |
+| `pnpm build`      | Compile TypeScript                       |
+| `pnpm start`      | Run production build                     |
+| `pnpm seed:admin` | Seed admin user                          |
+| `pnpm seed:demo`  | Seed demo data                           |
 
 ## Environment Variables
 

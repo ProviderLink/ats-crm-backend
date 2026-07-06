@@ -129,7 +129,7 @@ export const listClientNotes = catchAsync(
   async (req: Request, res: Response) => {
     const { clientId } = req.params;
     const notes = await clientService.listNotes(clientId);
-    sendSuccess(res, notes, 'Notes retrieved', 200, { total: notes.length });
+    sendSuccess(res, notes, 'Notes retrieved', 200);
   }
 );
 

@@ -535,11 +535,11 @@ export const addNote = async (
   const client = await Client.findById(clientId);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
 
-  const note = client.notes.create({
+  const note = {
     method: input.method,
     content: input.content,
     author: authorId ? new mongoose.Types.ObjectId(authorId) : null,
-  } as never);
+  } as ClientNote;
   client.notes.push(note);
 
   if (authorId) client.updatedBy = new mongoose.Types.ObjectId(authorId);

@@ -37,7 +37,12 @@ import AppError from './shared/utils/AppError';
 import logger from './shared/utils/logger';
 import { initializeSockets } from './sockets';
 
-Sentry.init({ dsn: env.SENTRY_DSN });
+Sentry.init({
+  dsn: env.SENTRY_DSN,
+  environment: env.NODE_ENV,
+  tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  integrations: [Sentry.expressIntegration()],
+});
 
 const app = express();
 
@@ -133,6 +138,14 @@ app.use('/api/webhooks', webhookRouter);
 
 app.use((_req, _res, next) => {
   next(new AppError(404, 'RESOURCE_NOT_FOUND', 'Route not found'));
+});
+
+Sentry.setupExpressErrorHandler(app, {
+  shouldHandleError(error): boolean {
+    // Don't send 4xx (client errors) to Sentry
+    const statusCode = (error as any).statusCode;
+    return statusCode >= 500 || !statusCode;
+  },
 });
 
 app.use(errorHandler);

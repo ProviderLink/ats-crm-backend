@@ -1,4 +1,5 @@
 import { ErrorRequestHandler } from 'express';
+import * as Sentry from '@sentry/node';
 import AppError from '../utils/AppError';
 import { sendError } from '../utils/response';
 
@@ -39,6 +40,8 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
+  // Unexpected error — capture in Sentry for alerting
+  Sentry.captureException(err);
   console.error(err);
   sendError(res, 'INTERNAL_SERVER_ERROR', 'Something went wrong', 500);
 };

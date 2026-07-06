@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import {
+  deleteGoogleMeetMeeting,
+  updateGoogleMeetMeeting,
+} from '../../shared/utils/googleMeet';
 import logger from '../../shared/utils/logger';
 import {
   createZoomMeeting,
@@ -103,6 +107,7 @@ export const createInterview = async (
       address: null,
     };
   } else if (input.type === 'google_meet') {
+    // Google Meet uses manual link — user pastes a link from https://meet.google.com/
     meetingDetails = {
       link: input.meetingDetails?.link ?? null,
       meetingId: null,
@@ -196,16 +201,30 @@ export const updateInterview = async (
       changes.push('Date & time updated');
       interview.scheduledAt = newDate;
 
-      // Update Zoom meeting if the interview is a Zoom call
-      if (interview.type === 'zoom' && interview.meetingDetails?.meetingId) {
-        updateZoomMeeting(interview.meetingDetails.meetingId, {
-          topic: interview.title,
-          scheduledAt: input.scheduledAt as string,
-          duration: input.duration ?? interview.duration,
-          timezone: input.timezone ?? interview.timezone,
-        }).catch(err => {
-          logger.error('Failed to update Zoom meeting on reschedule', err);
-        });
+      // Update meeting if the interview is a video call
+      if (interview.meetingDetails?.meetingId) {
+        if (interview.type === 'zoom') {
+          updateZoomMeeting(interview.meetingDetails.meetingId, {
+            topic: interview.title,
+            scheduledAt: input.scheduledAt as string,
+            duration: input.duration ?? interview.duration,
+            timezone: input.timezone ?? interview.timezone,
+          }).catch(err => {
+            logger.error('Failed to update Zoom meeting on reschedule', err);
+          });
+        } else if (interview.type === 'google_meet') {
+          updateGoogleMeetMeeting(interview.meetingDetails.meetingId, {
+            topic: interview.title,
+            scheduledAt: input.scheduledAt as string,
+            duration: input.duration ?? interview.duration,
+            timezone: input.timezone ?? interview.timezone,
+          }).catch(err => {
+            logger.error(
+              'Failed to update Google Meet meeting on reschedule',
+              err
+            );
+          });
+        }
       }
     }
   }
@@ -215,17 +234,24 @@ export const updateInterview = async (
     );
     interview.duration = input.duration;
 
-    // Also update Zoom if duration changed and no date change triggered it above
+    // Also update meeting if duration changed and no date change triggered it above
     if (
-      interview.type === 'zoom' &&
       interview.meetingDetails?.meetingId &&
       input.scheduledAt === undefined
     ) {
-      updateZoomMeeting(interview.meetingDetails.meetingId, {
-        duration: input.duration,
-      }).catch(err => {
-        logger.error('Failed to update Zoom meeting duration', err);
-      });
+      if (interview.type === 'zoom') {
+        updateZoomMeeting(interview.meetingDetails.meetingId, {
+          duration: input.duration,
+        }).catch(err => {
+          logger.error('Failed to update Zoom meeting duration', err);
+        });
+      } else if (interview.type === 'google_meet') {
+        updateGoogleMeetMeeting(interview.meetingDetails.meetingId, {
+          duration: input.duration,
+        }).catch(err => {
+          logger.error('Failed to update Google Meet meeting duration', err);
+        });
+      }
     }
   }
   if (input.timezone !== undefined && input.timezone !== interview.timezone) {
@@ -291,8 +317,12 @@ export const cancelInterview = async (
 
   interview.status = 'cancelled';
 
-  if (interview.type === 'zoom' && interview.meetingDetails?.meetingId) {
-    await deleteZoomMeeting(interview.meetingDetails.meetingId);
+  if (interview.meetingDetails?.meetingId) {
+    if (interview.type === 'zoom') {
+      await deleteZoomMeeting(interview.meetingDetails.meetingId);
+    } else if (interview.type === 'google_meet') {
+      await deleteGoogleMeetMeeting(interview.meetingDetails.meetingId);
+    }
   }
 
   await interview.save();

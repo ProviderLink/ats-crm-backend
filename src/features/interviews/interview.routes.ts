@@ -42,6 +42,7 @@ const updateInterviewSchema = z.object({
   duration: z.number().int().min(15).max(480).optional(),
   timezone: z.string().min(1).optional(),
   interviewerIds: z.array(z.string()).min(1).optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled', 'no_show']).optional(),
   meetingDetails: z
     .object({
       link: z.string().url().optional().nullable(),

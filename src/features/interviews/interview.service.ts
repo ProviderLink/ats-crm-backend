@@ -12,6 +12,7 @@ import {
 } from '../../shared/utils/zoom';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
+import Application from '../applications/application.model';
 import Candidate from '../candidates/candidate.model';
 import Interview from './interview.model';
 import type {
@@ -153,12 +154,22 @@ export const createInterview = async (
 
   createLog({
     type: 'interview_scheduled',
-    resourceType: 'interview',
-    resourceId: interview._id.toString(),
-    relatedType: 'candidate',
-    relatedId: input.candidateId,
-    metadata: { type: input.type, round: input.round },
+    resourceType: 'application',
+    resourceId: input.applicationId,
+    relatedType: 'interview',
+    relatedId: interview._id.toString(),
+    description: 'Interview scheduled',
+    metadata: {
+      interviewId: interview._id.toString(),
+      type: input.type,
+      round: input.round,
+    },
     performedBy: input.organizerId,
+  });
+
+  // Push interview ID into Application.interviewIds for history tracking
+  await Application.findByIdAndUpdate(input.applicationId, {
+    $push: { interviewIds: interview._id },
   });
 
   const safeInterview = interview.toSafeObject();
@@ -190,6 +201,29 @@ export const updateInterview = async (
   }
 
   const changes: string[] = [];
+
+  // Handle status change (e.g. scheduled → completed via completeAndFeedback)
+  if (input.status !== undefined && input.status !== interview.status) {
+    if (
+      interview.status === 'scheduled' &&
+      (input.status === 'completed' || input.status === 'no_show')
+    ) {
+      interview.status = input.status;
+      changes.push(`Status changed to "${input.status}"`);
+    } else if (input.status === 'cancelled') {
+      throw new AppError(
+        400,
+        'INVALID_STATUS_CHANGE',
+        'Use the cancel endpoint to cancel an interview'
+      );
+    } else {
+      throw new AppError(
+        400,
+        'INVALID_STATUS_CHANGE',
+        `Cannot change status from "${interview.status}" to "${input.status}"`
+      );
+    }
+  }
 
   if (input.title !== undefined && input.title !== interview.title) {
     changes.push(`Title changed from "${interview.title}" to "${input.title}"`);
@@ -278,11 +312,29 @@ export const updateInterview = async (
 
   await interview.save();
 
+  // Log under the APPLICATION so it shows in the app's activity timeline.
+  // Include the interview ID in metadata for reference.
+  const logType =
+    input.status === 'completed'
+      ? 'interview_completed'
+      : input.status === 'no_show'
+        ? 'interview_no_show'
+        : 'interview_updated';
+
   createLog({
-    type: 'interview_updated',
-    resourceType: 'interview',
-    resourceId: id,
-    metadata: changes.length > 0 ? { changes } : undefined,
+    type: logType,
+    resourceType: 'application',
+    resourceId: interview.applicationId.toString(),
+    description:
+      input.status === 'completed'
+        ? 'Interview completed'
+        : input.status === 'no_show'
+          ? 'Interview no-show'
+          : 'Interview updated',
+    metadata: {
+      interviewId: id,
+      ...(changes.length > 0 ? { changes } : {}),
+    },
     performedBy: updatedBy ?? null,
   });
 
@@ -329,8 +381,10 @@ export const cancelInterview = async (
 
   createLog({
     type: 'interview_cancelled',
-    resourceType: 'interview',
-    resourceId: id,
+    resourceType: 'application',
+    resourceId: interview.applicationId.toString(),
+    description: 'Interview cancelled',
+    metadata: { interviewId: id },
     performedBy: cancelledBy ?? null,
   });
 
@@ -386,9 +440,14 @@ export const submitFeedback = async (
 
   createLog({
     type: 'interview_feedback_submitted',
-    resourceType: 'interview',
-    resourceId: id,
-    metadata: { rating: input.rating, recommendation: input.recommendation },
+    resourceType: 'application',
+    resourceId: interview.applicationId.toString(),
+    description: 'Feedback submitted',
+    metadata: {
+      interviewId: id,
+      rating: input.rating,
+      recommendation: input.recommendation,
+    },
     performedBy: input.interviewerId,
   });
 

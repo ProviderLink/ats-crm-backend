@@ -14,7 +14,7 @@ export interface IApplicationDocument
       | 'hiredBy'
       | 'createdBy'
       | 'updatedBy'
-      | 'interviewId'
+      | 'interviewIds'
       | 'currentStage'
     >,
     Document {
@@ -26,7 +26,7 @@ export interface IApplicationDocument
   hiredBy: mongoose.Types.ObjectId | null;
   createdBy: mongoose.Types.ObjectId | null;
   updatedBy: mongoose.Types.ObjectId | null;
-  interviewId: mongoose.Types.ObjectId | null;
+  interviewIds: mongoose.Types.ObjectId[];
   currentStage: {
     stageId: mongoose.Types.ObjectId;
     stageName: string;
@@ -104,11 +104,7 @@ const applicationSchema = new Schema(
     rejectedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     rejectionReason: { type: String, default: null },
 
-    interviewId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Interview',
-      default: null,
-    },
+    interviewIds: [{ type: Schema.Types.ObjectId, ref: 'Interview' }],
     notes: { type: String, default: null },
 
     hiredAt: { type: Date, default: null },
@@ -140,7 +136,9 @@ applicationSchema.methods.toSafeObject = function (): IApplication {
   raw['hiredBy'] = raw['hiredBy'] ? String(raw['hiredBy']) : null;
   raw['createdBy'] = raw['createdBy'] ? String(raw['createdBy']) : null;
   raw['updatedBy'] = raw['updatedBy'] ? String(raw['updatedBy']) : null;
-  raw['interviewId'] = raw['interviewId'] ? String(raw['interviewId']) : null;
+  raw['interviewIds'] = Array.isArray(raw['interviewIds'])
+    ? (raw['interviewIds'] as mongoose.Types.ObjectId[]).map(String)
+    : [];
   if (raw['currentStage']) {
     const stage = raw['currentStage'] as Record<string, unknown>;
     stage['stageId'] = String(stage['stageId']);

@@ -35,7 +35,7 @@ export interface IApplication {
   rejectedAt: Date | null;
   rejectedBy: string | null;
   rejectionReason: string | null;
-  interviewId: string | null;
+  interviewIds: string[];
   notes: string | null;
   hiredAt: Date | null;
   hiredBy: string | null;

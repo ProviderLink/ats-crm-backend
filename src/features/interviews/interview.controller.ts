@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import { AppError } from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
+import Application from '../applications/application.model';
 import * as interviewService from './interview.service';
 
 export const getAllInterviews = catchAsync(
@@ -89,5 +91,56 @@ export const submitFeedback = catchAsync(
       recommendation,
     });
     sendSuccess(res, interview, 'Feedback submitted', 201);
+  }
+);
+
+// ── Nested handlers (under /applications/:applicationId/interviews) ──
+
+export const getInterviewsForApplication = catchAsync(
+  async (req: Request, res: Response) => {
+    const { applicationId } = req.params;
+    const { status, interviewerId, page, limit } = req.query as Record<
+      string,
+      string | undefined
+    >;
+
+    const result = await interviewService.getAllInterviews({
+      applicationId,
+      status,
+      interviewerId,
+      page: page !== undefined ? Number(page) : undefined,
+      limit: limit !== undefined ? Number(limit) : undefined,
+    });
+
+    sendSuccess(res, result.interviews, 'Interviews retrieved', 200, {
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+    });
+  }
+);
+
+export const createInterviewForApplication = catchAsync(
+  async (req: Request, res: Response) => {
+    const { applicationId } = req.params;
+    const organizerId = req.user!._id;
+
+    // Derive candidateId, jobId, clientId from the application
+    const application = await Application.findById(applicationId);
+    if (!application) {
+      throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
+    }
+
+    const interview = await interviewService.createInterview({
+      ...req.body,
+      applicationId,
+      candidateId: application.candidateId.toString(),
+      jobId: application.jobId.toString(),
+      clientId: application.clientId.toString(),
+      organizerId,
+    });
+
+    sendSuccess(res, interview, 'Interview scheduled', 201);
   }
 );

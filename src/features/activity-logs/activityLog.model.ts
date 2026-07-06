@@ -18,6 +18,7 @@ const activityLogSchema = new Schema(
     resourceId: { type: Schema.Types.ObjectId, required: true },
     relatedType: { type: String, default: null },
     relatedId: { type: Schema.Types.ObjectId, default: null },
+    description: { type: String, default: null },
     metadata: { type: Schema.Types.Mixed, default: {} },
     performedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },

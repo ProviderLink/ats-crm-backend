@@ -21,6 +21,7 @@ export interface IActivityLog {
   resourceId: string;
   relatedType: string | null;
   relatedId: string | null;
+  description: string | null;
   metadata: Record<string, unknown>;
   performedBy: string | null;
   createdAt: Date;
@@ -32,6 +33,7 @@ export interface CreateActivityLogInput {
   resourceId: string;
   relatedType?: string | null;
   relatedId?: string | null;
+  description?: string | null;
   metadata?: Record<string, unknown>;
   performedBy?: string | null;
 }

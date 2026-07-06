@@ -12,6 +12,7 @@ export const createLog = async (
       resourceId: input.resourceId,
       relatedType: input.relatedType ?? null,
       relatedId: input.relatedId ?? null,
+      description: input.description ?? null,
       metadata: input.metadata ?? {},
       performedBy: input.performedBy ?? null,
     });

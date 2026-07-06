@@ -66,5 +66,6 @@ export interface UpdateInterviewInput {
   duration?: number;
   timezone?: string;
   interviewerIds?: string[];
+  status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
   meetingDetails?: Partial<IInterviewMeetingDetails>;
 }

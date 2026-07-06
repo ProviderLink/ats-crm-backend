@@ -1,5 +1,5 @@
-import { ErrorRequestHandler } from 'express';
 import * as Sentry from '@sentry/node';
+import { ErrorRequestHandler } from 'express';
 import AppError from '../utils/AppError';
 import { sendError } from '../utils/response';
 

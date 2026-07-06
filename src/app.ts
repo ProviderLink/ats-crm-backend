@@ -1,12 +1,21 @@
 import * as Sentry from '@sentry/node';
+import './config/env';
+import { env } from './config/env';
+
+// Must init Sentry BEFORE importing express
+Sentry.init({
+  dsn: env.SENTRY_DSN,
+  environment: env.NODE_ENV,
+  tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  integrations: [Sentry.expressIntegration()],
+});
+
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { connectDB } from './config/db';
-import './config/env';
-import { env } from './config/env';
 import activityLogRouter from './features/activity-logs/activityLog.routes';
 import applicationRouter from './features/applications/application.routes';
 import assignmentRouter from './features/assignments/assignment.routes';

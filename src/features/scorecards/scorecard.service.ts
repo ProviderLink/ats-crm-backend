@@ -27,11 +27,14 @@ function computeProductivityScore(params: {
   onTimeRate: number;
 }): number {
   const { totalHours, totalTasks, eodCompliance, onTimeRate } = params;
-  // Weighted score: hours (25%), tasks (25%), eod compliance (30%), on-time (20%)
-  const hoursScore = Math.min(totalHours / 40, 1) * 25; // 40h = full score
-  const tasksScore = Math.min(totalTasks / (DAYS_IN_WEEK * 3), 1) * 25; // ~3 tasks/day
-  const eodScore = (eodCompliance / 100) * 30;
-  const onTimeScore = (onTimeRate / 100) * 20;
+  // Weighted score per spec: EOD Compliance 40%, Work Volume 30%, Task Completion 20%, Consistency 10%
+  // Work Volume = total hours normalized to a 40h week
+  // Task Completion = completed tasks normalized to ~15 tasks/week (3/day)
+  // Consistency = on-time submission rate
+  const hoursScore = Math.min(totalHours / 40, 1) * 30; // Work Volume 30%
+  const tasksScore = Math.min(totalTasks / (DAYS_IN_WEEK * 3), 1) * 20; // Task Completion 20%
+  const eodScore = (eodCompliance / 100) * 40; // EOD Compliance 40%
+  const onTimeScore = (onTimeRate / 100) * 10; // Consistency 10%
   return Math.round(hoursScore + tasksScore + eodScore + onTimeScore);
 }
 

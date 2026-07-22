@@ -84,10 +84,16 @@ export const createAssignmentReminders = async (
   startDate: Date,
   accountManagerId: string
 ): Promise<void> => {
-  const reminders = [30, 60, 90].map(days => ({
+  // Spec: 3-day, 1-week, 30-day, monthly (60-day) check-in schedule
+  const reminders = [
+    { days: 3, type: '3_day' },
+    { days: 7, type: '1_week' },
+    { days: 30, type: '30_day' },
+    { days: 60, type: 'monthly' },
+  ].map(({ days, type }) => ({
     relatedType: 'assignment',
     relatedId: new mongoose.Types.ObjectId(assignmentId),
-    surveyType: `${days}_day`,
+    surveyType: type,
     dueDate: new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000),
     assignedTo: new mongoose.Types.ObjectId(accountManagerId),
   }));

@@ -8,6 +8,8 @@ export interface IWorkEntryDocument
   assignmentId: mongoose.Types.ObjectId;
   candidateId: mongoose.Types.ObjectId;
   clientId: mongoose.Types.ObjectId;
+  isDeleted: boolean;
+  deletedAt: Date | null;
   toSafeObject(): IWorkEntry;
 }
 
@@ -35,6 +37,8 @@ const workEntrySchema = new Schema(
       default: 'completed',
     },
     notes: { type: String, default: null },
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

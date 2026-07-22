@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/node';
 import './config/env';
 import { env } from './config/env';
 
-// Must init Sentry BEFORE importing express
+// Must init Sentry BEFORE importing express — only once
 Sentry.init({
   dsn: env.SENTRY_DSN,
   environment: env.NODE_ENV,
@@ -48,13 +48,6 @@ import errorHandler from './shared/middleware/errorHandler';
 import AppError from './shared/utils/AppError';
 import logger from './shared/utils/logger';
 import { initializeSockets } from './sockets';
-
-Sentry.init({
-  dsn: env.SENTRY_DSN,
-  environment: env.NODE_ENV,
-  tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
-  integrations: [Sentry.expressIntegration()],
-});
 
 const app = express();
 

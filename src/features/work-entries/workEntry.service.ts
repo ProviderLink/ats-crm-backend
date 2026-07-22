@@ -33,6 +33,8 @@ export const getAllWorkEntries = async (filters: {
     limit = 20,
   } = filters;
   const query: Record<string, unknown> = {};
+  // Always exclude soft-deleted entries
+  query['isDeleted'] = { $ne: true };
 
   if (assignmentId !== undefined)
     query['assignmentId'] = new mongoose.Types.ObjectId(assignmentId);
@@ -154,7 +156,11 @@ export const deleteWorkEntry = async (
   const workEntry = await WorkEntry.findById(id);
   if (!workEntry)
     throw new AppError(404, 'WORK_ENTRY_NOT_FOUND', 'Work entry not found');
-  await workEntry.deleteOne();
+
+  // Soft-delete: mark as deleted instead of removing from DB
+  workEntry.isDeleted = true;
+  workEntry.deletedAt = new Date();
+  await workEntry.save();
 
   createLog({
     action: 'deleted',

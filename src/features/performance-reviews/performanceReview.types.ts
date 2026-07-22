@@ -1,6 +1,4 @@
 export type ReviewType =
-  | '30_day'
-  | '60_day'
   | '90_day'
   | 'annual'
   | 'client_satisfaction'

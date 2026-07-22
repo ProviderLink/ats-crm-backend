@@ -29,8 +29,6 @@ const vaProfileSchema = new Schema(
   { timestamps: true }
 );
 
-vaProfileSchema.index({ vaId: 1 }, { unique: true });
-
 vaProfileSchema.methods.toSafeObject = function (): IVaProfile {
   const raw = this.toObject({ versionKey: false }) as Record<string, unknown>;
   raw['_id'] = String(raw['_id']);

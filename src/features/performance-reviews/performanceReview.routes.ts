@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
-import { requireAppAccess, requireRoles } from '../../shared/middleware/authorize';
+import {
+  requireAppAccess,
+  requireRoles,
+} from '../../shared/middleware/authorize';
 import { validate } from '../../shared/validators/common.validator';
 import {
   completeReview,
+  deleteReview,
+  exportReviewPdf,
   generateReview,
   getAllReviews,
   getReviewById,
@@ -80,15 +85,31 @@ router.post(
   validate(generateReviewSchema),
   generateReview
 );
-router.get('/:id', requireRoles('admin', 'account_manager', 'va'), getReviewById);
+router.get(
+  '/:id',
+  requireRoles('admin', 'account_manager', 'va'),
+  getReviewById
+);
 // /:id/complete must be registered before /:id to prevent Express matching 'complete' as :id
-router.patch('/:id/complete', requireRoles('admin', 'account_manager'), completeReview);
+router.patch(
+  '/:id/complete',
+  requireRoles('admin', 'account_manager'),
+  completeReview
+);
 router.patch(
   '/:id',
   requireRoles('admin', 'account_manager'),
   validate(updateReviewSchema),
   updateReview
 );
+router.delete('/:id', requireRoles('admin', 'account_manager'), deleteReview);
+
+router.get(
+  '/:id/export-pdf',
+  requireRoles('admin', 'account_manager', 'va'),
+  exportReviewPdf
+);
+
 router.post(
   '/:id/regenerate',
   requireRoles('admin', 'account_manager'),

@@ -57,4 +57,6 @@ router.patch(
   eodController.updateEodSubmission
 );
 
+router.delete('/:id', requireRoles('va'), eodController.deleteEodSubmission);
+
 export default router;

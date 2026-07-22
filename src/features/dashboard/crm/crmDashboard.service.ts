@@ -1,4 +1,5 @@
 import Assignment from '../../assignments/assignment.model';
+import Candidate from '../../candidates/candidate.model';
 import EodReminder from '../../eod-reminders/eodReminder.model';
 import EodSubmission from '../../eod-submissions/eodSubmission.model';
 import { IEodSubmission } from '../../eod-submissions/eodSubmission.types';
@@ -66,6 +67,45 @@ export const getDashboardStats = async () => {
 
   const weeklyData = weeklyAgg[0] ?? { totalMinutes: 0, entriesCount: 0 };
 
+  // Per-VA activity breakdown for the current week
+  const perVaAgg = await WorkEntry.aggregate([
+    {
+      $match: {
+        entryDate: { $gte: weekStart, $lte: todayEnd },
+      },
+    },
+    {
+      $group: {
+        _id: '$candidateId',
+        totalMinutes: { $sum: '$timeSpent' },
+        entriesCount: { $sum: 1 },
+        tasksCompleted: {
+          $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+        },
+      },
+    },
+    { $sort: { totalMinutes: -1 } },
+  ]);
+
+  // Resolve candidate names
+  const candidateIds = perVaAgg.map(r => r._id);
+  const candidates = await Candidate.find({
+    _id: { $in: candidateIds },
+  }).lean();
+  const candidateMap: Record<string, string> = {};
+  for (const c of candidates) {
+    candidateMap[String(c._id)] = `${c.firstName} ${c.lastName}`;
+  }
+
+  const perVABreakdown = perVaAgg.map(r => ({
+    vaId: String(r._id),
+    vaName: candidateMap[String(r._id)] ?? 'Unknown VA',
+    totalMinutes: r.totalMinutes,
+    totalHours: Math.round((r.totalMinutes / 60) * 10) / 10,
+    entriesCount: r.entriesCount,
+    tasksCompleted: r.tasksCompleted,
+  }));
+
   return {
     overview: {
       totalAssignments,
@@ -93,5 +133,6 @@ export const getDashboardStats = async () => {
       totalHours: weeklyData.totalMinutes / 60,
       entriesCount: weeklyData.entriesCount,
     },
+    perVABreakdown,
   };
 };

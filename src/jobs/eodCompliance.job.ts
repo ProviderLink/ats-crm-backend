@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import os from 'os';
 import { createLog } from '../features/activity-logs/activityLog.service';
 import Assignment from '../features/assignments/assignment.model';
 import Candidate from '../features/candidates/candidate.model';
@@ -7,6 +8,10 @@ import EodSubmission from '../features/eod-submissions/eodSubmission.model';
 import Settings from '../features/settings/settings.model';
 import { sendEmail } from '../shared/utils/email';
 import logger from '../shared/utils/logger';
+import { acquireLock, releaseLock } from './cronLock';
+
+const JOB_NAME = 'eod-compliance';
+const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 
 async function runEodComplianceCheck(): Promise<void> {
   try {
@@ -75,6 +80,17 @@ async function runEodComplianceCheck(): Promise<void> {
 
 export function scheduleEodComplianceJob(): void {
   cron.schedule('0 17 * * *', async () => {
-    await runEodComplianceCheck();
+    const locked = await acquireLock(JOB_NAME, INSTANCE_ID);
+    if (!locked) {
+      logger.debug(
+        'EOD compliance check skipped — lock held by another instance'
+      );
+      return;
+    }
+    try {
+      await runEodComplianceCheck();
+    } finally {
+      await releaseLock(JOB_NAME);
+    }
   });
 }

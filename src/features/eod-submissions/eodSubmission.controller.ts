@@ -48,3 +48,11 @@ export const updateEodSubmission = catchAsync(
     sendSuccess(res, eodSubmission, 'EOD submission updated', 200);
   }
 );
+
+export const deleteEodSubmission = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await eodService.deleteEodSubmission(id);
+    sendSuccess(res, null, 'EOD submission deleted', 200);
+  }
+);

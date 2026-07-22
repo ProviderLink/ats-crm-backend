@@ -1,9 +1,14 @@
 import cron from 'node-cron';
+import os from 'os';
 import { createLog } from '../features/activity-logs/activityLog.service';
 import SurveyReminder from '../features/survey-reminders/surveyReminder.model';
 import User from '../features/users/user.model';
 import { sendEmail } from '../shared/utils/email';
 import logger from '../shared/utils/logger';
+import { acquireLock, releaseLock } from './cronLock';
+
+const JOB_NAME = 'survey-dispatcher';
+const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 
 async function runSurveyDispatcher(): Promise<void> {
   try {
@@ -58,6 +63,15 @@ async function runSurveyDispatcher(): Promise<void> {
 
 export function scheduleSurveyDispatcherJob(): void {
   cron.schedule('0 9 * * *', async () => {
-    await runSurveyDispatcher();
+    const locked = await acquireLock(JOB_NAME, INSTANCE_ID);
+    if (!locked) {
+      logger.debug('Survey dispatcher skipped — lock held by another instance');
+      return;
+    }
+    try {
+      await runSurveyDispatcher();
+    } finally {
+      await releaseLock(JOB_NAME);
+    }
   });
 }

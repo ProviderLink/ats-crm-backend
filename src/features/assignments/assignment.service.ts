@@ -139,11 +139,25 @@ export const createAssignment = async (
 export const updateAssignment = async (
   id: string,
   input: UpdateAssignmentInput,
-  updatedBy: string
+  updatedBy: string,
+  userRoles: string[] = []
 ): Promise<IAssignment> => {
   const assignment = await Assignment.findById(id);
   if (!assignment)
     throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
+
+  // Account managers can only manage assignments they are assigned to
+  if (
+    !userRoles.includes('admin') &&
+    userRoles.includes('account_manager') &&
+    String(assignment.accountManagerId) !== updatedBy
+  ) {
+    throw new AppError(
+      403,
+      'FORBIDDEN',
+      'You can only manage assignments assigned to you'
+    );
+  }
 
   if (assignment.status === 'ended') {
     throw new AppError(
@@ -212,11 +226,25 @@ export const updateAssignment = async (
 
 export const endAssignment = async (
   id: string,
-  updatedBy: string
+  updatedBy: string,
+  userRoles: string[] = []
 ): Promise<IAssignment> => {
   const assignment = await Assignment.findById(id);
   if (!assignment)
     throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
+
+  // Account managers can only manage assignments they are assigned to
+  if (
+    !userRoles.includes('admin') &&
+    userRoles.includes('account_manager') &&
+    String(assignment.accountManagerId) !== updatedBy
+  ) {
+    throw new AppError(
+      403,
+      'FORBIDDEN',
+      'You can only manage assignments assigned to you'
+    );
+  }
 
   if (assignment.status === 'ended') {
     throw new AppError(400, 'VALIDATION_ERROR', 'Assignment is already ended');

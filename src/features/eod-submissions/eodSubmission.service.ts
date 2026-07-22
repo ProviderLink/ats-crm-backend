@@ -160,3 +160,21 @@ export const updateEodSubmission = async (
   emitToCrm('assignments', 'eod:updated', result);
   return result;
 };
+
+export const deleteEodSubmission = async (id: string): Promise<void> => {
+  const eodSubmission = await EodSubmission.findById(id);
+  if (!eodSubmission)
+    throw new AppError(404, 'EOD_NOT_FOUND', 'EOD submission not found');
+
+  await EodSubmission.findByIdAndDelete(id);
+
+  createLog({
+    action: 'eod_deleted',
+    resourceType: 'eod',
+    resourceId: id,
+    relatedType: 'assignment',
+    relatedId: String(eodSubmission.assignmentId),
+  });
+
+  emitToCrm('assignments', 'eod:deleted', { eodId: id });
+};

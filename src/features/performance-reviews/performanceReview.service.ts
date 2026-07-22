@@ -292,6 +292,27 @@ export const completeReview = async (
   return result;
 };
 
+export const deleteReview = async (id: string): Promise<void> => {
+  const review = await PerformanceReview.findById(id);
+  if (!review) {
+    throw new AppError(
+      404,
+      'PERFORMANCE_REVIEW_NOT_FOUND',
+      'Performance review not found'
+    );
+  }
+
+  await PerformanceReview.findByIdAndDelete(id);
+
+  createLog({
+    action: 'review_deleted',
+    resourceType: 'performance_review',
+    resourceId: id,
+  });
+
+  emitToCrm('assignments', 'performanceReview:deleted', { reviewId: id });
+};
+
 export const regenerateSection = async (
   id: string,
   section: 'categories' | 'goals' | 'summary'

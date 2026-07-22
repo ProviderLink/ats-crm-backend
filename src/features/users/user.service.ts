@@ -444,7 +444,10 @@ export const provisionVA = async (
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
     // If the user was previously deactivated / CRM revoked, re-activate and re-invite
-    if (!existing.isActive || !(existing.appAccess as AppAccess[]).includes('crm')) {
+    if (
+      !existing.isActive ||
+      !(existing.appAccess as AppAccess[]).includes('crm')
+    ) {
       const newInviteToken = crypto.randomBytes(32).toString('hex');
       const newInviteTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
       existing.isActive = true;
@@ -513,7 +516,10 @@ export const provisionClient = async (
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
     // If the user was previously deactivated / CRM revoked, re-activate and re-invite
-    if (!existing.isActive || !(existing.appAccess as AppAccess[]).includes('crm')) {
+    if (
+      !existing.isActive ||
+      !(existing.appAccess as AppAccess[]).includes('crm')
+    ) {
       const newInviteToken = crypto.randomBytes(32).toString('hex');
       const newInviteTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
       existing.isActive = true;

@@ -377,6 +377,7 @@ export const updateCrmProfile = async (
   input: Partial<{
     healthStatus: string;
     baaSign: boolean;
+    baaSigned: boolean; // alias from CRM
     baaSignedDate: Date | null;
     emrSystem: string;
     onboardingComplete: boolean;
@@ -385,9 +386,17 @@ export const updateCrmProfile = async (
     openIssuesCount: number;
     lastClientCheckin: Date | null;
     notes: string;
+    accountOwnerId: string | null;
+    serviceStartDate: Date | null;
+    primaryContact: string;
+    secondaryContact: string;
   }>,
   updatedBy?: string
 ): Promise<IClient> => {
+  // Normalise baaSigned → baaSign
+  const baaSignValue =
+    input.baaSign !== undefined ? input.baaSign : input.baaSigned;
+
   const client = await Client.findById(clientId);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
 
@@ -403,6 +412,10 @@ export const updateCrmProfile = async (
       openIssuesCount: 0,
       lastClientCheckin: null,
       notes: '',
+      accountOwnerId: null,
+      serviceStartDate: null,
+      primaryContact: '',
+      secondaryContact: '',
     };
   }
 
@@ -420,13 +433,13 @@ export const updateCrmProfile = async (
   } else if (input.healthStatus !== undefined) {
     profile.healthStatus = input.healthStatus;
   }
-  if (input.baaSign !== undefined && input.baaSign !== profile.baaSign) {
+  if (baaSignValue !== undefined && baaSignValue !== profile.baaSign) {
     changes.push(
-      input.baaSign ? 'BAA marked as signed' : 'BAA marked as unsigned'
+      baaSignValue ? 'BAA marked as signed' : 'BAA marked as unsigned'
     );
-    profile.baaSign = input.baaSign;
-  } else if (input.baaSign !== undefined) {
-    profile.baaSign = input.baaSign;
+    profile.baaSign = baaSignValue;
+  } else if (baaSignValue !== undefined) {
+    profile.baaSign = baaSignValue;
   }
   if (input.baaSignedDate !== undefined) {
     changes.push(
@@ -493,6 +506,25 @@ export const updateCrmProfile = async (
   if (input.notes !== undefined) {
     changes.push('CRM notes updated');
     profile.notes = input.notes;
+  }
+  if (input.accountOwnerId !== undefined) {
+    profile.accountOwnerId =
+      input.accountOwnerId !== null
+        ? (new mongoose.Types.ObjectId(input.accountOwnerId) as any)
+        : null;
+    changes.push('Account owner updated');
+  }
+  if (input.serviceStartDate !== undefined) {
+    profile.serviceStartDate = input.serviceStartDate;
+    changes.push('Service start date updated');
+  }
+  if (input.primaryContact !== undefined) {
+    profile.primaryContact = input.primaryContact;
+    changes.push('Primary contact updated');
+  }
+  if (input.secondaryContact !== undefined) {
+    profile.secondaryContact = input.secondaryContact;
+    changes.push('Secondary contact updated');
   }
 
   client.markModified('crmProfile');

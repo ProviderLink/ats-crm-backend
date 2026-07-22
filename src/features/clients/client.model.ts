@@ -114,6 +114,10 @@ const crmProfileSchema = new Schema(
     openIssuesCount: { type: Number, default: 0 },
     lastClientCheckin: { type: Date, default: null },
     notes: { type: String, default: '' },
+    accountOwnerId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    serviceStartDate: { type: Date, default: null },
+    primaryContact: { type: String, default: '' },
+    secondaryContact: { type: String, default: '' },
   },
   { _id: false }
 );

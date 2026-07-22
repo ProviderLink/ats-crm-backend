@@ -38,7 +38,7 @@ router.get(
 
 router.post(
   '/',
-  requireRoles('admin', 'account_manager', 'va'),
+  requireRoles('va'),
   validate(createWorkEntrySchema),
   workEntryController.createWorkEntry
 );
@@ -51,15 +51,11 @@ router.get(
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'account_manager', 'va'),
+  requireRoles('va'),
   validate(updateWorkEntrySchema),
   workEntryController.updateWorkEntry
 );
 
-router.delete(
-  '/:id',
-  requireRoles('admin', 'account_manager'),
-  workEntryController.deleteWorkEntry
-);
+router.delete('/:id', requireRoles('va'), workEntryController.deleteWorkEntry);
 
 export default router;

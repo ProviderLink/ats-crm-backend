@@ -71,6 +71,7 @@ const updateClientNoteSchema = createClientNoteSchema.partial();
 const updateCrmProfileSchema = z.object({
   healthStatus: z.enum(['green', 'yellow', 'red']).optional(),
   baaSign: z.boolean().optional(),
+  baaSigned: z.boolean().optional(), // alias accepted by CRM
   baaSignedDate: z.string().datetime().optional().nullable(),
   emrSystem: z.string().optional(),
   onboardingComplete: z.boolean().optional(),
@@ -79,6 +80,10 @@ const updateCrmProfileSchema = z.object({
   openIssuesCount: z.number().min(0).optional(),
   lastClientCheckin: z.string().datetime().optional().nullable(),
   notes: z.string().optional(),
+  accountOwnerId: z.string().optional().nullable(),
+  serviceStartDate: z.string().datetime().optional().nullable(),
+  primaryContact: z.string().optional(),
+  secondaryContact: z.string().optional(),
 });
 
 const router = Router();

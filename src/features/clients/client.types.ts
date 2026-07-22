@@ -52,6 +52,10 @@ export interface ClientCrmProfile {
   openIssuesCount: number;
   lastClientCheckin: Date | null;
   notes: string;
+  accountOwnerId: string | null;
+  serviceStartDate: Date | null;
+  primaryContact: string;
+  secondaryContact: string;
 }
 
 export interface IClient {

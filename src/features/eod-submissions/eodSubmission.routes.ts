@@ -39,7 +39,7 @@ router.get(
 
 router.post(
   '/',
-  requireRoles('admin', 'account_manager', 'va'),
+  requireRoles('va'),
   validate(createEodSchema),
   eodController.createEodSubmission
 );
@@ -52,7 +52,7 @@ router.get(
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'account_manager', 'va'),
+  requireRoles('va'),
   validate(updateEodSchema),
   eodController.updateEodSubmission
 );

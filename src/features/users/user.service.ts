@@ -443,6 +443,30 @@ export const provisionVA = async (
 ): Promise<{ user: SafeUser; inviteToken: string | null }> => {
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
+    // If the user was previously deactivated / CRM revoked, re-activate and re-invite
+    if (!existing.isActive || !(existing.appAccess as AppAccess[]).includes('crm')) {
+      const newInviteToken = crypto.randomBytes(32).toString('hex');
+      const newInviteTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      existing.isActive = true;
+      const access = existing.appAccess as AppAccess[];
+      if (!access.includes('crm')) {
+        access.push('crm');
+        existing.appAccess = access;
+        existing.markModified('appAccess');
+      }
+      existing.inviteToken = newInviteToken;
+      existing.inviteTokenExpires = newInviteTokenExpires;
+      existing.candidateRef = new mongoose.Types.ObjectId(candidateId);
+      await existing.save();
+      createLog({
+        action: 'provisioned_va',
+        resourceType: 'user',
+        resourceId: existing._id.toString(),
+        relatedType: 'candidate',
+        relatedId: candidateId,
+      });
+      return { user: existing.toSafeObject(), inviteToken: newInviteToken };
+    }
     return { user: existing.toSafeObject(), inviteToken: null };
   }
 
@@ -488,6 +512,30 @@ export const provisionClient = async (
 ): Promise<{ user: SafeUser; inviteToken: string | null }> => {
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
+    // If the user was previously deactivated / CRM revoked, re-activate and re-invite
+    if (!existing.isActive || !(existing.appAccess as AppAccess[]).includes('crm')) {
+      const newInviteToken = crypto.randomBytes(32).toString('hex');
+      const newInviteTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      existing.isActive = true;
+      const access = existing.appAccess as AppAccess[];
+      if (!access.includes('crm')) {
+        access.push('crm');
+        existing.appAccess = access;
+        existing.markModified('appAccess');
+      }
+      existing.inviteToken = newInviteToken;
+      existing.inviteTokenExpires = newInviteTokenExpires;
+      existing.clientRef = new mongoose.Types.ObjectId(clientId);
+      await existing.save();
+      createLog({
+        action: 'provisioned_client',
+        resourceType: 'user',
+        resourceId: existing._id.toString(),
+        relatedType: 'client',
+        relatedId: clientId,
+      });
+      return { user: existing.toSafeObject(), inviteToken: newInviteToken };
+    }
     return { user: existing.toSafeObject(), inviteToken: null };
   }
 

@@ -11,7 +11,10 @@ export type ActivityLogResourceType =
   | 'survey'
   | 'tag'
   | 'work_entry'
-  | 'settings';
+  | 'settings'
+  | 'scorecards'
+  | 'vaProfile'
+  | 'client_account';
 
 export type ActivityAction =
   // ── Generic ────────────────────────────────────────────
@@ -59,11 +62,20 @@ export type ActivityAction =
   // ── Performance Review ─────────────────────────────────
   | 'review_generated'
   | 'review_completed'
+  // ── Scorecard ──────────────────────────────────────────
+  | 'scorecard_generated'
   // ── EOD / Survey / Settings ────────────────────────────
   | 'eod_compliance_checked'
   | 'eod_submitted'
+  | 'eod_deleted'
   | 'survey_dispatched'
-  | 'settings_updated';
+  | 'settings_updated'
+  // ── CRM ────────────────────────────────────────────────
+  | 'revoked_crm'
+  | 'crm_client_account_updated'
+  | 'va_profile_updated'
+  // ── Performance Review ─────────────────────────────────
+  | 'review_deleted';
 
 export interface IActivityLog {
   _id: string;

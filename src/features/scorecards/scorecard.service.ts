@@ -167,7 +167,7 @@ export const generateScorecards = async (
 
   if (performedBy) {
     await createLog({
-      action: 'generated',
+      action: 'scorecard_generated',
       resourceType: 'scorecards',
       resourceId: 'bulk',
       description: `Generated ${generated} scorecards for week of ${weekStart.toISOString().slice(0, 10)}`,

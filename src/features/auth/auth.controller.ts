@@ -10,10 +10,11 @@ export const login = catchAsync(async (req: Request, res: Response) => {
     req.body
   );
   const cookieName = app === 'crm' ? 'refreshTokenCrm' : 'refreshTokenAts';
+  const isProd = env.NODE_ENV === 'production';
   res.cookie(cookieName, refreshToken, {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
   sendSuccess(res, { user, accessToken }, 'Login successful', 200);

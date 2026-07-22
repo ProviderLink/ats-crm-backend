@@ -51,6 +51,10 @@ import { initializeSockets } from './sockets';
 
 const app = express();
 
+// Heroku and other cloud platforms use reverse proxies —
+// trust the X-Forwarded-* headers for rate limiting, cookies, and IP logging.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(
   cors({

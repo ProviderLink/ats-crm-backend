@@ -1,5 +1,5 @@
 import { AppError } from '../../shared/utils/AppError';
-import { callClaude, parseJsonResponse } from '../../shared/utils/ai/index';
+import { getAiProvider, parseJsonResponse } from '../../shared/utils/ai/index';
 import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
@@ -121,7 +121,8 @@ Respond with exactly this JSON structure:
 Generate 6-8 relevant performance categories for this role.
 `;
 
-  const text = await callClaude(prompt, 2000);
+  const provider = await getAiProvider();
+  const text = await provider.generate(prompt, { maxTokens: 2000 });
   const result = parseJsonResponse<{
     roleSummary: string;
     coreResponsibilities: string;
@@ -385,7 +386,8 @@ Respond with exactly this JSON structure:
 `;
   }
 
-  const text = await callClaude(prompt, 1500);
+  const provider = await getAiProvider();
+  const text = await provider.generate(prompt, { maxTokens: 1500 });
 
   if (section === 'categories') {
     const result = parseJsonResponse<{

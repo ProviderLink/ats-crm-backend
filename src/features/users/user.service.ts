@@ -304,10 +304,14 @@ export const sendTeamMemberInvite = async (params: {
   firstName: string;
   inviteToken: string;
   invitedByName?: string;
+  /** Override the default ATS invite URL. Use env.CRM_FRONTEND_URL for CRM roles. */
+  inviteUrl?: string;
 }): Promise<void> => {
   const { email, firstName, inviteToken, invitedByName } = params;
 
-  const inviteUrl = `${env.ATS_FRONTEND_URL}/ats/verify-email/${inviteToken}`;
+  const inviteUrl =
+    params.inviteUrl ??
+    `${env.ATS_FRONTEND_URL}/ats/verify-email/${inviteToken}`;
   const companyName = env.COMPANY_NAME;
   const invitedBy = invitedByName || 'Administrator';
 
@@ -519,4 +523,26 @@ export const provisionClient = async (
   });
 
   return { user: user.toSafeObject(), inviteToken };
+};
+
+/**
+ * Revoke CRM access for a user.
+ * Removes 'crm' from appAccess and deactivates the account.
+ */
+export const revokeCrmAccess = async (id: string): Promise<SafeUser> => {
+  const user = await User.findById(id);
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+
+  user.appAccess = (user.appAccess as AppAccess[]).filter(a => a !== 'crm');
+  user.isActive = false;
+  user.markModified('appAccess');
+  await user.save();
+
+  createLog({
+    action: 'revoked_crm',
+    resourceType: 'user',
+    resourceId: id,
+  });
+
+  return user.toSafeObject();
 };

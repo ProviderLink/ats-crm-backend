@@ -9,6 +9,9 @@ import {
   deactivateUser,
   getAllUsers,
   getUserById,
+  provisionClient,
+  provisionVA,
+  revokeCrmAccess,
   updateMe,
   updatePermissions,
   updateUser,
@@ -69,6 +72,14 @@ const updatePermissionsSchema = z.object({
   permissions: z.record(z.record(z.boolean())),
 });
 
+const provisionClientSchema = z.object({
+  clientId: z.string().min(1),
+});
+
+const provisionVASchema = z.object({
+  candidateId: z.string().min(1),
+});
+
 router.use(authenticate);
 
 // Self-service routes (any authenticated user)
@@ -96,6 +107,25 @@ router.patch(
   requirePermission('team', 'manage'),
   validate(updatePermissionsSchema),
   updatePermissions
+);
+
+// CRM provisioning routes (admin only)
+router.post(
+  '/provision-client',
+  requirePermission('team', 'write'),
+  validate(provisionClientSchema),
+  provisionClient
+);
+router.post(
+  '/provision-va',
+  requirePermission('team', 'write'),
+  validate(provisionVASchema),
+  provisionVA
+);
+router.post(
+  '/:id/revoke-crm',
+  requirePermission('team', 'manage'),
+  revokeCrmAccess
 );
 
 export default router;

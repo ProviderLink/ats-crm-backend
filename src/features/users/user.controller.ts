@@ -3,6 +3,7 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from '../../config/cloudinary';
+import { env } from '../../config/env';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import logger from '../../shared/utils/logger';
@@ -52,7 +53,7 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
   const isCrmOnly =
     user.appAccess?.includes('crm') && !user.appAccess?.includes('ats');
   const inviteUrl = isCrmOnly
-    ? `${process.env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`
+    ? `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`
     : undefined; // undefined = default ATS URL
 
   // Send invite email asynchronously (don't block the response)
@@ -185,7 +186,7 @@ export const provisionClient = catchAsync(
           firstName: user.firstName,
           inviteToken,
           invitedByName: `${req.user!.firstName} ${req.user!.lastName}`,
-          inviteUrl: `${process.env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
+          inviteUrl: `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
         })
         .catch(err => {
           logger.error('Failed to send client invite email', err);
@@ -237,7 +238,7 @@ export const provisionVA = catchAsync(async (req: Request, res: Response) => {
         firstName: user.firstName,
         inviteToken,
         invitedByName: `${req.user!.firstName} ${req.user!.lastName}`,
-        inviteUrl: `${process.env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
+        inviteUrl: `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
       })
       .catch(err => {
         logger.error('Failed to send VA invite email', err);

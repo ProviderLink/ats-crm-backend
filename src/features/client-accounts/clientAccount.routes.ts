@@ -31,6 +31,18 @@ router.use(authenticate);
 router.use(requireAppAccess('crm'));
 
 router.get(
+  '/provisioned',
+  requireRoles('admin', 'account_manager'),
+  controller.getProvisionedClients
+);
+
+router.get(
+  '/:id/hired-vas',
+  requireRoles('admin', 'account_manager'),
+  controller.getHiredVasForClient
+);
+
+router.get(
   '/',
   requireRoles('admin', 'account_manager'),
   controller.getAllClientAccounts

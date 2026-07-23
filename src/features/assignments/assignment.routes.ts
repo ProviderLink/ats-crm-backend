@@ -15,6 +15,8 @@ const createAssignmentSchema = z.object({
   startDate: z.string().datetime(),
   endDate: z.string().datetime().optional().nullable(),
   accountManagerId: z.string(),
+  status: z.enum(['active', 'on_hold', 'ended']).optional(),
+  jobId: z.string().optional(),
   notes: z.string().optional().nullable(),
 });
 
@@ -23,6 +25,7 @@ const updateAssignmentSchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional().nullable(),
   accountManagerId: z.string().optional(),
+  status: z.enum(['active', 'on_hold', 'ended']).optional(),
   notes: z.string().optional().nullable(),
 });
 

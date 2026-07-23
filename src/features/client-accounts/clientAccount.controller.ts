@@ -4,6 +4,13 @@ import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
 import * as service from './clientAccount.service';
 
+export const getProvisionedClients = catchAsync(
+  async (_req: Request, res: Response) => {
+    const clients = await service.getProvisionedClients();
+    sendSuccess(res, clients, 'Provisioned clients retrieved', 200);
+  }
+);
+
 export const getAllClientAccounts = catchAsync(
   async (req: Request, res: Response) => {
     const { page, limit } = req.query as Record<string, string | undefined>;
@@ -29,6 +36,14 @@ export const getClientAccountById = catchAsync(
     } catch {
       throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
     }
+  }
+);
+
+export const getHiredVasForClient = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const vas = await service.getHiredVasForClient(id);
+    sendSuccess(res, vas, 'Hired VAs retrieved', 200);
   }
 );
 

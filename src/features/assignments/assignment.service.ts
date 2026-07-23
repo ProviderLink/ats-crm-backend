@@ -82,6 +82,7 @@ export const createAssignment = async (
     candidateId: new mongoose.Types.ObjectId(input.candidateId),
     clientId: new mongoose.Types.ObjectId(input.clientId),
     serviceType: input.serviceType,
+    status: input.status ?? 'active',
     startDate: new Date(input.startDate),
     endDate: input.endDate ? new Date(input.endDate) : null,
     accountManagerId: new mongoose.Types.ObjectId(input.accountManagerId),
@@ -204,6 +205,14 @@ export const updateAssignment = async (
   if (input.notes !== undefined) {
     changes.push('Notes updated');
     assignment.notes = input.notes ?? null;
+  }
+  if (input.status !== undefined && input.status !== assignment.status) {
+    changes.push(
+      `Status changed from "${assignment.status}" to "${input.status}"`
+    );
+    assignment.status = input.status;
+  } else if (input.status !== undefined) {
+    assignment.status = input.status;
   }
 
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);

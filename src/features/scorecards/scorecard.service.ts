@@ -78,9 +78,14 @@ export const getScorecardById = async (id: string): Promise<IScorecard> => {
 };
 
 export const generateScorecards = async (
+  vaId?: string,
   performedBy?: string
 ): Promise<{ generated: number }> => {
-  const activeAssignments = await Assignment.find({ status: 'active' });
+  const assignmentFilter: Record<string, unknown> = { status: 'active' };
+  if (vaId) {
+    assignmentFilter['candidateId'] = new mongoose.Types.ObjectId(vaId);
+  }
+  const activeAssignments = await Assignment.find(assignmentFilter);
   const { weekStart, weekEnd } = getWeekRange(new Date());
   let generated = 0;
 

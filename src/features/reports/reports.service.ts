@@ -1,8 +1,11 @@
+import * as XLSX from 'xlsx';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
 import EodSubmission from '../eod-submissions/eodSubmission.model';
 import PerformanceReview from '../performance-reviews/performanceReview.model';
 import WorkEntry from '../work-entries/workEntry.model';
+
+export type ExportFormat = 'csv' | 'xlsx';
 
 function generateCsv(headers: string[], rows: string[][]): string {
   const escape = (value: string) =>
@@ -12,11 +15,35 @@ function generateCsv(headers: string[], rows: string[][]): string {
   return [headerLine, ...rowLines].join('\n');
 }
 
+function generateXlsx(headers: string[], rows: string[][]): Buffer {
+  const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, 'Report');
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+}
+
+type ReportResult = { csv: string; xlsx: Buffer; filename: string };
+
+function formatResult(
+  format: ExportFormat,
+  headers: string[],
+  rows: string[][],
+  baseName: string
+): ReportResult {
+  const ext = format === 'xlsx' ? 'xlsx' : 'csv';
+  return {
+    csv: generateCsv(headers, rows),
+    xlsx: generateXlsx(headers, rows),
+    filename: `${baseName}-${Date.now()}.${ext}`,
+  };
+}
+
 export const getWorkEntriesReport = async (filters: {
   startDate?: string;
   endDate?: string;
   candidateId?: string;
   clientId?: string;
+  format?: ExportFormat;
 }) => {
   const query: Record<string, any> = {};
 
@@ -61,10 +88,7 @@ export const getWorkEntriesReport = async (filters: {
     })
   );
 
-  return {
-    csv: generateCsv(headers, rows),
-    filename: `work-entries-${Date.now()}.csv`,
-  };
+  return formatResult(filters.format ?? 'csv', headers, rows, 'work-entries');
 };
 
 export const getEodSubmissionsReport = async (filters: {
@@ -72,6 +96,7 @@ export const getEodSubmissionsReport = async (filters: {
   endDate?: string;
   candidateId?: string;
   clientId?: string;
+  format?: ExportFormat;
 }) => {
   const query: Record<string, any> = {};
 
@@ -120,10 +145,12 @@ export const getEodSubmissionsReport = async (filters: {
     })
   );
 
-  return {
-    csv: generateCsv(headers, rows),
-    filename: `eod-submissions-${Date.now()}.csv`,
-  };
+  return formatResult(
+    filters.format ?? 'csv',
+    headers,
+    rows,
+    'eod-submissions'
+  );
 };
 
 export const getPerformanceReport = async (filters: {
@@ -131,6 +158,7 @@ export const getPerformanceReport = async (filters: {
   endDate?: string;
   candidateId?: string;
   clientId?: string;
+  format?: ExportFormat;
 }) => {
   const query: Record<string, any> = {};
 
@@ -178,8 +206,10 @@ export const getPerformanceReport = async (filters: {
     })
   );
 
-  return {
-    csv: generateCsv(headers, rows),
-    filename: `performance-reviews-${Date.now()}.csv`,
-  };
+  return formatResult(
+    filters.format ?? 'csv',
+    headers,
+    rows,
+    'performance-reviews'
+  );
 };

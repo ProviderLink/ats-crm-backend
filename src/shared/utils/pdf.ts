@@ -2,6 +2,8 @@ import PDFDocument from 'pdfkit';
 import type { IPerformanceReview } from '../../features/performance-reviews/performanceReview.types';
 
 const REVIEW_TYPE_LABELS: Record<string, string> = {
+  '30_day': '30-Day Review',
+  '60_day': '60-Day Review',
   '90_day': '90-Day Review',
   annual: 'Annual Review',
   client_satisfaction: 'Client Satisfaction Review',

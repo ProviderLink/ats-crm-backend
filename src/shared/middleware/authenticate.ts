@@ -31,6 +31,8 @@ const authenticate = catchAsync(
       roles: decoded.roles as string[],
       appAccess: decoded.appAccess as string[],
       permissions: decoded.permissions,
+      candidateRef: (decoded.candidateRef as string | null) ?? null,
+      clientRef: (decoded.clientRef as string | null) ?? null,
     };
 
     next();

@@ -41,6 +41,8 @@ export const login = async (input: LoginInput) => {
       string,
       Record<string, boolean>
     >,
+    candidateRef: user.candidateRef ? String(user.candidateRef) : null,
+    clientRef: user.clientRef ? String(user.clientRef) : null,
   };
 
   const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
@@ -118,6 +120,8 @@ export const refreshToken = async (
       string,
       Record<string, boolean>
     >,
+    candidateRef: user.candidateRef ? String(user.candidateRef) : null,
+    clientRef: user.clientRef ? String(user.clientRef) : null,
   };
 
   const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {

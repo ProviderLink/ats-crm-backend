@@ -38,7 +38,11 @@ export const getScorecardById = catchAsync(
 
 export const generateScorecards = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await scorecardService.generateScorecards(req.user!._id);
+    const { vaId } = req.body as { vaId?: string };
+    const result = await scorecardService.generateScorecards(
+      vaId,
+      req.user!._id
+    );
     sendSuccess(res, result, `Generated ${result.generated} scorecards`, 201);
   }
 );

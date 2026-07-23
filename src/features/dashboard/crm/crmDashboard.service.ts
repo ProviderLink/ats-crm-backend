@@ -1,11 +1,19 @@
 import Assignment from '../../assignments/assignment.model';
 import Candidate from '../../candidates/candidate.model';
+import Client from '../../clients/client.model';
 import EodReminder from '../../eod-reminders/eodReminder.model';
 import EodSubmission from '../../eod-submissions/eodSubmission.model';
 import { IEodSubmission } from '../../eod-submissions/eodSubmission.types';
 import WorkEntry from '../../work-entries/workEntry.model';
 
-export const getDashboardStats = async () => {
+/**
+ * Get dashboard stats, optionally scoped to an account manager's assignments.
+ *
+ * When `accountManagerId` is provided (for AM users), all assignment counts,
+ * work entries, EOD submissions, and per-VA breakdowns are filtered to only
+ * the assignments where the AM is assigned.  Admin users receive global stats.
+ */
+export const getDashboardStats = async (accountManagerId?: string) => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
@@ -14,6 +22,25 @@ export const getDashboardStats = async () => {
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 7);
   weekStart.setHours(0, 0, 0, 0);
+
+  // ── AM scoping: resolve candidate IDs for this AM ─────
+  let candidateIdFilter: string[] | undefined;
+
+  if (accountManagerId) {
+    const amAssignments = await Assignment.find({
+      accountManagerId,
+    }).lean();
+    const candidateIds = [
+      ...new Set(amAssignments.map(a => String(a.candidateId))),
+    ];
+    if (candidateIds.length === 0) {
+      // No assignments — return empty stats
+      return emptyDashboard();
+    }
+    candidateIdFilter = candidateIds;
+  }
+
+  const assignmentBase = accountManagerId ? { accountManagerId } : {};
 
   const [
     totalAssignments,
@@ -24,19 +51,22 @@ export const getDashboardStats = async () => {
     totalWorkEntriesToday,
     missingEodsToday,
   ] = await Promise.all([
-    Assignment.countDocuments({}),
-    Assignment.countDocuments({ status: 'active' }),
-    Assignment.countDocuments({ status: 'on_hold' }),
-    Assignment.countDocuments({ status: 'ended' }),
+    Assignment.countDocuments(assignmentBase),
+    Assignment.countDocuments({ ...assignmentBase, status: 'active' }),
+    Assignment.countDocuments({ ...assignmentBase, status: 'on_hold' }),
+    Assignment.countDocuments({ ...assignmentBase, status: 'ended' }),
     EodSubmission.countDocuments({
       date: { $gte: todayStart, $lte: todayEnd },
+      ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
     WorkEntry.countDocuments({
       entryDate: { $gte: todayStart, $lte: todayEnd },
+      ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
     EodReminder.countDocuments({
       reminderDate: { $gte: todayStart, $lte: todayEnd },
       status: 'sent',
+      ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
   ]);
 
@@ -45,17 +75,24 @@ export const getDashboardStats = async () => {
       ? Math.round((totalEodToday / activeAssignments) * 100)
       : 100;
 
-  const recentEodSubmissions = (await EodSubmission.find({})
+  const eodQuery: Record<string, unknown> = {};
+  if (candidateIdFilter) {
+    eodQuery.candidateId = { $in: candidateIdFilter };
+  }
+  const recentEodSubmissions = (await EodSubmission.find(eodQuery)
     .sort({ createdAt: -1 })
     .limit(10)
     .lean()) as unknown as IEodSubmission[];
 
+  const workEntryMatch: Record<string, unknown> = {
+    entryDate: { $gte: weekStart, $lte: todayEnd },
+  };
+  if (candidateIdFilter) {
+    workEntryMatch.candidateId = { $in: candidateIdFilter };
+  }
+
   const weeklyAgg = await WorkEntry.aggregate([
-    {
-      $match: {
-        entryDate: { $gte: weekStart, $lte: todayEnd },
-      },
-    },
+    { $match: workEntryMatch },
     {
       $group: {
         _id: null,
@@ -69,11 +106,7 @@ export const getDashboardStats = async () => {
 
   // Per-VA activity breakdown for the current week
   const perVaAgg = await WorkEntry.aggregate([
-    {
-      $match: {
-        entryDate: { $gte: weekStart, $lte: todayEnd },
-      },
-    },
+    { $match: workEntryMatch },
     {
       $group: {
         _id: '$candidateId',
@@ -88,22 +121,52 @@ export const getDashboardStats = async () => {
   ]);
 
   // Resolve candidate names
-  const candidateIds = perVaAgg.map(r => r._id);
+  const aggCandidateIds = perVaAgg.map(r => String(r._id));
   const candidates = await Candidate.find({
-    _id: { $in: candidateIds },
+    _id: { $in: aggCandidateIds },
   }).lean();
-  const candidateMap: Record<string, string> = {};
+  const vaCandidateMap: Record<string, string> = {};
   for (const c of candidates) {
-    candidateMap[String(c._id)] = `${c.firstName} ${c.lastName}`;
+    vaCandidateMap[String(c._id)] = `${c.firstName} ${c.lastName}`;
   }
 
   const perVABreakdown = perVaAgg.map(r => ({
     vaId: String(r._id),
-    vaName: candidateMap[String(r._id)] ?? 'Unknown VA',
+    vaName: vaCandidateMap[String(r._id)] ?? 'Unknown VA',
     totalMinutes: r.totalMinutes,
     totalHours: Math.round((r.totalMinutes / 60) * 10) / 10,
     entriesCount: r.entriesCount,
     tasksCompleted: r.tasksCompleted,
+  }));
+
+  // Per-Client activity breakdown for the current week
+  const perClientAgg = await WorkEntry.aggregate([
+    { $match: workEntryMatch },
+    {
+      $group: {
+        _id: '$clientId',
+        totalMinutes: { $sum: '$timeSpent' },
+        entriesCount: { $sum: 1 },
+      },
+    },
+    { $sort: { totalMinutes: -1 } },
+  ]);
+
+  const aggClientIds = perClientAgg.map(r => String(r._id));
+  const clients = await Client.find({
+    _id: { $in: aggClientIds },
+  }).lean();
+  const clientNameMap: Record<string, string> = {};
+  for (const c of clients) {
+    clientNameMap[String(c._id)] = c.companyName;
+  }
+
+  const perClientBreakdown = perClientAgg.map(r => ({
+    clientId: String(r._id),
+    clientName: clientNameMap[String(r._id)] ?? 'Unknown Client',
+    totalMinutes: r.totalMinutes,
+    totalHours: Math.round((r.totalMinutes / 60) * 10) / 10,
+    entriesCount: r.entriesCount,
   }));
 
   return {
@@ -134,5 +197,40 @@ export const getDashboardStats = async () => {
       entriesCount: weeklyData.entriesCount,
     },
     perVABreakdown,
+    perClientBreakdown,
   };
 };
+
+/** Empty dashboard returned when an AM has no assignments. */
+function emptyDashboard() {
+  return {
+    overview: {
+      totalAssignments: 0,
+      activeAssignments: 0,
+      onHoldAssignments: 0,
+      endedAssignments: 0,
+      totalEodSubmissionsToday: 0,
+      totalWorkEntriesToday: 0,
+      missingEodsToday: 0,
+    },
+    eodCompliance: {
+      totalActive: 0,
+      submittedToday: 0,
+      missingToday: 0,
+      complianceRate: 0,
+    },
+    recentEodSubmissions: [],
+    assignmentHealth: {
+      active: 0,
+      on_hold: 0,
+      ended: 0,
+    },
+    weeklyWorkHours: {
+      totalMinutes: 0,
+      totalHours: 0,
+      entriesCount: 0,
+    },
+    perVABreakdown: [],
+    perClientBreakdown: [],
+  };
+}

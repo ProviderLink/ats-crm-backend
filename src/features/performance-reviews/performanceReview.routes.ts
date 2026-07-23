@@ -24,6 +24,8 @@ const generateReviewSchema = z.object({
   clientId: z.string(),
   jobId: z.string(),
   reviewType: z.enum([
+    '30_day',
+    '60_day',
     '90_day',
     'annual',
     'client_satisfaction',

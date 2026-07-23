@@ -9,6 +9,10 @@ declare global {
         lastName: string;
         roles: string[];
         appAccess: string[];
+        /** ATS Candidate document ID — only set for VA users */
+        candidateRef: string | null;
+        /** ATS Client document ID — only set for client users */
+        clientRef: string | null;
         permissions: {
           candidates?: { read?: boolean; write?: boolean; manage?: boolean };
           jobs?: { read?: boolean; write?: boolean; manage?: boolean };

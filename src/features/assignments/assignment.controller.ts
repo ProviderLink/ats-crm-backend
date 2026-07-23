@@ -7,9 +7,31 @@ export const getAllAssignments = catchAsync(
   async (req: Request, res: Response) => {
     const { candidateId, clientId, accountManagerId, status, page, limit } =
       req.query as Record<string, string | undefined>;
+    const user = req.user!;
+
+    // Auto-scope for non-admin users
+    const isAdmin = user.roles.includes('admin');
+    const isAM = user.roles.includes('account_manager');
+
+    // VA sees only their own assignments
+    const resolvedCandidateId =
+      isAdmin || isAM
+        ? candidateId
+        : user.roles.includes('va') && user.candidateRef
+          ? user.candidateRef
+          : candidateId;
+
+    // Client sees only their own assignments
+    const resolvedClientId =
+      isAdmin || isAM
+        ? clientId
+        : user.roles.includes('client') && user.clientRef
+          ? user.clientRef
+          : clientId;
+
     const result = await assignmentService.getAllAssignments({
-      candidateId,
-      clientId,
+      candidateId: resolvedCandidateId,
+      clientId: resolvedClientId,
       accountManagerId,
       status,
       page: page !== undefined ? Number(page) : undefined,

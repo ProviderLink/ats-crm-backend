@@ -7,10 +7,30 @@ export const getAllWorkEntries = catchAsync(
   async (req: Request, res: Response) => {
     const { assignmentId, candidateId, clientId, entryDate, page, limit } =
       req.query as Record<string, string | undefined>;
+    const user = req.user!;
+
+    // Auto-scope: VA sees only their own entries, client sees only their VAs
+    const isAdmin = user.roles.includes('admin');
+    const isAM = user.roles.includes('account_manager');
+
+    const resolvedCandidateId =
+      isAdmin || isAM
+        ? candidateId
+        : user.roles.includes('va') && user.candidateRef
+          ? user.candidateRef
+          : candidateId;
+
+    const resolvedClientId =
+      isAdmin || isAM
+        ? clientId
+        : user.roles.includes('client') && user.clientRef
+          ? user.clientRef
+          : clientId;
+
     const result = await workEntryService.getAllWorkEntries({
       assignmentId,
-      candidateId,
-      clientId,
+      candidateId: resolvedCandidateId,
+      clientId: resolvedClientId,
       entryDate,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,

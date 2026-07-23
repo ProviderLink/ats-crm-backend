@@ -10,7 +10,11 @@ export interface IClientAccount {
   onboardingComplete: boolean;
   sopReceived: boolean;
   primaryContact: string;
+  primaryContactEmail: string;
+  primaryContactPhone: string;
   secondaryContact: string;
+  secondaryContactEmail: string;
+  secondaryContactPhone: string;
   lastClientCheckin: Date | null;
   satisfactionScore: number | null;
   healthStatus: string;

@@ -15,6 +15,11 @@ function toClientAccount(client: any): IClientAccount | null {
     ? (client.toObject({ versionKey: false }) as Record<string, unknown>)
     : (client as Record<string, unknown>);
   const profile = raw['crmProfile'] as Record<string, unknown> | null;
+
+  const contacts = (raw['contacts'] as Array<Record<string, unknown>>) ?? [];
+  const primaryAtsCt = contacts.find(c => c['isPrimary']) ?? contacts[0] ?? null;
+  const secondaryAtsCt = contacts.find(c => !c['isPrimary'] && c !== primaryAtsCt) ?? null;
+
   return {
     id: String(raw['_id']),
     clientId: String(raw['_id']),
@@ -28,8 +33,12 @@ function toClientAccount(client: any): IClientAccount | null {
     baaSignedDate: (profile?.baaSignedDate as Date) ?? null,
     onboardingComplete: Boolean(profile?.onboardingComplete ?? false),
     sopReceived: Boolean(profile?.sopReceived ?? false),
-    primaryContact: String(profile?.primaryContact ?? ''),
-    secondaryContact: String(profile?.secondaryContact ?? ''),
+    primaryContact: String(profile?.primaryContact || primaryAtsCt?.['name'] || ''),
+    primaryContactEmail: String(primaryAtsCt?.['email'] ?? ''),
+    primaryContactPhone: String(primaryAtsCt?.['phone'] ?? ''),
+    secondaryContact: String(profile?.secondaryContact || secondaryAtsCt?.['name'] || ''),
+    secondaryContactEmail: String(secondaryAtsCt?.['email'] ?? ''),
+    secondaryContactPhone: String(secondaryAtsCt?.['phone'] ?? ''),
     lastClientCheckin: (profile?.lastClientCheckin as Date) ?? null,
     satisfactionScore: (profile?.satisfactionScore as number) ?? null,
     healthStatus: String(profile?.healthStatus ?? 'green'),

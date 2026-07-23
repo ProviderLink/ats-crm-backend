@@ -46,13 +46,25 @@ export const getAllAssignments = async (filters: {
   if (status !== undefined) query['status'] = status;
 
   const skip = (page - 1) * limit;
-  const [assignments, total] = await Promise.all([
+  const [rawAssignments, total] = await Promise.all([
     Assignment.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Assignment.countDocuments(query),
   ]);
 
+  const clientIds = [...new Set(rawAssignments.map(a => String(a.clientId)))];
+  const clientDocs =
+    clientIds.length > 0
+      ? await Client.find({ _id: { $in: clientIds } }).select('companyName')
+      : [];
+  const clientNameMap: Record<string, string> = Object.fromEntries(
+    clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
+  );
+
   return {
-    assignments: assignments.map(a => a.toSafeObject()),
+    assignments: rawAssignments.map(a => ({
+      ...a.toSafeObject(),
+      companyName: clientNameMap[String(a.clientId)] ?? '',
+    })),
     total,
     page,
     limit,

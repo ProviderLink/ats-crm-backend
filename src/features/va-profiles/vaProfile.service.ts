@@ -35,8 +35,19 @@ export const getVaProfileById = async (id: string): Promise<IVaProfile> => {
     throw new Error('VA_PROFILE_NOT_FOUND');
   }
   const profile = await VaProfile.findOne({ vaId: id });
-  if (!profile) throw new Error('VA_PROFILE_NOT_FOUND');
-  return profile.toSafeObject();
+  if (profile) return profile.toSafeObject();
+
+  // Auto-create with defaults so the sheet always has a profile to display
+  const created = await VaProfile.create({
+    vaId: new mongoose.Types.ObjectId(id),
+    workloadLevel: 'normal',
+    satisfactionScore: null,
+    burnoutRiskFlag: false,
+    replacementRiskFlag: false,
+    lastVaCheckin: null,
+    notes: '',
+  });
+  return created.toSafeObject();
 };
 
 export const upsertVaProfile = async (

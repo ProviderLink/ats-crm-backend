@@ -6,6 +6,7 @@ import { AppError } from '../../shared/utils/AppError';
 import { sendEmail } from '../../shared/utils/email';
 import logger from '../../shared/utils/logger';
 import { createLog } from '../activity-logs/activityLog.service';
+import { upsertVaProfile } from '../va-profiles/vaProfile.service';
 import User from './user.model';
 import type {
   AppAccess,
@@ -461,6 +462,7 @@ export const provisionVA = async (
       existing.inviteTokenExpires = newInviteTokenExpires;
       existing.candidateRef = new mongoose.Types.ObjectId(candidateId);
       await existing.save();
+      upsertVaProfile(candidateId, {}).catch(() => {});
       createLog({
         action: 'provisioned_va',
         resourceType: 'user',
@@ -503,6 +505,8 @@ export const provisionVA = async (
     relatedType: 'candidate',
     relatedId: candidateId,
   });
+
+  upsertVaProfile(candidateId, {}).catch(() => {});
 
   return { user: user.toSafeObject(), inviteToken };
 };

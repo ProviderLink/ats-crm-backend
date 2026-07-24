@@ -22,7 +22,8 @@ const router = Router();
 const generateReviewSchema = z.object({
   candidateId: z.string(),
   clientId: z.string(),
-  jobId: z.string(),
+  jobId: z.string().optional(),
+  jobDescription: z.string().optional(),
   reviewType: z.enum([
     '30_day',
     '60_day',
@@ -38,11 +39,21 @@ const generateReviewSchema = z.object({
   managerNotes: z.string().optional(),
 });
 
+const REVIEW_STATUS_ENUM = z.enum([
+  'draft',
+  'ai_generated',
+  'in_review',
+  'sent_to_client',
+  'archived',
+  'completed',
+]);
+
 const updateReviewSchema = z.object({
+  status: REVIEW_STATUS_ENUM.optional(),
   aiGenerated: z
     .object({
       roleSummary: z.string().optional(),
-      coreResponsibilities: z.string().optional(),
+      coreResponsibilities: z.array(z.string()).optional(),
       strengths: z.string().optional(),
       areasForImprovement: z.string().optional(),
       goals: z.array(z.string()).optional(),
@@ -68,6 +79,7 @@ const updateReviewSchema = z.object({
   clientSatisfactionScore: z.number().min(1).max(5).nullable().optional(),
   managerRatingInputs: z.record(z.unknown()).nullable().optional(),
   finalRecommendation: z.string().nullable().optional(),
+  finalManagerSummary: z.string().optional(),
   reviewedByUserId: z.string().nullable().optional(),
 });
 

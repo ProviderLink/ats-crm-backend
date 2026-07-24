@@ -21,7 +21,7 @@ export interface IPerformanceReviewDocument
     Document {
   candidateId: mongoose.Types.ObjectId;
   clientId: mongoose.Types.ObjectId;
-  jobId: mongoose.Types.ObjectId;
+  jobId: mongoose.Types.ObjectId | null;
   generatedByUserId: mongoose.Types.ObjectId;
   reviewedByUserId: mongoose.Types.ObjectId | null;
   aiGenerated: IPerformanceReviewAiGenerated | null;
@@ -34,7 +34,7 @@ export interface IPerformanceReviewDocument
 const aiGeneratedSchema = new Schema(
   {
     roleSummary: { type: String, default: '' },
-    coreResponsibilities: { type: String, default: '' },
+    coreResponsibilities: { type: [String], default: [] },
     strengths: { type: String, default: '' },
     areasForImprovement: { type: String, default: '' },
     goals: { type: [String], default: [] },
@@ -63,7 +63,7 @@ const performanceReviewSchema = new Schema(
       required: true,
     },
     clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true },
-    jobId: { type: Schema.Types.ObjectId, ref: 'Job', required: true },
+    jobId: { type: Schema.Types.ObjectId, ref: 'Job', default: null },
     reviewType: {
       type: String,
       enum: [
@@ -80,7 +80,14 @@ const performanceReviewSchema = new Schema(
     reviewPeriodEnd: { type: Date, required: true },
     status: {
       type: String,
-      enum: ['draft', 'ai_generated', 'completed'],
+      enum: [
+        'draft',
+        'ai_generated',
+        'in_review',
+        'sent_to_client',
+        'archived',
+        'completed',
+      ],
       default: 'draft',
     },
     aiGenerated: { type: aiGeneratedSchema, default: null },
@@ -89,6 +96,7 @@ const performanceReviewSchema = new Schema(
     clientSatisfactionScore: { type: Number, min: 1, max: 5, default: null },
     managerRatingInputs: { type: Schema.Types.Mixed, default: null },
     finalRecommendation: { type: String, default: null },
+    finalManagerSummary: { type: String, default: '' },
     generatedByUserId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -115,7 +123,7 @@ performanceReviewSchema.methods.toSafeObject = function (): IPerformanceReview {
   raw['_id'] = String(raw['_id']);
   raw['candidateId'] = String(raw['candidateId']);
   raw['clientId'] = String(raw['clientId']);
-  raw['jobId'] = String(raw['jobId']);
+  raw['jobId'] = raw['jobId'] ? String(raw['jobId']) : null;
   raw['generatedByUserId'] = String(raw['generatedByUserId']);
   raw['reviewedByUserId'] = raw['reviewedByUserId']
     ? String(raw['reviewedByUserId'])

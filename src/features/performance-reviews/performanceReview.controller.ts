@@ -8,11 +8,12 @@ import Job from '../jobs/job.model';
 import * as reviewService from './performanceReview.service';
 
 export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
-  const { candidateId, clientId, reviewType, status, page, limit } =
+  const { candidateId, vaId, clientId, reviewType, status, page, limit } =
     req.query as Record<string, string | undefined>;
 
   const result = await reviewService.getAllReviews({
     candidateId,
+    vaId,
     clientId,
     reviewType,
     status,
@@ -31,7 +32,23 @@ export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
 export const getReviewById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const review = await reviewService.getReviewById(id);
-  sendSuccess(res, review, 'Performance review retrieved', 200);
+
+  const [candidate, client, job] = await Promise.all([
+    Candidate.findById(review.candidateId).lean(),
+    Client.findById(review.clientId).lean(),
+    review.jobId ? Job.findById(review.jobId).lean() : Promise.resolve(null),
+  ]);
+
+  const reviewWithNames = {
+    ...review,
+    candidateName: candidate
+      ? `${candidate.firstName} ${candidate.lastName}`
+      : undefined,
+    clientName: client?.companyName,
+    jobTitle: job?.title,
+  };
+
+  sendSuccess(res, reviewWithNames, 'Performance review retrieved', 200);
 });
 
 export const generateReview = catchAsync(

@@ -6,7 +6,13 @@ export type ReviewType =
   | 'client_satisfaction'
   | 'corrective_coaching';
 
-export type ReviewStatus = 'draft' | 'ai_generated' | 'completed';
+export type ReviewStatus =
+  | 'draft'
+  | 'ai_generated'
+  | 'in_review'
+  | 'sent_to_client'
+  | 'archived'
+  | 'completed';
 
 export interface IPerformanceCategory {
   _id: string;
@@ -22,7 +28,7 @@ export interface IPerformanceCategory {
 
 export interface IPerformanceReviewAiGenerated {
   roleSummary: string;
-  coreResponsibilities: string;
+  coreResponsibilities: string[];
   strengths: string;
   areasForImprovement: string;
   goals: string[];
@@ -34,7 +40,7 @@ export interface IPerformanceReview {
   _id: string;
   candidateId: string;
   clientId: string;
-  jobId: string;
+  jobId: string | null;
   reviewType: ReviewType;
   reviewPeriodStart: Date;
   reviewPeriodEnd: Date;
@@ -45,6 +51,7 @@ export interface IPerformanceReview {
   clientSatisfactionScore: number | null;
   managerRatingInputs: Record<string, unknown> | null;
   finalRecommendation: string | null;
+  finalManagerSummary: string;
   generatedByUserId: string;
   reviewedByUserId: string | null;
   createdAt: Date;
@@ -54,7 +61,8 @@ export interface IPerformanceReview {
 export interface GenerateReviewInput {
   candidateId: string;
   clientId: string;
-  jobId: string;
+  jobId?: string;
+  jobDescription?: string;
   reviewType: ReviewType;
   reviewPeriodStart: Date | string;
   reviewPeriodEnd: Date | string;
@@ -71,7 +79,9 @@ export interface UpdateReviewInput {
   clientSatisfactionScore?: number | null;
   managerRatingInputs?: Record<string, unknown> | null;
   finalRecommendation?: string | null;
+  finalManagerSummary?: string;
   reviewedByUserId?: string | null;
+  status?: ReviewStatus;
 }
 
 export interface RegenerateSection {

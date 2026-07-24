@@ -14,6 +14,7 @@ import type {
 
 export const getAllReviews = async (filters: {
   candidateId?: string;
+  vaId?: string;
   clientId?: string;
   reviewType?: string;
   status?: string;
@@ -28,6 +29,7 @@ export const getAllReviews = async (filters: {
 }> => {
   const {
     candidateId,
+    vaId,
     clientId,
     reviewType,
     status,
@@ -36,7 +38,9 @@ export const getAllReviews = async (filters: {
   } = filters;
   const query: Record<string, unknown> = {};
 
-  if (candidateId !== undefined) query['candidateId'] = candidateId;
+  const effectiveCandidateId = candidateId ?? vaId;
+  if (effectiveCandidateId !== undefined)
+    query['candidateId'] = effectiveCandidateId;
   if (clientId !== undefined) query['clientId'] = clientId;
   if (reviewType !== undefined) query['reviewType'] = reviewType;
   if (status !== undefined) query['status'] = status;
@@ -79,8 +83,12 @@ export const generateReview = async (
   const [candidate, client, job] = await Promise.all([
     Candidate.findById(input.candidateId),
     Client.findById(input.clientId),
-    Job.findById(input.jobId),
+    input.jobId ? Job.findById(input.jobId) : Promise.resolve(null),
   ]);
+
+  const jobTitle = job?.title ?? 'Virtual Assistant';
+  const jobDescription =
+    job?.description ?? input.jobDescription ?? 'Not provided';
 
   const prompt = `
 You are an expert HR performance review generator.
@@ -90,8 +98,8 @@ no explanation.
 
 Employee: ${candidate?.firstName} ${candidate?.lastName}
 Client: ${client?.companyName}
-Job Title: ${job?.title}
-Job Description: ${job?.description ?? 'Not provided'}
+Job Title: ${jobTitle}
+Job Description: ${jobDescription}
 Role Type: ${input.roleType}
 Review Type: ${input.reviewType}
 Review Period: ${input.reviewPeriodStart} to ${input.reviewPeriodEnd}
@@ -101,7 +109,7 @@ Manager Notes: ${input.managerNotes ?? 'Not provided'}
 Respond with exactly this JSON structure:
 {
   "roleSummary": "string",
-  "coreResponsibilities": "string",
+  "coreResponsibilities": ["responsibility1", "responsibility2", "responsibility3"],
   "strengths": "string",
   "areasForImprovement": "string",
   "goals": ["goal1", "goal2", "goal3"],
@@ -125,7 +133,7 @@ Generate 6-8 relevant performance categories for this role.
   const text = await provider.generate(prompt, { maxTokens: 2000 });
   const result = parseJsonResponse<{
     roleSummary: string;
-    coreResponsibilities: string;
+    coreResponsibilities: string[];
     strengths: string;
     areasForImprovement: string;
     goals: string[];
@@ -151,14 +159,16 @@ Generate 6-8 relevant performance categories for this role.
   const review = await PerformanceReview.create({
     candidateId: input.candidateId,
     clientId: input.clientId,
-    jobId: input.jobId,
+    jobId: input.jobId ?? null,
     reviewType: input.reviewType,
     reviewPeriodStart: new Date(input.reviewPeriodStart),
     reviewPeriodEnd: new Date(input.reviewPeriodEnd),
     status: 'ai_generated',
     aiGenerated: {
       roleSummary: result.roleSummary,
-      coreResponsibilities: result.coreResponsibilities,
+      coreResponsibilities: Array.isArray(result.coreResponsibilities)
+        ? result.coreResponsibilities
+        : [result.coreResponsibilities].filter(Boolean),
       strengths: result.strengths,
       areasForImprovement: result.areasForImprovement,
       goals: result.goals,
@@ -208,6 +218,21 @@ export const updateReview = async (
       'VALIDATION_ERROR',
       'Cannot update a completed review'
     );
+  }
+
+  if (input.status !== undefined && input.status !== review.status) {
+    if (input.status === 'completed') {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Use the /complete endpoint to mark a review as completed'
+      );
+    }
+    review.status = input.status;
+  }
+
+  if (input.finalManagerSummary !== undefined) {
+    review.finalManagerSummary = input.finalManagerSummary;
   }
 
   if (input.aiGenerated !== undefined) {

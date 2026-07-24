@@ -10,7 +10,7 @@ import * as workEntryController from './workEntry.controller';
 
 const createWorkEntrySchema = z.object({
   assignmentId: z.string(),
-  entryDate: z.string().datetime(),
+  entryDate: z.string().date(),
   entryTime: z
     .string()
     .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be in HH:MM format'),

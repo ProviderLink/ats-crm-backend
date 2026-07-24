@@ -4,6 +4,7 @@ import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
+import User from '../users/user.model';
 import { createAssignmentReminders } from '../survey-reminders/surveyReminder.service';
 import * as userService from '../users/user.service';
 import Assignment from './assignment.model';
@@ -52,18 +53,33 @@ export const getAllAssignments = async (filters: {
   ]);
 
   const clientIds = [...new Set(rawAssignments.map(a => String(a.clientId)))];
-  const clientDocs =
+  const amIds = [...new Set(rawAssignments.map(a => String(a.accountManagerId)))];
+
+  const [clientDocs, amDocs] = await Promise.all([
     clientIds.length > 0
-      ? await Client.find({ _id: { $in: clientIds } }).select('companyName')
-      : [];
+      ? Client.find({ _id: { $in: clientIds } }).select('companyName')
+      : [],
+    amIds.length > 0
+      ? User.find({ _id: { $in: amIds } }).select('firstName lastName email')
+      : [],
+  ]);
+
   const clientNameMap: Record<string, string> = Object.fromEntries(
     clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
+  );
+  const amNameMap: Record<string, string> = Object.fromEntries(
+    amDocs.map(u => [String(u._id), `${(u as any).firstName ?? ''} ${(u as any).lastName ?? ''}`.trim()])
+  );
+  const amEmailMap: Record<string, string> = Object.fromEntries(
+    amDocs.map(u => [String(u._id), String((u as any).email ?? '')])
   );
 
   return {
     assignments: rawAssignments.map(a => ({
       ...a.toSafeObject(),
       companyName: clientNameMap[String(a.clientId)] ?? '',
+      accountManagerName: amNameMap[String(a.accountManagerId)] ?? '',
+      accountManagerEmail: amEmailMap[String(a.accountManagerId)] ?? '',
     })),
     total,
     page,

@@ -49,6 +49,9 @@ eodSubmissionSchema.methods.toSafeObject = function (): IEodSubmission {
   raw['assignmentId'] = String(raw['assignmentId']);
   raw['candidateId'] = String(raw['candidateId']);
   raw['clientId'] = String(raw['clientId']);
+  if (raw['date'] instanceof Date) {
+    raw['date'] = (raw['date'] as Date).toISOString().slice(0, 10);
+  }
   return raw as unknown as IEodSubmission;
 };
 

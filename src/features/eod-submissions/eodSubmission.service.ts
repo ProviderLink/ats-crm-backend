@@ -86,10 +86,9 @@ export const createEodSubmission = async (
     );
   }
 
-  const submissionDate = new Date(input.date);
-  submissionDate.setHours(0, 0, 0, 0);
+  const submissionDate = new Date(input.date); // "YYYY-MM-DD" parses as UTC midnight
   const nextDay = new Date(submissionDate);
-  nextDay.setDate(nextDay.getDate() + 1);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
 
   const existing = await EodSubmission.findOne({
     assignmentId: input.assignmentId,

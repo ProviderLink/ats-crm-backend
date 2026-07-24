@@ -12,7 +12,7 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const createEodSchema = z.object({
   assignmentId: z.string(),
-  date: z.string().datetime(),
+  date: z.string().date(),
   shiftStart: z.string().regex(timeRegex, 'Time must be in HH:MM format'),
   shiftEnd: z.string().regex(timeRegex, 'Time must be in HH:MM format'),
   hoursWorked: z.number().min(0).max(24),

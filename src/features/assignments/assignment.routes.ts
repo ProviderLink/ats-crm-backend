@@ -12,8 +12,8 @@ const createAssignmentSchema = z.object({
   candidateId: z.string(),
   clientId: z.string(),
   serviceType: z.string().min(1).max(100),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime().optional().nullable(),
+  startDate: z.string().date(),
+  endDate: z.string().date().optional().nullable(),
   accountManagerId: z.string(),
   status: z.enum(['active', 'on_hold', 'ended']).optional(),
   jobId: z.string().optional(),
@@ -22,8 +22,8 @@ const createAssignmentSchema = z.object({
 
 const updateAssignmentSchema = z.object({
   serviceType: z.string().min(1).max(100).optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional().nullable(),
+  startDate: z.string().date().optional(),
+  endDate: z.string().date().optional().nullable(),
   accountManagerId: z.string().optional(),
   status: z.enum(['active', 'on_hold', 'ended']).optional(),
   notes: z.string().optional().nullable(),

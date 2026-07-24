@@ -24,13 +24,13 @@ const createSurveyReminderSchema = z.object({
     '90_day',
     'monthly',
   ]),
-  dueDate: z.string().datetime(),
+  dueDate: z.string().date(),
   assignedTo: z.string(),
 });
 
 const updateSurveyReminderSchema = z.object({
   status: z.enum(['pending', 'sent', 'completed', 'skipped']).optional(),
-  completedDate: z.string().datetime().optional().nullable(),
+  completedDate: z.string().date().optional().nullable(),
   dueDate: z.string().datetime().optional(),
   assignedTo: z.string().optional(),
 });

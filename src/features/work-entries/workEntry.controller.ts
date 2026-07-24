@@ -5,8 +5,16 @@ import * as workEntryService from './workEntry.service';
 
 export const getAllWorkEntries = catchAsync(
   async (req: Request, res: Response) => {
-    const { assignmentId, candidateId, clientId, entryDate, page, limit } =
-      req.query as Record<string, string | undefined>;
+    const {
+      assignmentId,
+      candidateId,
+      clientId,
+      entryDate,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    } = req.query as Record<string, string | undefined>;
     const user = req.user!;
 
     // Auto-scope: VA sees only their own entries, client sees only their VAs
@@ -32,6 +40,8 @@ export const getAllWorkEntries = catchAsync(
       candidateId: resolvedCandidateId,
       clientId: resolvedClientId,
       entryDate,
+      dateFrom,
+      dateTo,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });

@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
+import Candidate from '../candidates/candidate.model';
+import Client from '../clients/client.model';
 import EodSubmission from '../eod-submissions/eodSubmission.model';
 import WorkEntry from '../work-entries/workEntry.model';
 import Scorecard from './scorecard.model';
@@ -59,8 +61,50 @@ export const getAllScorecards = async (filters: {
     Scorecard.countDocuments(query),
   ]);
 
+  const vaIds = [...new Set(scorecards.map(s => String(s.vaId)))];
+  const assignmentIds = [
+    ...new Set(scorecards.map(s => String(s.assignmentId))),
+  ];
+
+  const [candidateDocs, assignmentDocs] = await Promise.all([
+    vaIds.length > 0
+      ? Candidate.find({ _id: { $in: vaIds } }).select('firstName lastName')
+      : [],
+    assignmentIds.length > 0
+      ? Assignment.find({ _id: { $in: assignmentIds } }).select('clientId')
+      : [],
+  ]);
+
+  const candidateNameMap: Record<string, string> = Object.fromEntries(
+    candidateDocs.map(c => [
+      String(c._id),
+      `${(c as any).firstName ?? ''} ${(c as any).lastName ?? ''}`.trim(),
+    ])
+  );
+
+  const assignmentToClient: Record<string, string> = Object.fromEntries(
+    assignmentDocs.map(a => [String(a._id), String(a.clientId)])
+  );
+  const clientIds = [
+    ...new Set(Object.values(assignmentToClient).filter(Boolean)),
+  ];
+  const clientDocs =
+    clientIds.length > 0
+      ? await Client.find({ _id: { $in: clientIds } }).select('companyName')
+      : [];
+  const clientNameMap: Record<string, string> = Object.fromEntries(
+    clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
+  );
+
   return {
-    scorecards: scorecards.map(s => s.toSafeObject()),
+    scorecards: scorecards.map(s => {
+      const clientId = assignmentToClient[String(s.assignmentId)] ?? '';
+      return {
+        ...s.toSafeObject(),
+        vaName: candidateNameMap[String(s.vaId)] ?? '',
+        companyName: clientNameMap[clientId] ?? '',
+      };
+    }),
     total,
     page,
     limit,

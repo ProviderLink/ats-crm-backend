@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import {
   deleteFromCloudinary,
   uploadToCloudinary,
@@ -8,8 +9,10 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
+import Assignment from '../assignments/assignment.model';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
+import User from './user.model';
 import * as userService from './user.service';
 
 export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
@@ -37,6 +40,68 @@ export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
     totalPages: result.totalPages,
   });
 });
+
+/**
+ * GET /shared/users/crm-accounts — returns CRM client & VA users, scoped to
+ * the caller. Account managers get only the clients/VAs tied to their own
+ * assignments; admins get everyone. Requires only authentication (no team.read).
+ */
+export const getCrmAccountsList = catchAsync(
+  async (req: Request, res: Response) => {
+    const user = req.user!;
+    const isAdmin = user.roles.includes('admin');
+    const isAM = user.roles.includes('account_manager');
+
+    let scopedClientIds: Set<string> | undefined;
+    let scopedCandidateIds: Set<string> | undefined;
+
+    if (!isAdmin) {
+      if (!isAM) {
+        // Non-admin, non-AM callers (e.g. va/client) have no reason to see
+        // CRM account lists; return empty.
+        return sendSuccess(res, { clients: [], vas: [] }, 'OK', 200);
+      }
+      const assignments = await Assignment.find({
+        accountManagerId: new mongoose.Types.ObjectId(String(user._id)),
+      }).select('clientId candidateId');
+      scopedClientIds = new Set(assignments.map(a => String(a.clientId)));
+      scopedCandidateIds = new Set(assignments.map(a => String(a.candidateId)));
+    }
+
+    const userQuery: Record<string, unknown> = {};
+    const [clientUsers, vaUsers] = await Promise.all([
+      (async () => {
+        if (scopedClientIds && scopedClientIds.size === 0) return [];
+        const q: Record<string, unknown> = {
+          roles: 'client',
+          clientRef: { $ne: null },
+        };
+        if (scopedClientIds) q['clientRef'] = { $in: [...scopedClientIds] };
+        return User.find(q);
+      })(),
+      (async () => {
+        if (scopedCandidateIds && scopedCandidateIds.size === 0) return [];
+        const q: Record<string, unknown> = {
+          roles: 'va',
+          candidateRef: { $ne: null },
+        };
+        if (scopedCandidateIds)
+          q['candidateRef'] = { $in: [...scopedCandidateIds] };
+        return User.find(q);
+      })(),
+    ]);
+
+    return sendSuccess(
+      res,
+      {
+        clients: clientUsers.map(u => u.toSafeObject()),
+        vas: vaUsers.map(u => u.toSafeObject()),
+      },
+      'CRM accounts retrieved',
+      200
+    );
+  }
+);
 
 export const getUserById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;

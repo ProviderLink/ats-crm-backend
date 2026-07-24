@@ -4,8 +4,8 @@ import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
-import User from '../users/user.model';
 import { createAssignmentReminders } from '../survey-reminders/surveyReminder.service';
+import User from '../users/user.model';
 import * as userService from '../users/user.service';
 import Assignment from './assignment.model';
 import type {
@@ -53,14 +53,24 @@ export const getAllAssignments = async (filters: {
   ]);
 
   const clientIds = [...new Set(rawAssignments.map(a => String(a.clientId)))];
-  const amIds = [...new Set(rawAssignments.map(a => String(a.accountManagerId)))];
+  const amIds = [
+    ...new Set(rawAssignments.map(a => String(a.accountManagerId))),
+  ];
+  const candidateIds = [
+    ...new Set(rawAssignments.map(a => String(a.candidateId))),
+  ];
 
-  const [clientDocs, amDocs] = await Promise.all([
+  const [clientDocs, amDocs, candidateDocs] = await Promise.all([
     clientIds.length > 0
       ? Client.find({ _id: { $in: clientIds } }).select('companyName')
       : [],
     amIds.length > 0
       ? User.find({ _id: { $in: amIds } }).select('firstName lastName email')
+      : [],
+    candidateIds.length > 0
+      ? Candidate.find({ _id: { $in: candidateIds } }).select(
+          'firstName lastName'
+        )
       : [],
   ]);
 
@@ -68,10 +78,19 @@ export const getAllAssignments = async (filters: {
     clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
   );
   const amNameMap: Record<string, string> = Object.fromEntries(
-    amDocs.map(u => [String(u._id), `${(u as any).firstName ?? ''} ${(u as any).lastName ?? ''}`.trim()])
+    amDocs.map(u => [
+      String(u._id),
+      `${(u as any).firstName ?? ''} ${(u as any).lastName ?? ''}`.trim(),
+    ])
   );
   const amEmailMap: Record<string, string> = Object.fromEntries(
     amDocs.map(u => [String(u._id), String((u as any).email ?? '')])
+  );
+  const candidateNameMap: Record<string, string> = Object.fromEntries(
+    candidateDocs.map(c => [
+      String(c._id),
+      `${(c as any).firstName ?? ''} ${(c as any).lastName ?? ''}`.trim(),
+    ])
   );
 
   return {
@@ -80,6 +99,7 @@ export const getAllAssignments = async (filters: {
       companyName: clientNameMap[String(a.clientId)] ?? '',
       accountManagerName: amNameMap[String(a.accountManagerId)] ?? '',
       accountManagerEmail: amEmailMap[String(a.accountManagerId)] ?? '',
+      candidateName: candidateNameMap[String(a.candidateId)] ?? '',
     })),
     total,
     page,

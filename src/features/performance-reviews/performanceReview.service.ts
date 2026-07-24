@@ -54,8 +54,40 @@ export const getAllReviews = async (filters: {
     PerformanceReview.countDocuments(query),
   ]);
 
+  const candidateIds = [
+    ...new Set(reviews.map(r => String(r.candidateId)).filter(Boolean)),
+  ];
+  const clientIds = [
+    ...new Set(reviews.map(r => String(r.clientId)).filter(Boolean)),
+  ];
+
+  const [candidateDocs, clientDocs] = await Promise.all([
+    candidateIds.length > 0
+      ? Candidate.find({ _id: { $in: candidateIds } }).select(
+          'firstName lastName'
+        )
+      : [],
+    clientIds.length > 0
+      ? Client.find({ _id: { $in: clientIds } }).select('companyName')
+      : [],
+  ]);
+
+  const candidateNameMap: Record<string, string> = Object.fromEntries(
+    candidateDocs.map(c => [
+      String(c._id),
+      `${(c as any).firstName ?? ''} ${(c as any).lastName ?? ''}`.trim(),
+    ])
+  );
+  const clientNameMap: Record<string, string> = Object.fromEntries(
+    clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
+  );
+
   return {
-    reviews: reviews.map(r => r.toSafeObject()),
+    reviews: reviews.map(r => ({
+      ...r.toSafeObject(),
+      candidateName: candidateNameMap[String(r.candidateId)] ?? '',
+      clientName: clientNameMap[String(r.clientId)] ?? '',
+    })),
     total,
     page,
     limit,

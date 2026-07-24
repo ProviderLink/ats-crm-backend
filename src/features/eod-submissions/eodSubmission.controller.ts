@@ -5,8 +5,16 @@ import * as eodService from './eodSubmission.service';
 
 export const getAllEodSubmissions = catchAsync(
   async (req: Request, res: Response) => {
-    const { assignmentId, candidateId, clientId, date, page, limit } =
-      req.query as Record<string, string | undefined>;
+    const {
+      assignmentId,
+      candidateId,
+      clientId,
+      date,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    } = req.query as Record<string, string | undefined>;
     const user = req.user!;
 
     // Auto-scope: VA sees only their own EODs, client sees only their VAs
@@ -32,6 +40,8 @@ export const getAllEodSubmissions = catchAsync(
       candidateId: resolvedCandidateId,
       clientId: resolvedClientId,
       date,
+      dateFrom,
+      dateTo,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });

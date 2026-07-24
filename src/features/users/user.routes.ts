@@ -8,6 +8,7 @@ import {
   createUser,
   deactivateUser,
   getAllUsers,
+  getCrmAccountsList,
   getUserById,
   provisionClient,
   provisionVA,
@@ -85,6 +86,10 @@ router.use(authenticate);
 // Self-service routes (any authenticated user)
 router.patch('/me', validate(updateMeSchema), updateMe);
 router.post('/me/avatar', uploadUserAvatarFile, uploadAvatar);
+
+// Self-scoped CRM accounts list (any authenticated user) — MUST be registered
+// before the /:id route to avoid param capture.
+router.get('/crm-accounts', getCrmAccountsList);
 
 // Admin-only routes (team management)
 router.get('/', requirePermission('team', 'read'), getAllUsers);

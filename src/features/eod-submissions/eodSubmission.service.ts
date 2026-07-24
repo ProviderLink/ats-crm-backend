@@ -3,6 +3,8 @@ import AppError from '../../shared/utils/AppError';
 import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
+import Candidate from '../candidates/candidate.model';
+import Client from '../clients/client.model';
 import EodSubmission from './eodSubmission.model';
 import type {
   CreateEodSubmissionInput,
@@ -15,6 +17,8 @@ export const getAllEodSubmissions = async (filters: {
   candidateId?: string;
   clientId?: string;
   date?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -29,6 +33,8 @@ export const getAllEodSubmissions = async (filters: {
     candidateId,
     clientId,
     date,
+    dateFrom,
+    dateTo,
     page = 1,
     limit = 20,
   } = filters;
@@ -46,6 +52,19 @@ export const getAllEodSubmissions = async (filters: {
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
     query['date'] = { $gte: start, $lte: end };
+  } else if (dateFrom !== undefined || dateTo !== undefined) {
+    const range: Record<string, Date> = {};
+    if (dateFrom !== undefined) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      range['$gte'] = from;
+    }
+    if (dateTo !== undefined) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      range['$lte'] = to;
+    }
+    query['date'] = range;
   }
 
   const skip = (page - 1) * limit;
@@ -54,8 +73,38 @@ export const getAllEodSubmissions = async (filters: {
     EodSubmission.countDocuments(query),
   ]);
 
+  const candidateIds = [
+    ...new Set(eodSubmissions.map(e => String(e.candidateId))),
+  ];
+  const clientIds = [...new Set(eodSubmissions.map(e => String(e.clientId)))];
+
+  const [candidateDocs, clientDocs] = await Promise.all([
+    candidateIds.length > 0
+      ? Candidate.find({ _id: { $in: candidateIds } }).select(
+          'firstName lastName'
+        )
+      : [],
+    clientIds.length > 0
+      ? Client.find({ _id: { $in: clientIds } }).select('companyName')
+      : [],
+  ]);
+
+  const candidateNameMap: Record<string, string> = Object.fromEntries(
+    candidateDocs.map(c => [
+      String(c._id),
+      `${(c as any).firstName ?? ''} ${(c as any).lastName ?? ''}`.trim(),
+    ])
+  );
+  const clientNameMap: Record<string, string> = Object.fromEntries(
+    clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
+  );
+
   return {
-    eodSubmissions: eodSubmissions.map(e => e.toSafeObject()),
+    eodSubmissions: eodSubmissions.map(e => ({
+      ...e.toSafeObject(),
+      candidateName: candidateNameMap[String(e.candidateId)] ?? '',
+      companyName: clientNameMap[String(e.clientId)] ?? '',
+    })),
     total,
     page,
     limit,

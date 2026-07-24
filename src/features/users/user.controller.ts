@@ -59,7 +59,8 @@ export const getCrmAccountsList = catchAsync(
       if (!isAM) {
         // Non-admin, non-AM callers (e.g. va/client) have no reason to see
         // CRM account lists; return empty.
-        return sendSuccess(res, { clients: [], vas: [] }, 'OK', 200);
+        sendSuccess(res, { clients: [], vas: [] }, 'OK', 200);
+        return;
       }
       const assignments = await Assignment.find({
         accountManagerId: new mongoose.Types.ObjectId(String(user._id)),
@@ -91,7 +92,7 @@ export const getCrmAccountsList = catchAsync(
       })(),
     ]);
 
-    return sendSuccess(
+    sendSuccess(
       res,
       {
         clients: clientUsers.map(u => u.toSafeObject()),

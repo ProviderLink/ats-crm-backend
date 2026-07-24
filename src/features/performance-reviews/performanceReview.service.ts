@@ -271,7 +271,7 @@ export const updateReview = async (
     review.aiGenerated = {
       ...(review.aiGenerated ?? {
         roleSummary: '',
-        coreResponsibilities: '',
+        coreResponsibilities: [],
         strengths: '',
         areasForImprovement: '',
         goals: [],
@@ -483,7 +483,7 @@ Respond with exactly this JSON structure:
     review.aiGenerated = {
       ...(review.aiGenerated ?? {
         roleSummary: '',
-        coreResponsibilities: '',
+        coreResponsibilities: [],
         strengths: '',
         areasForImprovement: '',
         goals: [],
@@ -506,7 +506,7 @@ Respond with exactly this JSON structure:
     review.aiGenerated = {
       ...(review.aiGenerated ?? {
         roleSummary: '',
-        coreResponsibilities: '',
+        coreResponsibilities: [],
         strengths: '',
         areasForImprovement: '',
         goals: [],
@@ -514,7 +514,9 @@ Respond with exactly this JSON structure:
         generatedAt: new Date(),
       }),
       roleSummary: result.roleSummary,
-      coreResponsibilities: result.coreResponsibilities,
+      coreResponsibilities: Array.isArray(result.coreResponsibilities)
+        ? result.coreResponsibilities
+        : [result.coreResponsibilities],
     };
     review.markModified('aiGenerated');
   }

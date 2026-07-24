@@ -38,7 +38,7 @@ router.get(
 
 router.get(
   '/:id/hired-vas',
-  requireRoles('admin', 'account_manager'),
+  requireRoles('admin', 'account_manager', 'client'),
   controller.getHiredVasForClient
 );
 

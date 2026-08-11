@@ -28,6 +28,20 @@ function sendReport(
   }
 }
 
+function parseReportFilters(req: Request) {
+  const { startDate, endDate, candidateId, clientId, jobId, format } =
+    req.query as Record<string, string | undefined>;
+
+  return {
+    ...(startDate && { startDate }),
+    ...(endDate && { endDate }),
+    ...(candidateId && { candidateId }),
+    ...(clientId && { clientId }),
+    ...(jobId && { jobId }),
+    format: (format === 'xlsx' ? 'xlsx' : 'csv') as ExportFormat,
+  };
+}
+
 export const exportWorkEntries = catchAsync(
   async (req: Request, res: Response) => {
     const { startDate, endDate, candidateId, clientId, format } =
@@ -73,5 +87,13 @@ export const exportPerformance = catchAsync(
       format: fmt,
     });
     sendReport(res, result, fmt);
+  }
+);
+
+export const exportDispositions = catchAsync(
+  async (req: Request, res: Response) => {
+    const filters = parseReportFilters(req);
+    const result = await reportsService.getDispositionsReport(filters);
+    sendReport(res, result, filters.format);
   }
 );

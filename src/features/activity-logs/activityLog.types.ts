@@ -25,6 +25,7 @@ export type ActivityAction =
   | 'talent_pool_added'
   | 'talent_pool_removed'
   | 'status_changed'
+  | 'eligibility_changed'
   | 'ai_score_updated'
   | 'ai_validation_updated'
   | 'parsed_data_updated'
@@ -35,6 +36,7 @@ export type ActivityAction =
   | 'approved'
   | 'stage_changed'
   | 'notes_updated'
+  | 'disposition'
   // ── Interview (logged under application resource) ──────
   | 'interview_scheduled'
   | 'interview_updated'
@@ -75,7 +77,10 @@ export type ActivityAction =
   | 'crm_client_account_updated'
   | 'va_profile_updated'
   // ── Performance Review ─────────────────────────────────
-  | 'review_deleted';
+  | 'review_deleted'
+  // ── Disposition ────────────────────────────────────────
+  | 'ineligible_reapply_blocked'
+  | 'legal_hold_toggled';
 
 export interface IActivityLog {
   _id: string;

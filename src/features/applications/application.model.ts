@@ -12,10 +12,13 @@ export interface IApplicationDocument
       | 'approvedBy'
       | 'rejectedBy'
       | 'hiredBy'
+      | 'closedBy'
       | 'createdBy'
       | 'updatedBy'
       | 'interviewIds'
       | 'currentStage'
+      | 'lastStage'
+      | 'dispositionReasonId'
     >,
     Document {
   candidateId: mongoose.Types.ObjectId;
@@ -24,10 +27,18 @@ export interface IApplicationDocument
   approvedBy: mongoose.Types.ObjectId | null;
   rejectedBy: mongoose.Types.ObjectId | null;
   hiredBy: mongoose.Types.ObjectId | null;
+  closedBy: mongoose.Types.ObjectId | null;
   createdBy: mongoose.Types.ObjectId | null;
   updatedBy: mongoose.Types.ObjectId | null;
   interviewIds: mongoose.Types.ObjectId[];
+  dispositionReasonId: mongoose.Types.ObjectId | null;
   currentStage: {
+    stageId: mongoose.Types.ObjectId;
+    stageName: string;
+    assignedAt: Date;
+    assignedBy: mongoose.Types.ObjectId;
+  } | null;
+  lastStage: {
     stageId: mongoose.Types.ObjectId;
     stageName: string;
     assignedAt: Date;
@@ -104,6 +115,24 @@ const applicationSchema = new Schema(
     rejectedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     rejectionReason: { type: String, default: null },
 
+    // ── Disposition fields (new unified dispose workflow) ──
+    lastStage: { type: currentStageSchema, default: null },
+    closedAt: { type: Date, default: null },
+    closedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    dispositionDate: { type: Date, default: null },
+    dispositionReasonId: {
+      type: Schema.Types.ObjectId,
+      ref: 'DispositionReason',
+      default: null,
+    },
+    dispositionDestination: {
+      type: String,
+      enum: ['candidate_pool', 'permanently_ineligible'],
+      default: null,
+    },
+    internalNotes: { type: String, default: null },
+    isBlocked: { type: Boolean, default: false },
+
     interviewIds: [{ type: Schema.Types.ObjectId, ref: 'Interview' }],
     notes: { type: String, default: null },
 
@@ -124,6 +153,9 @@ applicationSchema.index({ phase: 1 });
 applicationSchema.index({ jobId: 1, phase: 1 });
 applicationSchema.index({ candidateId: 1, phase: 1 });
 applicationSchema.index({ createdAt: -1 });
+applicationSchema.index({ isBlocked: 1 });
+applicationSchema.index({ dispositionReasonId: 1 });
+applicationSchema.index({ closedAt: -1 });
 
 applicationSchema.methods.toSafeObject = function (): IApplication {
   const raw = this.toObject({ versionKey: false }) as Record<string, unknown>;
@@ -134,15 +166,28 @@ applicationSchema.methods.toSafeObject = function (): IApplication {
   raw['approvedBy'] = raw['approvedBy'] ? String(raw['approvedBy']) : null;
   raw['rejectedBy'] = raw['rejectedBy'] ? String(raw['rejectedBy']) : null;
   raw['hiredBy'] = raw['hiredBy'] ? String(raw['hiredBy']) : null;
+  raw['closedBy'] = raw['closedBy'] ? String(raw['closedBy']) : null;
   raw['createdBy'] = raw['createdBy'] ? String(raw['createdBy']) : null;
   raw['updatedBy'] = raw['updatedBy'] ? String(raw['updatedBy']) : null;
+  raw['dispositionReasonId'] = raw['dispositionReasonId']
+    ? String(raw['dispositionReasonId'])
+    : null;
   raw['interviewIds'] = Array.isArray(raw['interviewIds'])
     ? (raw['interviewIds'] as mongoose.Types.ObjectId[]).map(String)
     : [];
   if (raw['currentStage']) {
     const stage = raw['currentStage'] as Record<string, unknown>;
     stage['stageId'] = String(stage['stageId']);
-    stage['assignedBy'] = String(stage['assignedBy']);
+    stage['assignedBy'] = stage['assignedBy']
+      ? String(stage['assignedBy'])
+      : null;
+  }
+  if (raw['lastStage']) {
+    const stage = raw['lastStage'] as Record<string, unknown>;
+    stage['stageId'] = String(stage['stageId']);
+    stage['assignedBy'] = stage['assignedBy']
+      ? String(stage['assignedBy'])
+      : null;
   }
   return raw as unknown as IApplication;
 };

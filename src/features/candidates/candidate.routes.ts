@@ -4,6 +4,7 @@ import authenticate from '../../shared/middleware/authenticate';
 import {
   requireAppAccess,
   requirePermission,
+  requireRoles,
 } from '../../shared/middleware/authorize';
 import { uploadAvatar, uploadResume } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
@@ -16,8 +17,9 @@ import {
   getCandidateById,
   publicParse,
   publicUploadAndParse,
-  rejectCandidate,
   updateCandidate,
+  updateEligibility,
+  updateLegalHold,
   updateTalentPool,
   uploadAvatar as uploadAvatarController,
 } from './candidate.controller';
@@ -102,6 +104,7 @@ const talentPoolSchema = z.object({
 
 const assignJobSchema = z.object({
   jobId: z.string().optional(),
+  startStageId: z.string().optional(),
 });
 
 const router = Router();
@@ -173,12 +176,6 @@ router.post(
   approveCandidate
 );
 
-router.post(
-  '/:id/reject',
-  requirePermission('candidates', 'write'),
-  rejectCandidate
-);
-
 router.get('/:id', requirePermission('candidates', 'read'), getCandidateById);
 
 router.patch(
@@ -206,6 +203,29 @@ router.patch(
   requirePermission('candidates', 'write'),
   validate(talentPoolSchema),
   updateTalentPool
+);
+
+const eligibilitySchema = z.object({
+  eligibilityStatus: z.enum(['eligible', 'permanently_ineligible']),
+  reason: z.string().optional(),
+});
+
+router.patch(
+  '/:id/eligibility',
+  requireRoles('admin'),
+  validate(eligibilitySchema, 'body'),
+  updateEligibility
+);
+
+const legalHoldSchema = z.object({
+  legalHold: z.boolean(),
+});
+
+router.patch(
+  '/:id/legal-hold',
+  requireRoles('admin'),
+  validate(legalHoldSchema, 'body'),
+  updateLegalHold
 );
 
 router.post(

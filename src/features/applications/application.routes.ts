@@ -16,11 +16,11 @@ import {
 } from '../interviews/interview.controller';
 import {
   approveApplication,
+  disposeApplication,
   getAllApplications,
   getApplicationById,
   hireApplication,
   moveStage,
-  rejectApplication,
   updateNotes,
 } from './application.controller';
 
@@ -63,8 +63,10 @@ const feedbackSchema = z.object({
   recommendation: z.enum(['strong_yes', 'yes', 'neutral', 'no', 'strong_no']),
 });
 
-const rejectSchema = z.object({
-  rejectionReason: z.string().optional(),
+const disposeSchema = z.object({
+  dispositionReasonId: z.string().min(1),
+  destination: z.enum(['candidate_pool', 'permanently_ineligible']),
+  internalNotes: z.string().optional(),
 });
 
 const moveStageSchema = z.object({
@@ -91,10 +93,10 @@ router.patch(
 );
 
 router.patch(
-  '/:id/reject',
+  '/:id/dispose',
   requirePermission('candidates', 'write'),
-  validate(rejectSchema),
-  rejectApplication
+  validate(disposeSchema),
+  disposeApplication
 );
 
 router.patch(

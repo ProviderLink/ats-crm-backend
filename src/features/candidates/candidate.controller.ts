@@ -27,10 +27,16 @@ export const getAllCandidates = catchAsync(
       tags: tagsStr,
       page,
       limit,
+      includeIneligible: includeIneligibleStr,
     } = req.query as Record<string, string | undefined>;
 
     const inTalentPool =
       inTalentPoolStr !== undefined ? inTalentPoolStr === 'true' : undefined;
+
+    const includeIneligible =
+      includeIneligibleStr !== undefined
+        ? includeIneligibleStr === 'true'
+        : undefined;
 
     const tags =
       tagsStr !== undefined
@@ -47,6 +53,7 @@ export const getAllCandidates = catchAsync(
       tags,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
+      includeIneligible,
     });
 
     sendSuccess(res, result.candidates, 'Candidates retrieved', 200, {
@@ -62,6 +69,19 @@ export const getCandidateById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const candidate = await candidateService.getCandidateById(id, false);
+
+    // Permanently ineligible candidates — admin-only access
+    if (
+      candidate.eligibilityStatus === 'permanently_ineligible' &&
+      !req.user!.roles.includes('admin')
+    ) {
+      throw new AppError(
+        403,
+        'CANDIDATE_PERMANENTLY_INELIGIBLE',
+        'This candidate is permanently ineligible'
+      );
+    }
+
     sendSuccess(res, candidate, 'Candidate retrieved', 200);
   }
 );
@@ -113,7 +133,8 @@ export const deleteCandidate = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const deletedBy = req.user!._id;
-    await candidateService.deleteCandidate(id, deletedBy);
+    const isAdmin = req.user!.roles.includes('admin');
+    await candidateService.deleteCandidate(id, deletedBy, isAdmin);
     sendSuccess(res, { deleted: true }, 'Candidate deleted', 200);
   }
 );
@@ -163,7 +184,7 @@ export const updateTalentPool = catchAsync(
 
 export const assignJob = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { jobId } = req.body;
+  const { jobId, startStageId } = req.body;
   const updatedBy = req.user!._id;
 
   // Verify candidate exists
@@ -172,14 +193,36 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
   }
 
+  // Permanently ineligible candidates cannot be assigned to jobs
+  if (candidate.eligibilityStatus === 'permanently_ineligible') {
+    throw new AppError(
+      403,
+      'CANDIDATE_PERMANENTLY_INELIGIBLE',
+      'This candidate is permanently ineligible and cannot be assigned to a job'
+    );
+  }
+
   // Get job to determine clientId
   const job = await getJobById(jobId);
   if (!job) {
     throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
   }
 
+  // Validate startStageId if provided
+  if (startStageId && job.pipeline?.stages) {
+    const stage = job.pipeline.stages.find(
+      (s: any) => s._id.toString() === startStageId
+    );
+    if (!stage) {
+      throw new AppError(
+        400,
+        'INVALID_STAGE',
+        'The specified starting stage does not belong to this job pipeline'
+      );
+    }
+  }
+
   // Create Application — the link between candidate and job.
-  // Phase: 'pending' means approved but not yet placed in a pipeline stage.
   const application = await applicationService.createApplication({
     candidateId: id,
     jobId,
@@ -187,6 +230,21 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
     source: 'assigned',
     createdBy: updatedBy,
   });
+
+  // If a startStageId is provided, move to that stage (application is
+  // already approved to the first stage by createApplication for 'assigned'
+  // source). Otherwise, the first-stage assignment is left as-is.
+  if (startStageId && job.pipeline?.stages) {
+    const stage = job.pipeline.stages.find(
+      (s: any) => s._id.toString() === startStageId
+    );
+    if (stage) {
+      await applicationService.moveStage(application._id.toString(), {
+        stageId: startStageId,
+        movedBy: updatedBy.toString(),
+      });
+    }
+  }
 
   // Trigger AI candidate scoring against this job (background)
   runCandidateScoring(id, jobId);
@@ -217,6 +275,15 @@ export const approveCandidate = catchAsync(
         400,
         'CANDIDATE_ALREADY_REVIEWED',
         'This candidate has already been reviewed'
+      );
+    }
+
+    // Permanently ineligible candidates cannot be approved into the pipeline
+    if (candidate.eligibilityStatus === 'permanently_ineligible') {
+      throw new AppError(
+        403,
+        'CANDIDATE_PERMANENTLY_INELIGIBLE',
+        'This candidate is permanently ineligible and cannot be approved into the pipeline'
       );
     }
 
@@ -276,37 +343,34 @@ export const approveCandidate = catchAsync(
   }
 );
 
-export const rejectCandidate = catchAsync(
+export const updateEligibility = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    const { eligibilityStatus, reason } = req.body;
+    const performedBy = req.user!._id;
 
-    // Verify candidate exists
-    const candidate = await candidateService.getCandidateById(id);
-    if (!candidate) {
-      throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
-    }
-
-    // Only pending (not-yet-reviewed) candidates can be rejected.
-    // Once approved, rejections happen per-application via /applications/:id/reject.
-    if (candidate.status !== 'pending') {
-      throw new AppError(
-        400,
-        'CANDIDATE_ALREADY_REVIEWED',
-        'Use the application reject endpoint for candidates that have been approved'
-      );
-    }
-
-    // Permanently delete the candidate and all data (per BUSINESS_LOGIC.md)
-    await candidateService.deleteCandidate(id, req.user!._id);
-
-    logger.info(`Pending candidate ${id} permanently rejected and deleted`);
-
-    sendSuccess(
-      res,
-      { deleted: true },
-      'Candidate rejected and permanently deleted',
-      200
+    const candidate = await candidateService.updateCandidateEligibility(
+      id,
+      eligibilityStatus,
+      reason,
+      performedBy
     );
+    sendSuccess(res, candidate, 'Candidate eligibility updated');
+  }
+);
+
+export const updateLegalHold = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { legalHold } = req.body;
+    const performedBy = req.user!._id;
+
+    const candidate = await candidateService.updateCandidateLegalHold(
+      id,
+      legalHold,
+      performedBy
+    );
+    sendSuccess(res, candidate, 'Candidate legal hold updated');
   }
 );
 
@@ -354,17 +418,18 @@ export const publicUploadAndParse = catchAsync(
     // Upload resume to Cloudinary
     const { url: resumeUrl } = await uploadToCloudinary(req.file, 'resumes');
 
-    // Create candidate (source: 'applied', no createdBy for public)
-    const candidate = await candidateService.createCandidate(
-      {
-        ...body,
-        resumeUrl,
-        resumeOriginalName: req.file.originalname,
-        resumeRawText,
-        source: 'applied' as const,
-      },
-      null // public apply has no authenticated user
-    );
+    // Find or create candidate via email+phone dedup (no more 409 on reapply)
+    const { candidate, isExisting } =
+      await candidateService.findOrCreateCandidate(
+        {
+          ...body,
+          resumeUrl,
+          resumeOriginalName: req.file.originalname,
+          resumeRawText,
+          source: 'applied' as const,
+        },
+        null // public apply has no authenticated user
+      );
 
     // Await AI resume parsing synchronously (not fire-and-forget)
     if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {

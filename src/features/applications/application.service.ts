@@ -9,16 +9,17 @@ import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import * as candidateService from '../candidates/candidate.service';
+import DispositionReason from '../disposition-reasons/dispositionReason.model';
 import Job from '../jobs/job.model';
 import * as userService from '../users/user.service';
 import Application from './application.model';
 import type {
   ApproveApplicationInput,
   CreateApplicationInput,
+  DisposeApplicationInput,
   HireApplicationInput,
   IApplication,
   MoveStageInput,
-  RejectApplicationInput,
 } from './application.types';
 
 export const getAllApplications = async (filters: {
@@ -74,7 +75,10 @@ export const createApplication = async (
     throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
   }
 
-  if (input.source === 'direct_apply' && job.status !== 'open') {
+  // Permanently ineligible candidate trying to apply — block the application
+  const isBlocked = candidate.eligibilityStatus === 'permanently_ineligible';
+
+  if (input.source === 'direct_apply' && job.status !== 'open' && !isBlocked) {
     throw new AppError(
       400,
       'JOB_CLOSED',
@@ -102,7 +106,11 @@ export const createApplication = async (
     assignedBy: mongoose.Types.ObjectId | null;
   } | null;
 
-  if (input.source === 'direct_apply') {
+  // Blocked applications always stay pending regardless of source
+  if (isBlocked) {
+    phase = 'pending';
+    currentStage = null;
+  } else if (input.source === 'direct_apply') {
     phase = 'pending';
     currentStage = null;
   } else {
@@ -134,16 +142,20 @@ export const createApplication = async (
     source: input.source,
     phase,
     currentStage,
+    isBlocked,
     createdBy: input.createdBy
       ? new mongoose.Types.ObjectId(input.createdBy)
       : null,
   });
 
-  if (input.source === 'internal_upload' || input.source === 'assigned') {
+  if (
+    (input.source === 'internal_upload' || input.source === 'assigned') &&
+    !isBlocked
+  ) {
     await candidateService.updateCandidateStatus(input.candidateId, 'approved');
   }
 
-  if (input.source === 'direct_apply') {
+  if (input.source === 'direct_apply' && !isBlocked) {
     runResumeValidation(application._id.toString());
   }
 
@@ -162,12 +174,12 @@ export const createApplication = async (
   }
 
   createLog({
-    action: 'applied',
+    action: isBlocked ? 'ineligible_reapply_blocked' : 'applied',
     resourceType: 'application',
     resourceId: application._id.toString(),
     relatedType: 'candidate',
     relatedId: input.candidateId,
-    metadata: { source: input.source, phase },
+    metadata: { source: input.source, phase, isBlocked },
     performedBy: input.createdBy ?? null,
   });
 
@@ -178,7 +190,8 @@ export const createApplication = async (
 
 export const approveApplication = async (
   id: string,
-  input: ApproveApplicationInput
+  input: ApproveApplicationInput,
+  startStageId?: string
 ): Promise<IApplication> => {
   const application = await Application.findById(id);
   if (!application) {
@@ -201,14 +214,22 @@ export const approveApplication = async (
     );
   }
 
-  const firstStage = job.pipeline.stages.sort(
+  // Use the specified startStageId if provided, otherwise default to first stage
+  let targetStage = job.pipeline.stages.sort(
     (a: { order: number }, b: { order: number }) => a.order - b.order
   )[0];
 
+  if (startStageId) {
+    const found = job.pipeline.stages.find(
+      (s: any) => s._id.toString() === startStageId
+    );
+    if (found) targetStage = found;
+  }
+
   application.phase = 'approved';
   application.currentStage = {
-    stageId: firstStage._id,
-    stageName: firstStage.name,
+    stageId: targetStage._id,
+    stageName: targetStage.name,
     assignedAt: new Date(),
     assignedBy: new mongoose.Types.ObjectId(input.approvedBy),
   };
@@ -232,7 +253,7 @@ export const approveApplication = async (
     resourceId: id,
     relatedType: 'candidate',
     relatedId: String(application.candidateId),
-    metadata: { stageName: firstStage.name },
+    metadata: { stageName: targetStage.name },
     performedBy: input.approvedBy,
   });
 
@@ -245,50 +266,147 @@ export const approveApplication = async (
   return result;
 };
 
-export const rejectApplication = async (
+export const disposeApplication = async (
   id: string,
-  input: RejectApplicationInput
+  input: DisposeApplicationInput
 ): Promise<IApplication> => {
   const application = await Application.findById(id);
   if (!application) {
     throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
   }
 
-  // Mark this application as rejected
+  // Prevent double-disposition
+  if (application.closedAt) {
+    throw new AppError(
+      409,
+      'APPLICATION_ALREADY_DISPOSED',
+      'This application has already been disposed'
+    );
+  }
+
+  // Validate disposition reason
+  const reason = await DispositionReason.findById(input.dispositionReasonId);
+  if (!reason) {
+    throw new AppError(
+      404,
+      'DISPOSITION_REASON_NOT_FOUND',
+      'Disposition reason not found'
+    );
+  }
+  if (!reason.isActive) {
+    throw new AppError(
+      400,
+      'DISPOSITION_REASON_INACTIVE',
+      'This disposition reason is no longer active'
+    );
+  }
+
+  // Enforce requireInternalNotes
+  if (
+    reason.requireInternalNotes &&
+    (!input.internalNotes || input.internalNotes.trim() === '')
+  ) {
+    throw new AppError(
+      422,
+      'INTERNAL_NOTES_REQUIRED',
+      'Internal notes are required for this disposition reason'
+    );
+  }
+
+  // Auto-derive destination from reason if needed
+  const destination =
+    reason.defaultEligibility === 'permanently_ineligible' &&
+    input.destination === 'candidate_pool'
+      ? 'permanently_ineligible'
+      : input.destination;
+
+  // Copy the currentStage (or approvedAt) for later reassignment reapply
+  if (application.currentStage) {
+    application.lastStage = application.currentStage;
+  } else {
+    application.lastStage = null;
+  }
+
+  // If currentStage is null, the candidate was never placed in a pipeline stage
+  // leave lastStage as null.
+
+  application.currentStage = null;
+
+  // Set reject fields for backward compatibility
   application.phase = 'rejected';
   application.rejectedAt = new Date();
-  application.rejectedBy = new mongoose.Types.ObjectId(input.rejectedBy);
-  application.rejectionReason = input.rejectionReason ?? null;
-  application.currentStage = null;
+  application.rejectedBy = new mongoose.Types.ObjectId(input.performedBy);
+  application.rejectionReason = reason.label;
+
+  // Set disposition fields
+  application.closedAt = new Date();
+  application.closedBy = new mongoose.Types.ObjectId(input.performedBy);
+  application.dispositionDate = new Date();
+  application.dispositionReasonId = new mongoose.Types.ObjectId(
+    input.dispositionReasonId
+  );
+  application.dispositionDestination = destination;
+  application.internalNotes = input.internalNotes ?? null;
+
   await application.save();
 
-  // §5.3 Cascade deletion: delete candidate only if ALL three conditions are true
+  // Candidate side-effects — NO deletion
   const candidate = await Candidate.findById(application.candidateId);
   if (candidate) {
-    // Condition 1: no other active applications (pending or approved on other jobs)
-    const otherActiveApps = await Application.countDocuments({
-      candidateId: application.candidateId,
-      _id: { $ne: application._id },
-      phase: { $in: ['pending', 'approved'] },
-    });
-
-    const hasNoOtherActiveApps = otherActiveApps === 0;
-    const notInTalentPool = candidate.inTalentPool === false;
-    const notHired = candidate.status !== 'hired';
-
-    if (hasNoOtherActiveApps && notInTalentPool && notHired) {
-      await candidateService.deleteCandidate(String(candidate._id));
+    if (destination === 'permanently_ineligible') {
+      candidate.eligibilityStatus = 'permanently_ineligible';
+      candidate.permanentlyIneligibleAt = new Date();
+      candidate.permanentlyIneligibleBy = new mongoose.Types.ObjectId(
+        input.performedBy
+      );
+      candidate.permanentlyIneligibleReason = new mongoose.Types.ObjectId(
+        input.dispositionReasonId
+      );
+      // Remove from talent pool if they're being marked ineligible
+      candidate.inTalentPool = false;
+      candidate.talentPoolAddedAt = null;
+      candidate.talentPoolNotes = null;
+      await candidate.save();
+    } else if (destination === 'candidate_pool') {
+      candidate.inTalentPool = true;
+      candidate.talentPoolAddedAt = new Date();
+      candidate.talentPoolNotes = input.internalNotes ?? null;
+      await candidate.save();
     }
   }
 
   createLog({
-    action: 'rejected',
+    action: 'disposition',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
     relatedId: String(application.candidateId),
-    metadata: { reason: input.rejectionReason },
-    performedBy: input.rejectedBy,
+    metadata: {
+      destination,
+      reasonId: input.dispositionReasonId,
+      reasonLabel: reason.label,
+      lastStage: application.lastStage?.stageName ?? null,
+      internalNotes: input.internalNotes ?? null,
+    },
+    performedBy: input.performedBy,
+  });
+
+  // Also write a candidate-level log so the disposition appears in the
+  // candidate activity timeline and DispositionHistory component queries.
+  createLog({
+    action: 'disposition',
+    resourceType: 'candidate',
+    resourceId: String(application.candidateId),
+    relatedType: 'application',
+    relatedId: id,
+    metadata: {
+      destination,
+      reasonId: input.dispositionReasonId,
+      reasonLabel: reason.label,
+      lastStage: application.lastStage?.stageName ?? null,
+      internalNotes: input.internalNotes ?? null,
+    },
+    performedBy: input.performedBy,
   });
 
   const result = application.toSafeObject();

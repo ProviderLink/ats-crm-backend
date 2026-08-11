@@ -1,7 +1,10 @@
 import * as XLSX from 'xlsx';
+import Application from '../applications/application.model';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
+import DispositionReason from '../disposition-reasons/dispositionReason.model';
 import EodSubmission from '../eod-submissions/eodSubmission.model';
+import Job from '../jobs/job.model';
 import PerformanceReview from '../performance-reviews/performanceReview.model';
 import WorkEntry from '../work-entries/workEntry.model';
 
@@ -212,4 +215,70 @@ export const getPerformanceReport = async (filters: {
     rows,
     'performance-reviews'
   );
+};
+
+export const getDispositionsReport = async (filters: {
+  startDate?: string;
+  endDate?: string;
+  jobId?: string;
+  clientId?: string;
+  format?: ExportFormat;
+}) => {
+  const query: Record<string, any> = {
+    phase: 'rejected',
+    closedAt: { $ne: null },
+  };
+
+  if (filters.startDate || filters.endDate) {
+    query.closedAt = {};
+    if (filters.startDate) query.closedAt.$gte = new Date(filters.startDate);
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query.closedAt.$lte = end;
+    }
+  }
+  if (filters.jobId) query.jobId = filters.jobId;
+  if (filters.clientId) query.clientId = filters.clientId;
+
+  const apps = await Application.find(query).sort({ closedAt: -1 });
+
+  const headers = [
+    'Disposition Date',
+    'Candidate Name',
+    'Candidate Email',
+    'Job Title',
+    'Last Stage',
+    'Disposition Category',
+    'Disposition Reason',
+    'Destination',
+    'Internal Notes',
+    'Disposed By',
+    'Eligibility Status',
+  ];
+
+  const rows: string[][] = [];
+  for (const app of apps) {
+    const candidate = await Candidate.findById(app.candidateId);
+    const job = await Job.findById(app.jobId);
+    const reason = app.dispositionReasonId
+      ? await DispositionReason.findById(app.dispositionReasonId)
+      : null;
+
+    rows.push([
+      app.closedAt?.toISOString().split('T')[0] ?? '',
+      candidate ? `${candidate.firstName} ${candidate.lastName}` : '',
+      candidate?.email ?? '',
+      job?.title ?? '',
+      app.lastStage?.stageName ?? app.rejectionReason ?? '',
+      reason?.category ?? '',
+      reason?.label ?? app.rejectionReason ?? '',
+      app.dispositionDestination ?? '',
+      app.internalNotes ?? '',
+      String(app.closedBy ?? ''),
+      candidate?.eligibilityStatus ?? '',
+    ]);
+  }
+
+  return formatResult(filters.format ?? 'csv', headers, rows, 'dispositions');
 };

@@ -5,13 +5,21 @@ export interface ICandidateDocument
   extends
     Omit<
       ICandidate,
-      '_id' | 'createdBy' | 'updatedBy' | 'tags' | 'appliedJobId'
+      | '_id'
+      | 'createdBy'
+      | 'updatedBy'
+      | 'tags'
+      | 'appliedJobId'
+      | 'permanentlyIneligibleBy'
+      | 'permanentlyIneligibleReason'
     >,
     Document {
   tags: mongoose.Types.ObjectId[];
   createdBy: mongoose.Types.ObjectId | null;
   updatedBy: mongoose.Types.ObjectId | null;
   appliedJobId: mongoose.Types.ObjectId | null;
+  permanentlyIneligibleBy: mongoose.Types.ObjectId | null;
+  permanentlyIneligibleReason: mongoose.Types.ObjectId | null;
   toSafeObject(): ICandidate;
 }
 
@@ -147,6 +155,26 @@ const candidateSchema = new Schema(
       default: 'pending',
     },
 
+    eligibilityStatus: {
+      type: String,
+      enum: ['eligible', 'permanently_ineligible'],
+      default: 'eligible',
+    },
+    permanentlyIneligibleAt: { type: Date, default: null },
+    permanentlyIneligibleBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    permanentlyIneligibleReason: {
+      type: Schema.Types.ObjectId,
+      ref: 'DispositionReason',
+      default: null,
+    },
+
+    phoneNormalized: { type: String, default: null },
+    legalHold: { type: Boolean, default: false },
+
     crmProfile: { type: crmProfileSchema, default: null },
 
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -157,6 +185,8 @@ const candidateSchema = new Schema(
 
 candidateSchema.index({ status: 1 });
 candidateSchema.index({ inTalentPool: 1 });
+candidateSchema.index({ eligibilityStatus: 1 });
+candidateSchema.index({ phoneNormalized: 1 }, { sparse: true });
 candidateSchema.index({ tags: 1 });
 candidateSchema.index({ createdAt: -1 });
 candidateSchema.index({ firstName: 'text', lastName: 'text', email: 'text' });
@@ -169,9 +199,44 @@ candidateSchema.methods.toSafeObject = function (): ICandidate {
   raw['tags'] = Array.isArray(raw['tags'])
     ? (raw['tags'] as mongoose.Types.ObjectId[]).map(String)
     : [];
+  raw['permanentlyIneligibleBy'] = raw['permanentlyIneligibleBy']
+    ? String(raw['permanentlyIneligibleBy'])
+    : null;
+  raw['permanentlyIneligibleReason'] = raw['permanentlyIneligibleReason']
+    ? String(raw['permanentlyIneligibleReason'])
+    : null;
+  raw['appliedJobId'] = raw['appliedJobId']
+    ? String(raw['appliedJobId'])
+    : null;
   // Guard against legacy documents with null/missing status
   if (!raw['status']) raw['status'] = 'pending';
+  if (!raw['eligibilityStatus']) raw['eligibilityStatus'] = 'eligible';
+  if (!raw['legalHold']) raw['legalHold'] = false;
   return raw as unknown as ICandidate;
 };
+
+/**
+ * Normalize a phone number for dedup matching.
+ * Strips non-digits and keeps last 10 digits as the canonical form.
+ * Returns null for unparseable inputs.
+ */
+export function normalizePhone(
+  phone: string | null | undefined
+): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 7) return null;
+  // Use last 10 digits as canonical form (handles country codes varying)
+  return digits.slice(-10);
+}
+
+// Pre-save hook: normalize phone number on save
+// Uses isNew || isModified to catch both new documents and phone updates.
+candidateSchema.pre('save', function (next) {
+  if (this.isNew || this.isModified('phone')) {
+    this.phoneNormalized = normalizePhone(this.phone);
+  }
+  next();
+});
 
 export default model<ICandidateDocument>('Candidate', candidateSchema);

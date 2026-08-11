@@ -25,6 +25,7 @@ import clientAccountRouter from './features/client-accounts/clientAccount.routes
 import clientRouter from './features/clients/client.routes';
 import atsDashboardRouter from './features/dashboard/ats/atsDashboard.routes';
 import crmDashboardRouter from './features/dashboard/crm/crmDashboard.routes';
+import dispositionReasonRouter from './features/disposition-reasons/dispositionReason.routes';
 import emailTemplateRouter from './features/email-templates/emailTemplate.routes';
 import emailRouter from './features/emails/email.routes';
 import eodReminderRouter from './features/eod-reminders/eodReminder.routes';
@@ -128,6 +129,7 @@ app.use('/api/v1/ats/jobs', jobRouter);
 app.use('/api/v1/ats/candidates', candidateRouter);
 app.use('/api/v1/ats/applications', applicationRouter);
 app.use('/api/v1/ats/interviews', interviewRouter);
+app.use('/api/v1/ats/disposition-reasons', dispositionReasonRouter);
 app.use('/api/v1/ats/email-templates', emailTemplateRouter);
 app.use('/api/v1/ats/emails', emailRouter);
 app.use('/api/v1/ats/dashboard', atsDashboardRouter);
@@ -141,6 +143,8 @@ app.use('/api/v1/crm/performance-reviews', performanceReviewRouter);
 app.use('/api/v1/crm/survey-reminders', surveyReminderRouter);
 app.use('/api/v1/crm/dashboard', crmDashboardRouter);
 app.use('/api/v1/crm/reports', reportsRouter);
+// ATS disposition reports via /api/v1/reports/ats/dispositions/export
+app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/crm/scorecards', scorecardRouter);
 app.use('/api/v1/crm/client-accounts', clientAccountRouter);
 app.use('/api/v1/crm/va-profiles', vaProfileRouter);

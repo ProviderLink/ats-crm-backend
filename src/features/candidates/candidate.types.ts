@@ -80,6 +80,12 @@ export interface ICandidate {
   talentPoolAddedAt: Date | null;
   talentPoolNotes: string | null;
   status: string;
+  eligibilityStatus: 'eligible' | 'permanently_ineligible';
+  permanentlyIneligibleAt: Date | null;
+  permanentlyIneligibleBy: string | null;
+  permanentlyIneligibleReason: string | null;
+  phoneNormalized: string | null;
+  legalHold: boolean;
   crmProfile: ICandidateCrmProfile | null;
   createdBy: string | null;
   updatedBy: string | null;
@@ -111,6 +117,7 @@ export interface CreateCandidateInput {
   cityOfResidence?: string | null;
   source: 'applied' | 'internal_upload';
   tags?: string[];
+  appliedJobId?: string;
 }
 
 export interface UpdateCandidateInput {

@@ -6,7 +6,7 @@ import logger from '../../shared/utils/logger';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Interview from '../interviews/interview.model';
-import Candidate from './candidate.model';
+import Candidate, { normalizePhone } from './candidate.model';
 import type {
   CreateCandidateInput,
   ICandidate,
@@ -28,6 +28,8 @@ export const getAllCandidates = async (filters: {
   tags?: string[];
   page?: number;
   limit?: number;
+  includeIneligible?: boolean;
+  includeBlockedApps?: boolean;
 }): Promise<{
   candidates: ICandidate[];
   total: number;
@@ -35,7 +37,15 @@ export const getAllCandidates = async (filters: {
   limit: number;
   totalPages: number;
 }> => {
-  const { status, inTalentPool, search, tags, page = 1, limit = 20 } = filters;
+  const {
+    status,
+    inTalentPool,
+    search,
+    tags,
+    page = 1,
+    limit = 20,
+    includeIneligible = false,
+  } = filters;
   const query: Record<string, unknown> = {};
 
   if (status !== undefined) query['status'] = status;
@@ -43,6 +53,11 @@ export const getAllCandidates = async (filters: {
   if (tags !== undefined && tags.length > 0) query['tags'] = { $in: tags };
   if (search !== undefined && search.trim() !== '')
     query['$text'] = { $search: search };
+
+  // Default: exclude permanently ineligible candidates unless explicitly requested
+  if (!includeIneligible) {
+    query['eligibilityStatus'] = { $ne: 'permanently_ineligible' };
+  }
 
   const skip = (page - 1) * limit;
   const [candidates, total] = await Promise.all([
@@ -82,6 +97,107 @@ export const getCandidateByEmail = async (
   return candidate.toSafeObject();
 };
 
+/**
+ * Find an existing candidate by email or normalized phone, or create a new one.
+ * Returns {candidate, isExisting} so callers can react to pre-existing profiles.
+ * This is the single entry point for both internal and public candidate creation.
+ */
+export const findOrCreateCandidate = async (
+  input: CreateCandidateInput,
+  createdBy: string | null
+): Promise<{ candidate: ICandidate; isExisting: boolean }> => {
+  const normalizedPhone = normalizePhone(input.phone);
+
+  // 1. Email match (case-insensitive)
+  const byEmail = await Candidate.findOne({
+    email: input.email.toLowerCase(),
+  });
+  if (byEmail) {
+    // Existing candidate — update resume if new one provided
+    if (input.resumeUrl && input.resumeRawText) {
+      byEmail.resumeUrl = input.resumeUrl;
+      byEmail.resumeOriginalName = input.resumeOriginalName;
+      byEmail.resumeRawText = input.resumeRawText;
+    }
+    // Always record the job they applied to (idempotent)
+    if (input.appliedJobId && !byEmail.appliedJobId) {
+      byEmail.appliedJobId = new mongoose.Types.ObjectId(input.appliedJobId);
+    }
+    await byEmail.save();
+    return { candidate: byEmail.toSafeObject(), isExisting: true };
+  }
+
+  // 2. Phone match (normalized)
+  if (normalizedPhone) {
+    const byPhone = await Candidate.findOne({
+      phoneNormalized: normalizedPhone,
+    });
+    if (byPhone) {
+      if (input.resumeUrl && input.resumeRawText) {
+        byPhone.resumeUrl = input.resumeUrl;
+        byPhone.resumeOriginalName = input.resumeOriginalName;
+        byPhone.resumeRawText = input.resumeRawText;
+      }
+      // Always record the job they applied to (idempotent)
+      if (input.appliedJobId && !byPhone.appliedJobId) {
+        byPhone.appliedJobId = new mongoose.Types.ObjectId(input.appliedJobId);
+      }
+      await byPhone.save();
+      return { candidate: byPhone.toSafeObject(), isExisting: true };
+    }
+  }
+
+  // 3. Create new candidate
+  const status = input.source === 'applied' ? 'pending' : 'approved';
+
+  const candidate = await Candidate.create({
+    firstName: input.firstName,
+    lastName: input.lastName,
+    email: input.email,
+    phone: input.phone ?? '',
+    phoneNormalized: normalizedPhone,
+    resumeUrl: input.resumeUrl,
+    resumeOriginalName: input.resumeOriginalName,
+    resumeRawText: input.resumeRawText ?? '',
+    videoIntroUrl: input.videoIntroUrl ?? null,
+    videoIntroSource: input.videoIntroSource ?? null,
+    yearsOfExperience: input.yearsOfExperience ?? 0,
+    englishProficiency: input.englishProficiency ?? null,
+    currentSalaryPHP: input.currentSalaryPHP ?? null,
+    currentSalaryUSD: input.currentSalaryUSD ?? null,
+    reasonForLeaving: input.reasonForLeaving ?? null,
+    cityOfResidence: input.cityOfResidence ?? null,
+    source: input.source,
+    tags: input.tags ? input.tags.map(t => new mongoose.Types.ObjectId(t)) : [],
+    appliedJobId: input.appliedJobId
+      ? new mongoose.Types.ObjectId(input.appliedJobId)
+      : null,
+    status,
+    createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
+  });
+
+  // Trigger AI resume parsing in background if resume text is provided
+  if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+    runResumeParsing(candidate._id.toString());
+  }
+
+  createLog({
+    action: 'created',
+    resourceType: 'candidate',
+    resourceId: candidate._id.toString(),
+    metadata: {
+      source: input.source,
+      status,
+      appliedJobId: input.appliedJobId ?? null,
+    },
+    performedBy: createdBy,
+  });
+
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:created', result);
+  return { candidate: result, isExisting: false };
+};
+
 export const createCandidate = async (
   input: CreateCandidateInput,
   createdBy: string | null
@@ -103,6 +219,7 @@ export const createCandidate = async (
     lastName: input.lastName,
     email: input.email,
     phone: input.phone ?? '',
+    phoneNormalized: normalizePhone(input.phone),
     resumeUrl: input.resumeUrl,
     resumeOriginalName: input.resumeOriginalName,
     resumeRawText: input.resumeRawText ?? '',
@@ -263,6 +380,7 @@ export const updateCandidate = async (
     candidate.markModified('parsedData');
   }
   if (input.appliedJobId !== undefined) {
+    changes.push('Applied job updated');
     candidate.appliedJobId = input.appliedJobId
       ? new mongoose.Types.ObjectId(input.appliedJobId)
       : null;
@@ -291,11 +409,30 @@ export const updateCandidate = async (
 
 export const deleteCandidate = async (
   id: string,
-  deletedBy?: string | null
+  deletedBy?: string | null,
+  isAdmin = false
 ): Promise<{ deleted: boolean }> => {
   const candidate = await Candidate.findById(id);
   if (!candidate)
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  // Legal hold — block deletion regardless of role
+  if (candidate.legalHold) {
+    throw new AppError(
+      409,
+      'LEGAL_HOLD',
+      'Cannot delete candidate — subject to legal hold'
+    );
+  }
+
+  // Permanently ineligible — only admins
+  if (candidate.eligibilityStatus === 'permanently_ineligible' && !isAdmin) {
+    throw new AppError(
+      403,
+      'CANDIDATE_PERMANENTLY_INELIGIBLE',
+      'Only an administrator can delete a permanently ineligible candidate'
+    );
+  }
 
   if (candidate.resumeUrl) {
     const publicId = extractCloudinaryPublicId(candidate.resumeUrl);
@@ -482,4 +619,76 @@ export const updateAiValidation = async (
   });
 
   return candidate.toSafeObject();
+};
+
+export const updateCandidateEligibility = async (
+  id: string,
+  eligibilityStatus: 'eligible' | 'permanently_ineligible',
+  reason?: string,
+  performedBy?: string | null
+): Promise<ICandidate> => {
+  const candidate = await Candidate.findById(id);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  const previousStatus = candidate.eligibilityStatus;
+  candidate.eligibilityStatus = eligibilityStatus;
+
+  if (eligibilityStatus === 'permanently_ineligible') {
+    candidate.permanentlyIneligibleAt = new Date();
+    candidate.permanentlyIneligibleBy = performedBy
+      ? new mongoose.Types.ObjectId(performedBy)
+      : null;
+    candidate.permanentlyIneligibleReason = reason
+      ? new mongoose.Types.ObjectId(reason)
+      : null;
+  } else {
+    // Clearing permanently_ineligible — reset all ineligible markers
+    candidate.permanentlyIneligibleAt = null;
+    candidate.permanentlyIneligibleBy = null;
+    candidate.permanentlyIneligibleReason = null;
+  }
+
+  await candidate.save();
+
+  createLog({
+    action: 'eligibility_changed',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: {
+      from: previousStatus,
+      to: eligibilityStatus,
+      reason,
+    },
+    performedBy: performedBy ?? null,
+  });
+
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
+};
+
+export const updateCandidateLegalHold = async (
+  id: string,
+  legalHold: boolean,
+  performedBy?: string | null
+): Promise<ICandidate> => {
+  const candidate = await Candidate.findById(id);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  candidate.legalHold = legalHold;
+  await candidate.save();
+
+  createLog({
+    action: 'legal_hold_toggled',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: { legalHold },
+    performedBy: performedBy ?? null,
+  });
+
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };

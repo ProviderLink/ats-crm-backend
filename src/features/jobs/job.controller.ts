@@ -4,6 +4,7 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
+import { createLog } from '../activity-logs/activityLog.service';
 import * as candidateService from '../candidates/candidate.service';
 import EmailTemplate from '../email-templates/emailTemplate.model';
 import * as emailService from '../emails/email.service';
@@ -96,6 +97,29 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
 
   // If candidateId is provided, update the existing candidate with reviewed data
   if (candidateId) {
+    // Check permanently-ineligible status before processing
+    const existingCandidate =
+      await candidateService.getCandidateById(candidateId);
+    if (existingCandidate.eligibilityStatus === 'permanently_ineligible') {
+      logger.warn(
+        `Permanently ineligible candidate ${candidateId} reapplied for job ${jobId}`
+      );
+      createLog({
+        action: 'ineligible_reapply_blocked',
+        resourceType: 'candidate',
+        resourceId: candidateId,
+        metadata: { jobId },
+        performedBy: null,
+      });
+      sendSuccess(
+        res,
+        { candidateId, jobId, received: true, blocked: true },
+        'Application received',
+        201
+      );
+      return;
+    }
+
     if (body.parsedData) {
       await candidateService.updateCandidate(
         candidateId,
@@ -104,22 +128,47 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
       );
     }
   } else {
-    // Fallback: create a candidate if not already created via publicUploadAndParse
-    const candidate = await candidateService.createCandidate(
-      {
-        firstName: body.firstName,
-        lastName: body.lastName,
-        email: body.email,
-        phone: body.phone,
-        resumeUrl: body.resumeUrl,
-        resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
-        resumeRawText: body.resumeRawText || '',
-        videoIntroUrl: body.videoIntroUrl ?? null,
-        source: 'applied',
-      },
-      null
-    );
+    // Find-or-create candidate via email+phone dedup (handles reapplicants).
+    // appliedJobId is set atomically during creation so it's never missing.
+    const { candidate, isExisting } =
+      await candidateService.findOrCreateCandidate(
+        {
+          firstName: body.firstName,
+          lastName: body.lastName,
+          email: body.email,
+          phone: body.phone,
+          resumeUrl: body.resumeUrl,
+          resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
+          resumeRawText: body.resumeRawText || '',
+          videoIntroUrl: body.videoIntroUrl ?? null,
+          source: 'applied',
+          appliedJobId: jobId,
+        },
+        null
+      );
     candidateId = candidate._id;
+
+    // If this is a permanently ineligible candidate reapplying, log + flag
+    if (candidate.eligibilityStatus === 'permanently_ineligible') {
+      logger.warn(
+        `Permanently ineligible candidate ${candidateId} reapplied for job ${jobId}`
+      );
+      createLog({
+        action: 'ineligible_reapply_blocked',
+        resourceType: 'candidate',
+        resourceId: candidateId,
+        metadata: { jobId },
+        performedBy: null,
+      });
+
+      sendSuccess(
+        res,
+        { candidateId, jobId, received: true, blocked: true },
+        'Application received',
+        201
+      );
+      return;
+    }
 
     // Trigger AI resume parsing for the newly created candidate (background)
     if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
@@ -132,8 +181,8 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     }
   }
 
-  // Store the job they applied to on the candidate — used later when
-  // the recruiter approves (no need to pick a job).
+  // Ensure appliedJobId is set even for the candidateId branch (re-applies).
+  // The findOrCreateCandidate branch already sets it atomically.
   await candidateService.updateCandidate(
     candidateId,
     { appliedJobId: jobId } as any,

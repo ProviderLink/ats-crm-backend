@@ -17,6 +17,11 @@ const updateVaProfileSchema = z.object({
   notes: z.string().optional(),
 });
 
+const createVaNoteSchema = z.object({
+  method: z.enum(['call', 'email', 'meeting', 'message', 'other']),
+  content: z.string().min(1).max(5000),
+});
+
 const router = Router();
 
 router.use(authenticate);
@@ -39,6 +44,17 @@ router.patch(
   requireRoles('admin', 'account_manager'),
   validate(updateVaProfileSchema),
   controller.upsertVaProfile
+);
+
+// --- Admin internal notes thread (Requirement 4) --------------------------
+// Admin-only: account_manager / client / va roles must not read or write.
+router.get('/:vaId/notes', requireRoles('admin'), controller.listVaNotes);
+
+router.post(
+  '/:vaId/notes',
+  requireRoles('admin'),
+  validate(createVaNoteSchema),
+  controller.createVaNote
 );
 
 export default router;

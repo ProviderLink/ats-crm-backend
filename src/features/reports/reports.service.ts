@@ -6,9 +6,49 @@ import DispositionReason from '../disposition-reasons/dispositionReason.model';
 import EodSubmission from '../eod-submissions/eodSubmission.model';
 import Job from '../jobs/job.model';
 import PerformanceReview from '../performance-reviews/performanceReview.model';
+import User from '../users/user.model';
 import WorkEntry from '../work-entries/workEntry.model';
 
 export type ExportFormat = 'csv' | 'xlsx';
+
+const EOD_WORK_STATUS_LABELS: Record<string, string> = {
+  completed: 'Completed',
+  in_progress: 'In Progress',
+  pending: 'Pending Client Input',
+};
+
+const Q2_LABELS: Record<string, string> = {
+  yes: 'Yes',
+  no: 'No',
+  other: 'Other',
+};
+
+/**
+ * Build the Q1 cell value for an EOD submission following the boss's
+ * Google-Forms export reference: the entire task list is contained in ONE
+ * cell, with one block per work entry. Legacy EODs (no workEntries) fall back
+ * to the original free-text summaryOfWork.
+ */
+function buildEodQ1Cell(submission: any): string {
+  const entries = Array.isArray(submission.workEntries)
+    ? submission.workEntries
+    : [];
+  if (entries.length > 0) {
+    return entries
+      .map((e: any, idx: number) => {
+        const lines = [
+          `Task ${idx + 1}: ${e.task ?? ''}`,
+          `Description: ${e.description ?? ''}`,
+          `Quantity: ${e.quantity ?? 0}`,
+          `Status: ${EOD_WORK_STATUS_LABELS[e.status] ?? e.status ?? ''}`,
+          `Time Spent: ${e.timeSpent ?? 0} min`,
+        ];
+        return lines.join('\n');
+      })
+      .join('\n\n');
+  }
+  return submission.summaryOfWork ?? '';
+}
 
 function generateCsv(headers: string[], rows: string[][]): string {
   const escape = (value: string) =>
@@ -117,36 +157,81 @@ export const getEodSubmissionsReport = async (filters: {
 
   const submissions = await EodSubmission.find(query).sort({ date: -1 });
 
-  const headers = [
-    'Date',
-    'VA Name',
-    'Client',
-    'Shift Start',
-    'Shift End',
-    'Hours Worked',
-    'Summary',
-    'Pending Tasks',
-    'Blockers',
-    'Notes',
+  // Prefetch related Candidate, Client, and User (VA login account) records
+  // to avoid N+1 queries inside the row loop. User.email is preferred for the
+  // "Email Address" column (matches the Google Forms respondent email);
+  // Candidate.email is used as a fallback when no User account is linked.
+  const candidateIds = [
+    ...new Set(submissions.map(s => String(s.candidateId))),
   ];
-  const rows = await Promise.all(
-    submissions.map(async (submission: any) => {
-      const candidate = await Candidate.findById(submission.candidateId);
-      const client = await Client.findById(submission.clientId);
-      return [
-        submission.date.toISOString().split('T')[0],
-        `${candidate?.firstName} ${candidate?.lastName}`,
-        client?.companyName ?? '',
-        submission.shiftStart,
-        submission.shiftEnd,
-        String(submission.hoursWorked),
-        submission.summaryOfWork,
-        submission.pendingTasks,
-        submission.blockers ?? '',
-        submission.notes ?? '',
-      ];
-    })
+  const clientIds = [...new Set(submissions.map(s => String(s.clientId)))];
+
+  const [candidateDocs, clientDocs, userDocs] = await Promise.all([
+    candidateIds.length > 0
+      ? Candidate.find({ _id: { $in: candidateIds } }).select(
+          'firstName lastName email'
+        )
+      : [],
+    clientIds.length > 0
+      ? Client.find({ _id: { $in: clientIds } }).select('companyName')
+      : [],
+    candidateIds.length > 0
+      ? User.find({ candidateRef: { $in: candidateIds } }).select(
+          'email candidateRef'
+        )
+      : [],
+  ]);
+
+  const candidateMap: Record<string, any> = Object.fromEntries(
+    candidateDocs.map(c => [String(c._id), c])
   );
+  const clientNameMap: Record<string, string> = Object.fromEntries(
+    clientDocs.map(c => [String(c._id), String((c as any).companyName ?? '')])
+  );
+  const userEmailByCandidateMap: Record<string, string> = Object.fromEntries(
+    userDocs
+      .filter(u => u.candidateRef)
+      .map(u => [String(u.candidateRef), String((u as any).email ?? '')])
+  );
+
+  // Boss-provided export-format reference: one row per EOD submission,
+  // eight columns, exact names and order below.
+  const headers = [
+    'Timestamp',
+    'Email Address',
+    'VA Name',
+    'Client Name',
+    'Q1. What tasks did you complete today?',
+    'Q2. Did you communicate with the client today?',
+    'Q3. Additional notes or updates that you want your client to know?',
+    'I submitted EOD today',
+  ];
+
+  const rows = submissions.map((submission: any) => {
+    const candidate = candidateMap[String(submission.candidateId)];
+    const vaName = candidate
+      ? `${(candidate as any).firstName ?? ''} ${
+          (candidate as any).lastName ?? ''
+        }`.trim()
+      : '';
+    const email =
+      userEmailByCandidateMap[String(submission.candidateId)] ||
+      (candidate ? String((candidate as any).email ?? '') : '');
+
+    return [
+      submission.createdAt ? new Date(submission.createdAt).toISOString() : '',
+      email,
+      vaName,
+      clientNameMap[String(submission.clientId)] ?? '',
+      buildEodQ1Cell(submission),
+      submission.communicatedWithClient
+        ? (Q2_LABELS[submission.communicatedWithClient] ??
+          submission.communicatedWithClient)
+        : '',
+      submission.clientNote ?? '',
+      'Yes',
+    ];
+  });
 
   return formatResult(
     filters.format ?? 'csv',

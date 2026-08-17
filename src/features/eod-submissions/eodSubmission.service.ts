@@ -113,12 +113,65 @@ export const getAllEodSubmissions = async (filters: {
 };
 
 export const getEodSubmissionById = async (
-  id: string
-): Promise<IEodSubmission> => {
+  id: string,
+  viewer?: {
+    roles: string[];
+    candidateRef?: string | null;
+    clientRef?: string | null;
+  }
+): Promise<
+  IEodSubmission & { candidateName?: string; companyName?: string }
+> => {
   const eodSubmission = await EodSubmission.findById(id);
   if (!eodSubmission)
     throw new AppError(404, 'EOD_NOT_FOUND', 'EOD submission not found');
-  return eodSubmission.toSafeObject();
+
+  // Ownership scoping: admin and account_manager bypass; VA may only view their
+  // own EODs (matched by candidateRef); client may only view EODs for their
+  // own client (matched by clientRef).
+  if (viewer) {
+    const isAdmin = viewer.roles.includes('admin');
+    const isAM = viewer.roles.includes('account_manager');
+    if (!isAdmin && !isAM) {
+      const isVa = viewer.roles.includes('va');
+      const isClient = viewer.roles.includes('client');
+      const ownerMatch =
+        (isVa &&
+          viewer.candidateRef &&
+          String(eodSubmission.candidateId) === String(viewer.candidateRef)) ||
+        (isClient &&
+          viewer.clientRef &&
+          String(eodSubmission.clientId) === String(viewer.clientRef));
+      if (!ownerMatch) {
+        throw new AppError(
+          403,
+          'AUTH_INSUFFICIENT_PERMISSIONS',
+          'You do not have permission to view this EOD submission'
+        );
+      }
+    }
+  }
+
+  // Join candidate + client names so the detail view has full context.
+  const [candidateDoc, clientDoc] = await Promise.all([
+    Candidate.findById(eodSubmission.candidateId).select('firstName lastName'),
+    Client.findById(eodSubmission.clientId).select('companyName'),
+  ]);
+
+  const candidateName = candidateDoc
+    ? `${(candidateDoc as any).firstName ?? ''} ${
+        (candidateDoc as any).lastName ?? ''
+      }`.trim()
+    : '';
+  const companyName = clientDoc
+    ? String((clientDoc as any).companyName ?? '')
+    : '';
+
+  return {
+    ...eodSubmission.toSafeObject(),
+    candidateName,
+    companyName,
+  };
 };
 
 export const createEodSubmission = async (
@@ -158,10 +211,13 @@ export const createEodSubmission = async (
     shiftStart: input.shiftStart,
     shiftEnd: input.shiftEnd,
     hoursWorked: input.hoursWorked,
-    summaryOfWork: input.summaryOfWork,
+    summaryOfWork: input.summaryOfWork ?? null,
+    workEntries: input.workEntries ?? [],
     pendingTasks: input.pendingTasks,
     blockers: input.blockers ?? null,
     notes: input.notes ?? null,
+    communicatedWithClient: input.communicatedWithClient ?? null,
+    clientNote: input.clientNote ?? null,
   });
 
   emitToCrm('assignments', 'eod:submitted', {
@@ -196,12 +252,18 @@ export const updateEodSubmission = async (
   if (input.hoursWorked !== undefined)
     eodSubmission.hoursWorked = input.hoursWorked;
   if (input.summaryOfWork !== undefined)
-    eodSubmission.summaryOfWork = input.summaryOfWork;
+    eodSubmission.summaryOfWork = input.summaryOfWork ?? null;
+  if (input.workEntries !== undefined)
+    eodSubmission.workEntries = input.workEntries;
   if (input.pendingTasks !== undefined)
     eodSubmission.pendingTasks = input.pendingTasks;
   if (input.blockers !== undefined)
     eodSubmission.blockers = input.blockers ?? null;
   if (input.notes !== undefined) eodSubmission.notes = input.notes ?? null;
+  if (input.communicatedWithClient !== undefined)
+    eodSubmission.communicatedWithClient = input.communicatedWithClient ?? null;
+  if (input.clientNote !== undefined)
+    eodSubmission.clientNote = input.clientNote ?? null;
 
   await eodSubmission.save();
   const result = eodSubmission.toSafeObject();

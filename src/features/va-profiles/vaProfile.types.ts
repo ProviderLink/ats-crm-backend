@@ -1,3 +1,17 @@
+export interface IVaNote {
+  _id: string;
+  method: 'call' | 'email' | 'meeting' | 'message' | 'other';
+  content: string;
+  author: string | null; // User id
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateVaNoteInput {
+  method: IVaNote['method'];
+  content: string;
+}
+
 export interface IVaProfile {
   _id: string;
   vaId: string;
@@ -7,6 +21,7 @@ export interface IVaProfile {
   replacementRiskFlag: boolean;
   lastVaCheckin: Date | null;
   notes: string;
+  noteThread?: IVaNote[];
   createdAt: Date;
   updatedAt: Date;
 }

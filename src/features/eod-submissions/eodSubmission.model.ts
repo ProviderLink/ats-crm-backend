@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema, model } from 'mongoose';
-import type { IEodSubmission } from './eodSubmission.types';
+import type { IEodSubmission, IEodWorkEntry } from './eodSubmission.types';
 
 export interface IEodSubmissionDocument
   extends
@@ -8,8 +8,24 @@ export interface IEodSubmissionDocument
   assignmentId: mongoose.Types.ObjectId;
   candidateId: mongoose.Types.ObjectId;
   clientId: mongoose.Types.ObjectId;
+  workEntries: IEodWorkEntry[];
   toSafeObject(): IEodSubmission;
 }
+
+const eodWorkEntrySchema = new Schema(
+  {
+    task: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
+    quantity: { type: Number, required: true, default: 0 },
+    status: {
+      type: String,
+      enum: ['completed', 'in_progress', 'pending'],
+      default: 'completed',
+    },
+    timeSpent: { type: Number, required: true }, // minutes
+  },
+  { _id: false }
+);
 
 const eodSubmissionSchema = new Schema(
   {
@@ -28,10 +44,22 @@ const eodSubmissionSchema = new Schema(
     shiftStart: { type: String, required: true },
     shiftEnd: { type: String, required: true },
     hoursWorked: { type: Number, required: true },
-    summaryOfWork: { type: String, required: true },
+    // Legacy free-text summary. Preserved for historical records; new
+    // submissions use the structured `workEntries` array instead. Kept as a
+    // plain (not required) field so new documents can omit it.
+    summaryOfWork: { type: String, default: null },
+    workEntries: { type: [eodWorkEntrySchema], default: [] },
     pendingTasks: { type: String, required: true },
     blockers: { type: String, default: null },
     notes: { type: String, default: null },
+    // Q2: Did you communicate with the client today? Null for historical records.
+    communicatedWithClient: {
+      type: String,
+      enum: ['yes', 'no', 'other'],
+      default: null,
+    },
+    // Q3: Additional notes/updates the VA wants the client to know.
+    clientNote: { type: String, default: null },
   },
   { timestamps: true }
 );

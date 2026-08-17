@@ -40,3 +40,16 @@ export const upsertVaProfile = catchAsync(
     sendSuccess(res, profile, 'VA profile updated', 200);
   }
 );
+
+export const listVaNotes = catchAsync(async (req: Request, res: Response) => {
+  const { vaId } = req.params;
+  const notes = await service.listVaNotes(vaId);
+  sendSuccess(res, notes, 'VA notes retrieved', 200);
+});
+
+export const createVaNote = catchAsync(async (req: Request, res: Response) => {
+  const { vaId } = req.params;
+  const author = req.user!._id;
+  const note = await service.addVaNote(vaId, req.body, author);
+  sendSuccess(res, note, 'VA note created', 201);
+});

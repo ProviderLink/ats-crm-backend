@@ -4,6 +4,7 @@ import authenticate from '../../shared/middleware/authenticate';
 import {
   requireAppAccess,
   requirePermission,
+  requireRoles,
 } from '../../shared/middleware/authorize';
 import { uploadLogo as uploadLogoMiddleware } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
@@ -146,29 +147,30 @@ router.patch(
 );
 
 // --- Client notes sub-resource -------------------------------------------
-router.get(
-  '/:clientId/notes',
-  requirePermission('clients', 'read'),
-  listClientNotes
-);
+// Admin-only (Requirement 4): this is a CRM-internal admin notes thread,
+// reusing the embedded Client.notes[] structure. Mirrors the VA-notes
+// guard in vaProfile.routes.ts (requireRoles('admin') alone, no stacking).
+// The other client.routes.ts routes below this block keep their existing
+// requirePermission('clients', ...) guards for AM-facing client management.
+router.get('/:clientId/notes', requireRoles('admin'), listClientNotes);
 
 router.post(
   '/:clientId/notes',
-  requirePermission('clients', 'write'),
+  requireRoles('admin'),
   validate(createClientNoteSchema),
   createClientNote
 );
 
 router.patch(
   '/:clientId/notes/:noteId',
-  requirePermission('clients', 'write'),
+  requireRoles('admin'),
   validate(updateClientNoteSchema),
   updateClientNote
 );
 
 router.delete(
   '/:clientId/notes/:noteId',
-  requirePermission('clients', 'write'),
+  requireRoles('admin'),
   deleteClientNote
 );
 

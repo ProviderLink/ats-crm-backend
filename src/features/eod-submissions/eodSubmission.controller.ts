@@ -57,7 +57,12 @@ export const getAllEodSubmissions = catchAsync(
 export const getEodSubmissionById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const eodSubmission = await eodService.getEodSubmissionById(id);
+    const user = req.user!;
+    const eodSubmission = await eodService.getEodSubmissionById(id, {
+      roles: user.roles,
+      candidateRef: user.candidateRef,
+      clientRef: user.clientRef,
+    });
     sendSuccess(res, eodSubmission, 'EOD submission retrieved', 200);
   }
 );

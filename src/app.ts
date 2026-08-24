@@ -30,6 +30,7 @@ import emailTemplateRouter from './features/email-templates/emailTemplate.routes
 import emailRouter from './features/emails/email.routes';
 import eodReminderRouter from './features/eod-reminders/eodReminder.routes';
 import eodSubmissionRouter from './features/eod-submissions/eodSubmission.routes';
+import interviewScorecardRouter from './features/interview-scorecards/interview-scorecard.routes';
 import interviewRouter from './features/interviews/interview.routes';
 import jobRouter from './features/jobs/job.routes';
 import performanceReviewRouter from './features/performance-reviews/performanceReview.routes';
@@ -129,6 +130,7 @@ app.use('/api/v1/ats/jobs', jobRouter);
 app.use('/api/v1/ats/candidates', candidateRouter);
 app.use('/api/v1/ats/applications', applicationRouter);
 app.use('/api/v1/ats/interviews', interviewRouter);
+app.use('/api/v1/ats/interview-scorecards', interviewScorecardRouter);
 app.use('/api/v1/ats/disposition-reasons', dispositionReasonRouter);
 app.use('/api/v1/ats/email-templates', emailTemplateRouter);
 app.use('/api/v1/ats/emails', emailRouter);

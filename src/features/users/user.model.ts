@@ -40,6 +40,9 @@ const permissionsSchema = new Schema(
     candidates: { type: resourcePermSchema },
     jobs: { type: resourcePermSchema },
     interviews: { type: resourcePermSchema },
+    // NEW (Interview Scorecard feature): additive permission resource.
+    // Mirrors the existing resource-perm shape; no other change in this file.
+    interviewScorecards: { type: resourcePermSchema },
     clients: { type: resourcePermSchema },
     emails: { type: resourcePermSchema },
     tags: { type: resourcePermSchema },

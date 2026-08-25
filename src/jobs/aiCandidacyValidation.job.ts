@@ -41,8 +41,12 @@ export async function runCandidacyValidation(
     return;
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const prompt = `
 You are a candidacy validation assistant. Your job is to determine if a job application is from a real person with legitimate data, or if it's fake, spam, garbage, or nonsensical.
+
+Today's date is ${today}. Treat any employment, education, or certification dates up to ${today} as valid and plausible — do NOT flag dates at or before ${today} as "future" or fabricated. Only consider a date suspicious if it is clearly AFTER ${today}.
 
 Analyze the resume text below and answer: is this a real candidate?
 

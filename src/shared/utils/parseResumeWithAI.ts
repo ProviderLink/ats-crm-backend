@@ -23,8 +23,12 @@ export async function parseResumeTextWithAI(
     return null;
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const prompt = `
 You are an expert ATS resume parser with 10+ years of experience analyzing thousands of resumes across all industries and formats. Your job is to extract EVERY piece of information present in the resume — never miss skills, positions, or education.
+
+Today's date is ${today}. Treat "Present" as ${today} when parsing durations, and treat all work/education dates up to ${today} as valid current or past dates.
 
 ══════════════════════════════════════
 CRITICAL: EXTRACT EVERYTHING — NO LIMITS

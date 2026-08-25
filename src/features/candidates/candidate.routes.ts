@@ -46,6 +46,48 @@ const createCandidateSchema = z.object({
   ),
   reasonForLeaving: z.string().max(500).optional().nullable(),
   cityOfResidence: z.string().max(100).optional().nullable(),
+  parsedData: z.preprocess(
+    v => {
+      if (typeof v === 'string' && v.trim() !== '') {
+        try {
+          return JSON.parse(v);
+        } catch {
+          return null;
+        }
+      }
+      return v ?? null;
+    },
+    z
+      .object({
+        summary: z.string().optional(),
+        yearsOfExperience: z.number().min(0).optional(),
+        skills: z.array(z.string()).optional(),
+        languages: z.array(z.string()).optional(),
+        certifications: z.array(z.string()).optional(),
+        experience: z
+          .array(
+            z.object({
+              company: z.string().optional(),
+              title: z.string().optional(),
+              duration: z.string().optional(),
+              description: z.string().optional(),
+            })
+          )
+          .optional(),
+        education: z
+          .array(
+            z.object({
+              institution: z.string().optional(),
+              degree: z.string().optional(),
+              field: z.string().optional(),
+              year: z.string().optional(),
+            })
+          )
+          .optional(),
+      })
+      .optional()
+      .nullable()
+  ),
   tags: z.array(z.string()).optional(),
 });
 
@@ -120,7 +162,9 @@ router.post('/public/parse', uploadResume, publicParse);
 
 /**
  * @route   POST /api/v1/ats/candidates/public/upload-and-parse
- * @desc    Upload resume + personal info, create candidate, run AI parsing, return candidate with parsedData
+ * @desc    Stateless — upload resume to Cloudinary, extract text, AI parse, and
+ *          return { resumeUrl, resumeOriginalName, resumeRawText, parsedData }.
+ *          NO candidate is created/saved here (persisted only on final submit).
  * @access  Public
  */
 const publicApplySchema = z.object({

@@ -141,6 +141,7 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
           resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
           resumeRawText: body.resumeRawText || '',
           videoIntroUrl: body.videoIntroUrl ?? null,
+          parsedData: body.parsedData ?? null,
           source: 'applied',
           appliedJobId: jobId,
         },
@@ -171,7 +172,12 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     }
 
     // Trigger AI resume parsing for the newly created candidate (background)
-    if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+    // only when parsedData wasn't already supplied from the stateless parse.
+    if (
+      !body.parsedData &&
+      candidate.resumeRawText &&
+      candidate.resumeRawText.trim() !== ''
+    ) {
       runResumeParsing(candidateId).catch(err => {
         logger.error('AI resume parsing failed during job apply', {
           candidateId,

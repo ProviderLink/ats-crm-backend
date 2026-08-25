@@ -3,11 +3,7 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from '../../config/cloudinary';
-import {
-  runCandidacyValidation,
-  runCandidateScoring,
-  runResumeParsing,
-} from '../../jobs';
+import { runCandidateScoring } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { extractResumeText } from '../../shared/utils/extract-resume-text';
@@ -409,7 +405,8 @@ export const publicUploadAndParse = catchAsync(
       `Public upload-and-parse: ${body.firstName} ${body.lastName} (${body.email})`
     );
 
-    // Extract raw text from the uploaded PDF/DOCX
+    // Extract raw text from the uploaded PDF/DOCX (image-based PDFs are
+    // rejected here — thrown as FILE_IMAGE_BASED_PDF).
     const resumeRawText = await extractResumeText(
       req.file.buffer,
       req.file.mimetype
@@ -418,50 +415,25 @@ export const publicUploadAndParse = catchAsync(
     // Upload resume to Cloudinary
     const { url: resumeUrl } = await uploadToCloudinary(req.file, 'resumes');
 
-    // Find or create candidate via email+phone dedup (no more 409 on reapply)
-    const { candidate, isExisting } =
-      await candidateService.findOrCreateCandidate(
-        {
-          ...body,
-          resumeUrl,
-          resumeOriginalName: req.file.originalname,
-          resumeRawText,
-          source: 'applied' as const,
-        },
-        null // public apply has no authenticated user
-      );
-
-    // Await AI resume parsing synchronously (not fire-and-forget)
-    if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
-      try {
-        await runResumeParsing(candidate._id.toString());
-      } catch (err) {
-        logger.error('AI parsing failed during public upload', {
-          candidateId: candidate._id,
-          error: (err as Error).message,
-        });
-        // Don't fail the request — return candidate without parsedData
-      }
-    }
-
-    // Trigger TYPE 1 AI candidacy validation — fire-and-forget (result stored on Candidate.aiValidation)
-    runCandidacyValidation(candidate._id.toString()).catch(err => {
-      logger.error('AI candidacy validation failed during public upload', {
-        candidateId: candidate._id,
-        error: (err as Error).message,
-      });
-    });
-
-    // Re-fetch to get the parsedData that was saved by the AI job
-    const updatedCandidate = await candidateService.getCandidateById(
-      candidate._id.toString(),
-      false
-    );
+    // Parse with AI — stateless: NO candidate is created or saved here.
+    // The candidate is only persisted on final submit (POST /jobs/:id/apply),
+    // which prevents orphan records when a user abandons before submitting.
+    const parsedData = await parseResumeTextWithAI(resumeRawText);
 
     logger.info(
-      `Public upload-and-parse complete: ${updatedCandidate._id}, parsedData=${!!updatedCandidate.parsedData}`
+      `Public upload-and-parse complete: skills=${parsedData?.skills?.length ?? 0}, experience=${parsedData?.experience?.length ?? 0}`
     );
 
-    sendSuccess(res, updatedCandidate, 'Resume uploaded and parsed', 201);
+    sendSuccess(
+      res,
+      {
+        resumeUrl,
+        resumeOriginalName: req.file.originalname,
+        resumeRawText,
+        parsedData,
+      },
+      'Resume uploaded and parsed',
+      201
+    );
   }
 );

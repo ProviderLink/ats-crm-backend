@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { env } from './env';
 import { AppError } from '../shared/utils/AppError';
+import { env } from './env';
 
 cloudinary.config({
   cloud_name: env.CLOUDINARY_CLOUD_NAME,
@@ -17,9 +17,10 @@ export const uploadToCloudinary = async (
     const result = await new Promise<{ secure_url: string; public_id: string }>(
       (resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `arista/${folder}`, resource_type: resourceType },
+          { folder: `ats/${folder}`, resource_type: resourceType },
           (error, result) => {
-            if (error || !result) reject(error ?? new Error('No result returned'));
+            if (error || !result)
+              reject(error ?? new Error('No result returned'));
             else resolve(result);
           }
         );
@@ -37,7 +38,9 @@ export const deleteFromCloudinary = async (
   resourceType: 'raw' | 'image' = 'image'
 ): Promise<void> => {
   try {
-    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
   } catch (error) {
     console.error('Failed to delete file from Cloudinary:', error);
   }

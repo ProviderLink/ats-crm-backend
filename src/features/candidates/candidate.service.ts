@@ -119,6 +119,11 @@ export const findOrCreateCandidate = async (
       byEmail.resumeOriginalName = input.resumeOriginalName;
       byEmail.resumeRawText = input.resumeRawText;
     }
+    // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
+    if (input.parsedData) {
+      byEmail.parsedData = input.parsedData;
+      byEmail.markModified('parsedData');
+    }
     // Always record the job they applied to (idempotent)
     if (input.appliedJobId && !byEmail.appliedJobId) {
       byEmail.appliedJobId = new mongoose.Types.ObjectId(input.appliedJobId);
@@ -137,6 +142,11 @@ export const findOrCreateCandidate = async (
         byPhone.resumeUrl = input.resumeUrl;
         byPhone.resumeOriginalName = input.resumeOriginalName;
         byPhone.resumeRawText = input.resumeRawText;
+      }
+      // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
+      if (input.parsedData) {
+        byPhone.parsedData = input.parsedData;
+        byPhone.markModified('parsedData');
       }
       // Always record the job they applied to (idempotent)
       if (input.appliedJobId && !byPhone.appliedJobId) {
@@ -167,6 +177,7 @@ export const findOrCreateCandidate = async (
     currentSalaryUSD: input.currentSalaryUSD ?? null,
     reasonForLeaving: input.reasonForLeaving ?? null,
     cityOfResidence: input.cityOfResidence ?? null,
+    parsedData: input.parsedData ?? null,
     source: input.source,
     tags: input.tags ? input.tags.map(t => new mongoose.Types.ObjectId(t)) : [],
     appliedJobId: input.appliedJobId
@@ -176,8 +187,13 @@ export const findOrCreateCandidate = async (
     createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
   });
 
-  // Trigger AI resume parsing in background if resume text is provided
-  if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+  // Trigger AI resume parsing in background only when parsedData wasn't already
+  // supplied by the caller (avoids overwriting reviewed data with a re-parse).
+  if (
+    !input.parsedData &&
+    candidate.resumeRawText &&
+    candidate.resumeRawText.trim() !== ''
+  ) {
     runResumeParsing(candidate._id.toString());
   }
 
@@ -231,14 +247,20 @@ export const createCandidate = async (
     currentSalaryUSD: input.currentSalaryUSD ?? null,
     reasonForLeaving: input.reasonForLeaving ?? null,
     cityOfResidence: input.cityOfResidence ?? null,
+    parsedData: input.parsedData ?? null,
     source: input.source,
     tags: input.tags ? input.tags.map(t => new mongoose.Types.ObjectId(t)) : [],
     status,
     createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : null,
   });
 
-  // Trigger AI resume parsing in background if resume text is provided
-  if (candidate.resumeRawText && candidate.resumeRawText.trim() !== '') {
+  // Trigger AI resume parsing in background only when parsedData wasn't already
+  // supplied by the caller (avoids overwriting reviewed data with a re-parse).
+  if (
+    !input.parsedData &&
+    candidate.resumeRawText &&
+    candidate.resumeRawText.trim() !== ''
+  ) {
     runResumeParsing(candidate._id.toString());
   }
 

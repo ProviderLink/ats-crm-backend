@@ -115,6 +115,7 @@ export interface CreateCandidateInput {
   currentSalaryUSD?: number | null;
   reasonForLeaving?: string | null;
   cityOfResidence?: string | null;
+  parsedData?: ICandidateParsedData | null;
   source: 'applied' | 'internal_upload';
   tags?: string[];
   appliedJobId?: string;

@@ -5,6 +5,7 @@ import { AppError } from '../../shared/utils/AppError';
 import logger from '../../shared/utils/logger';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
+import Application from '../applications/application.model';
 import Interview from '../interviews/interview.model';
 import Candidate, { normalizePhone } from './candidate.model';
 import type {
@@ -471,6 +472,14 @@ export const deleteCandidate = async (
   if (interviewResult.deletedCount > 0) {
     logger.info(
       `Deleted ${interviewResult.deletedCount} interview(s) for candidate ${id}`
+    );
+  }
+
+  // Delete all applications associated with this candidate
+  const applicationResult = await Application.deleteMany({ candidateId: id });
+  if (applicationResult.deletedCount > 0) {
+    logger.info(
+      `Deleted ${applicationResult.deletedCount} application(s) for candidate ${id}`
     );
   }
 

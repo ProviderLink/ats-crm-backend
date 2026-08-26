@@ -59,6 +59,28 @@ export const approveApplication = catchAsync(
   }
 );
 
+export const rejectApplication = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { reason } = req.body ?? {};
+    const rejectedBy = req.user!._id;
+    const application = await applicationService.rejectApplication(id, {
+      rejectedBy,
+      reason,
+    });
+    sendSuccess(res, application, 'Application rejected', 200);
+  }
+);
+
+export const deleteApplication = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const deletedBy = req.user!._id;
+    const result = await applicationService.deleteApplication(id, deletedBy);
+    sendSuccess(res, result, 'Application deleted', 200);
+  }
+);
+
 export const disposeApplication = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;

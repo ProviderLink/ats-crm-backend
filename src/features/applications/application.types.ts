@@ -67,6 +67,11 @@ export interface ApproveApplicationInput {
   approvedBy: string;
 }
 
+export interface RejectApplicationInput {
+  rejectedBy: string;
+  reason?: string;
+}
+
 export interface DisposeApplicationInput {
   dispositionReasonId: string;
   destination: 'candidate_pool' | 'permanently_ineligible';

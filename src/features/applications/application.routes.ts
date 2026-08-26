@@ -16,11 +16,13 @@ import {
 } from '../interviews/interview.controller';
 import {
   approveApplication,
+  deleteApplication,
   disposeApplication,
   getAllApplications,
   getApplicationById,
   hireApplication,
   moveStage,
+  rejectApplication,
   updateNotes,
 } from './application.controller';
 
@@ -73,6 +75,10 @@ const moveStageSchema = z.object({
   stageId: z.string().min(1),
 });
 
+const rejectSchema = z.object({
+  reason: z.string().optional(),
+});
+
 const notesSchema = z.object({
   notes: z.string(),
 });
@@ -90,6 +96,13 @@ router.patch(
   '/:id/approve',
   requirePermission('candidates', 'write'),
   approveApplication
+);
+
+router.patch(
+  '/:id/reject',
+  requirePermission('candidates', 'write'),
+  validate(rejectSchema),
+  rejectApplication
 );
 
 router.patch(
@@ -117,6 +130,12 @@ router.patch(
   requirePermission('candidates', 'write'),
   validate(notesSchema),
   updateNotes
+);
+
+router.delete(
+  '/:id',
+  requirePermission('candidates', 'manage'),
+  deleteApplication
 );
 
 // ── Nested interview routes (under /applications/:applicationId/interviews) ──

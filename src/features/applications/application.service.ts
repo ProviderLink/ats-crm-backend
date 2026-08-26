@@ -20,6 +20,7 @@ import type {
   HireApplicationInput,
   IApplication,
   MoveStageInput,
+  RejectApplicationInput,
 } from './application.types';
 
 export const getAllApplications = async (filters: {
@@ -262,6 +263,56 @@ export const approveApplication = async (
   emitToAts('applications', 'application:phaseChanged', {
     _id: result._id,
     phase: 'approved',
+  });
+  return result;
+};
+
+export const rejectApplication = async (
+  id: string,
+  input: RejectApplicationInput
+): Promise<IApplication> => {
+  const application = await Application.findById(id);
+  if (!application) {
+    throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
+  }
+  if (application.phase !== 'pending' && application.phase !== 'approved') {
+    throw new AppError(
+      400,
+      'APPLICATION_INVALID_PHASE',
+      'Only pending or approved applications can be rejected'
+    );
+  }
+
+  // Preserve the last pipeline stage for historical reference.
+  if (application.currentStage) {
+    application.lastStage = application.currentStage;
+  } else {
+    application.lastStage = null;
+  }
+  application.currentStage = null;
+
+  application.phase = 'rejected';
+  application.rejectedAt = new Date();
+  application.rejectedBy = new mongoose.Types.ObjectId(input.rejectedBy);
+  application.rejectionReason = input.reason?.trim() || null;
+
+  await application.save();
+
+  createLog({
+    action: 'rejected',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(application.candidateId),
+    metadata: { reason: application.rejectionReason },
+    performedBy: input.rejectedBy,
+  });
+
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  emitToAts('applications', 'application:phaseChanged', {
+    _id: result._id,
+    phase: 'rejected',
   });
   return result;
 };

@@ -5,6 +5,7 @@ import {
   createScorecard,
   getScorecardById,
   getScorecardsByCandidate,
+  updateScorecard,
 } from './interview-scorecard.service';
 
 // POST /api/v1/ats/interview-scorecards
@@ -57,5 +58,18 @@ export const getInterviewScorecard = catchAsync(
     const { id } = req.params;
     const scorecard = await getScorecardById(id);
     sendSuccess(res, scorecard, 'Interview scorecard retrieved', 200);
+  }
+);
+
+// PATCH /api/v1/ats/interview-scorecards/:id
+// Full re-save of editable fields; the service recomputes weighted scores.
+export const updateInterviewScorecard = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const performedBy = req.user!._id;
+
+    const scorecard = await updateScorecard(id, req.body, performedBy);
+
+    sendSuccess(res, scorecard, 'Interview scorecard updated', 200);
   }
 );

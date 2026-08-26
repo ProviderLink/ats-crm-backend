@@ -4,6 +4,7 @@ import { emitToAts } from '../../sockets';
 // generic 'created' action and carry the scorecard-specific verb in the
 // description + metadata (see "Anything that didn't go as planned" in the
 // completion report).
+import mongoose from 'mongoose';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Job from '../jobs/job.model';
@@ -11,6 +12,7 @@ import InterviewScorecard from './interview-scorecard.model';
 import type {
   CreateInterviewScorecardInput,
   IInterviewScorecard,
+  UpdateInterviewScorecardInput,
 } from './interview-scorecard.types';
 import { CATEGORY_WEIGHTS } from './interview-scorecard.types';
 
@@ -226,4 +228,108 @@ export const getScorecardsByCandidate = async (
     limit,
     totalPages: Math.ceil(total / limit),
   };
+};
+
+export const updateScorecard = async (
+  id: string,
+  input: UpdateInterviewScorecardInput,
+  performedBy: string
+): Promise<IInterviewScorecard> => {
+  const doc = await InterviewScorecard.findById(id);
+  if (!doc) {
+    throw new AppError(
+      404,
+      'INTERVIEW_SCORECARD_NOT_FOUND',
+      'Interview scorecard not found'
+    );
+  }
+
+  // Recompute server-derived fields — IGNORE any client value for them.
+  const computed = computeScores({
+    commEnglishDiction: input.commEnglishDiction,
+    commEnglishComprehension: input.commEnglishComprehension,
+    experienceRating: input.experienceRating,
+    professionalismRating: input.professionalismRating,
+    technologyRating: input.technologyRating,
+    availabilityRating: input.availabilityRating,
+  });
+
+  doc.interviewDate = new Date(input.interviewDate);
+  if (input.interviewerId) {
+    doc.interviewerId =
+      input.interviewerId as unknown as mongoose.Types.ObjectId;
+  }
+  doc.interviewType = 'initial_screening';
+
+  // raw category 1 inputs + recomputed rating
+  doc.commEnglishDiction = input.commEnglishDiction;
+  doc.commEnglishComprehension = input.commEnglishComprehension;
+  doc.communicationRating = computed.communicationRating;
+  // category 2
+  doc.experienceSelections = input.experienceSelections ?? [];
+  doc.experienceRating = input.experienceRating;
+  // category 3
+  doc.profPreparedOnTime = input.profPreparedOnTime;
+  doc.profAppearanceDemeanor = input.profAppearanceDemeanor;
+  doc.profAttitudeReliability = input.profAttitudeReliability;
+  doc.profInterestInPosition = input.profInterestInPosition;
+  doc.professionalismRating = input.professionalismRating;
+  // category 4
+  doc.techInternetSpeed = input.techInternetSpeed;
+  doc.techHeadsetNoiseCancelling = input.techHeadsetNoiseCancelling;
+  doc.techTwoScreens = input.techTwoScreens;
+  doc.techBackupInternet = input.techBackupInternet;
+  doc.techBackupGenerator = input.techBackupGenerator;
+  doc.technologyRating = input.technologyRating;
+  // category 5
+  doc.availUsHours = input.availUsHours;
+  doc.availCompensationAcceptable = input.availCompensationAcceptable;
+  doc.availStartAvailability = input.availStartAvailability;
+  doc.availOverallFit = input.availOverallFit;
+  doc.availabilityRating = input.availabilityRating;
+  // weighted + overall (recomputed, ignored if supplied)
+  doc.communicationWeighted = computed.communicationWeighted;
+  doc.experienceWeighted = computed.experienceWeighted;
+  doc.professionalismWeighted = computed.professionalismWeighted;
+  doc.technologyWeighted = computed.technologyWeighted;
+  doc.availabilityWeighted = computed.availabilityWeighted;
+  doc.overallScore = computed.overallScore;
+  // notes
+  doc.strengths = input.strengths ?? '';
+  doc.concerns = input.concerns ?? '';
+  doc.generalNotes = input.generalNotes ?? '';
+  doc.recommendedPosition = input.recommendedPosition ?? '';
+  doc.earliestStartDate = input.earliestStartDate
+    ? new Date(input.earliestStartDate)
+    : null;
+  doc.compensationExpectation = input.compensationExpectation ?? '';
+  // required
+  doc.finalRecommendation = input.finalRecommendation;
+
+  await doc.save();
+  const safe = doc.toSafeObject();
+
+  await createLog({
+    action: 'updated',
+    resourceType: 'candidate',
+    resourceId: safe.candidateId,
+    relatedType: 'interview_scorecard',
+    relatedId: safe._id,
+    description: `Interview scorecard updated — overall ${computed.overallScore}/100`,
+    metadata: {
+      scorecardId: safe._id,
+      jobId: safe.jobId,
+      overallScore: computed.overallScore,
+      finalRecommendation: input.finalRecommendation,
+    },
+    performedBy,
+  });
+
+  emitToAts(
+    `candidate:${safe.candidateId}`,
+    'interview-scorecard:updated',
+    safe
+  );
+
+  return safe;
 };

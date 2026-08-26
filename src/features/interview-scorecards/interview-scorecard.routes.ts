@@ -10,6 +10,7 @@ import {
   createInterviewScorecard,
   getInterviewScorecard,
   listInterviewScorecards,
+  updateInterviewScorecard,
 } from './interview-scorecard.controller';
 
 // ── Schemas ────────────────────────────────────────────────────────────────
@@ -94,6 +95,13 @@ const listScorecardsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
+// Update: same as create, minus the immutable candidateId/jobId. Requires a
+// full re-save of all editable fields (the service recomputes scores).
+const updateScorecardSchema = createScorecardSchema.omit({
+  candidateId: true,
+  jobId: true,
+});
+
 // ── Router ────────────────────────────────────────────────────────────────
 const router = Router();
 
@@ -118,6 +126,13 @@ router.get(
   '/:id',
   requirePermission('interviewScorecards', 'read'),
   getInterviewScorecard
+);
+
+router.patch(
+  '/:id',
+  requirePermission('interviewScorecards', 'write'),
+  validate(updateScorecardSchema),
+  updateInterviewScorecard
 );
 
 export default router;

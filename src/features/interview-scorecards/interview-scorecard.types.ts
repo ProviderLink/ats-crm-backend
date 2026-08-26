@@ -135,3 +135,12 @@ export interface CreateInterviewScorecardInput {
   compensationExpectation?: string;
   finalRecommendation: FinalRecommendation;
 }
+
+// ── Update: identical to create, minus the immutable candidateId/jobId. ──
+// interviewerId stays optional (omit to keep the existing interviewer).
+export type UpdateInterviewScorecardInput = Omit<
+  CreateInterviewScorecardInput,
+  'candidateId' | 'jobId' | 'interviewerId'
+> & {
+  interviewerId?: string;
+};

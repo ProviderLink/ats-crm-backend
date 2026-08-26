@@ -14,6 +14,7 @@ export interface UserPermissions {
   candidates?: { read?: boolean; write?: boolean; manage?: boolean };
   jobs?: { read?: boolean; write?: boolean; manage?: boolean };
   interviews?: { read?: boolean; write?: boolean; schedule?: boolean };
+  interviewScorecards?: { read?: boolean; write?: boolean };
   clients?: { read?: boolean; write?: boolean; manage?: boolean };
   emails?: { read?: boolean; write?: boolean };
   tags?: { read?: boolean; write?: boolean; manage?: boolean };

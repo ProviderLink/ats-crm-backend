@@ -33,13 +33,14 @@ function deriveAppAccess(roles: UserRole[]): AppAccess[] {
   return access;
 }
 
-function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
+export function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
   // ── Admin: everything ──────────────────────────────────────────────
   if (roles.includes('admin')) {
     return {
       candidates: { read: true, write: true, manage: true },
       jobs: { read: true, write: true, manage: true },
       interviews: { read: true, write: true, schedule: true },
+      interviewScorecards: { read: true, write: true },
       clients: { read: true, write: true, manage: true },
       emails: { read: true, write: true },
       tags: { read: true, write: true, manage: true },
@@ -75,6 +76,8 @@ function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
         merge('candidates', { read: true, write: true, manage: true });
         merge('jobs', { read: true, write: true, manage: true });
         merge('interviews', { read: true, write: true });
+        merge('interviewScorecards', { read: true, write: true });
+        merge('team', { read: true });
         merge('clients', { read: true });
         merge('emails', { read: true, write: true });
         merge('tags', { read: true, write: true });
@@ -88,6 +91,8 @@ function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
         merge('candidates', { read: true, write: true, manage: true });
         merge('jobs', { read: true });
         merge('interviews', { read: true, write: true });
+        merge('interviewScorecards', { read: true, write: true });
+        merge('team', { read: true });
         merge('clients', { read: true });
         merge('emails', { read: true, write: true });
         merge('tags', { read: true });
@@ -101,6 +106,8 @@ function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
         merge('candidates', { read: true, write: true });
         merge('jobs', { read: true });
         merge('interviews', { read: true, write: true, schedule: true });
+        merge('interviewScorecards', { read: true, write: true });
+        merge('team', { read: true });
         merge('clients', { read: true });
         merge('emails', { read: true, write: true });
         merge('tags', { read: true });
@@ -113,6 +120,8 @@ function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
       case 'interviewer':
         merge('candidates', { read: true });
         merge('interviews', { read: true, write: true });
+        merge('interviewScorecards', { read: true, write: true });
+        merge('team', { read: true });
         merge('tags', { read: true });
         break;
 

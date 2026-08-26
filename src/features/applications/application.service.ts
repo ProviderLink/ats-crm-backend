@@ -317,6 +317,36 @@ export const rejectApplication = async (
   return result;
 };
 
+export const deleteApplication = async (
+  id: string,
+  deletedBy: string
+): Promise<IApplication> => {
+  const application = await Application.findById(id);
+  if (!application) {
+    throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
+  }
+
+  // Capture the safe object + candidate reference BEFORE deleting so the
+  // activity log and socket payload still have valid IDs afterwards.
+  const result = application.toSafeObject();
+  const candidateId = String(application.candidateId);
+
+  await application.deleteOne();
+
+  createLog({
+    action: 'deleted',
+    resourceType: 'application',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: candidateId,
+    metadata: { jobId: result.jobId, phase: result.phase },
+    performedBy: deletedBy,
+  });
+
+  emitToAts('applications', 'application:deleted', result);
+  return result;
+};
+
 export const disposeApplication = async (
   id: string,
   input: DisposeApplicationInput

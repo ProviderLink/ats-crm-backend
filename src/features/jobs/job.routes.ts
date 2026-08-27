@@ -84,6 +84,21 @@ const applyToJobSchema = z.object({
   resumeOriginalName: z.string().optional(),
   resumeRawText: z.string().optional(),
   videoIntroUrl: z.string().url().optional().nullable(),
+  yearsOfExperience: z.coerce.number().min(0).optional(),
+  englishProficiency: z
+    .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
+    .optional()
+    .nullable(),
+  currentSalaryPHP: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().min(0).nullable()
+  ),
+  currentSalaryUSD: z.preprocess(
+    v => (v === '' || v === undefined || v === null ? null : Number(v)),
+    z.number().min(0).nullable()
+  ),
+  reasonForLeaving: z.string().max(500).optional().nullable(),
+  cityOfResidence: z.string().max(100).optional().nullable(),
   coverLetter: z.string().optional(),
   candidateId: z.string().optional(),
   parsedData: z

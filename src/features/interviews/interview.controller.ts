@@ -3,6 +3,7 @@ import { AppError } from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
 import Application from '../applications/application.model';
+import Job from '../jobs/job.model';
 import * as interviewService from './interview.service';
 
 export const getAllInterviews = catchAsync(
@@ -132,12 +133,25 @@ export const createInterviewForApplication = catchAsync(
       throw new AppError(404, 'APPLICATION_NOT_FOUND', 'Application not found');
     }
 
+    // Allow scheduling for a different job than the application's own.
+    // When a jobId override is supplied, derive the clientId from that job;
+    // otherwise fall back to the application's existing job/client.
+    const jobId = req.body.jobId ?? application.jobId.toString();
+    let clientId = application.clientId.toString();
+    if (jobId !== application.jobId.toString()) {
+      const job = await Job.findById(jobId);
+      if (!job) {
+        throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+      }
+      clientId = job.clientId.toString();
+    }
+
     const interview = await interviewService.createInterview({
       ...req.body,
       applicationId,
       candidateId: application.candidateId.toString(),
-      jobId: application.jobId.toString(),
-      clientId: application.clientId.toString(),
+      jobId,
+      clientId,
       organizerId,
     });
 

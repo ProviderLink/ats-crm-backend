@@ -29,6 +29,19 @@ import {
 const createInterviewSchema = z.object({
   title: z.string().min(1).max(200),
   type: z.enum(['zoom', 'google_meet', 'phone_call', 'in_person']),
+  interviewType: z
+    .enum([
+      'initial_screening',
+      'group_interview',
+      'technical_interview',
+      'panel_interview',
+      'final_interview',
+      'hr_interview',
+      'culture_fit',
+      'other',
+    ])
+    .optional(),
+  jobId: z.string().optional(),
   round: z.number().int().min(1),
   scheduledAt: z.string().datetime(),
   duration: z.number().int().min(15).max(480),

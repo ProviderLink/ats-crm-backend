@@ -15,6 +15,7 @@ import { createLog } from '../activity-logs/activityLog.service';
 import type { ActivityAction } from '../activity-logs/activityLog.types';
 import Application from '../applications/application.model';
 import Candidate from '../candidates/candidate.model';
+import Job from '../jobs/job.model';
 import Interview from './interview.model';
 import type {
   CreateInterviewInput,
@@ -23,6 +24,7 @@ import type {
   SubmitFeedbackInput,
   UpdateInterviewInput,
 } from './interview.types';
+import { INTERVIEW_MEETING_TYPE_LABELS } from './interview.types';
 import {
   sendInterviewCancelledEmails,
   sendInterviewScheduledEmails,
@@ -142,6 +144,7 @@ export const createInterview = async (
     clientId: new mongoose.Types.ObjectId(input.clientId),
     title: input.title,
     type: input.type,
+    interviewType: input.interviewType ?? 'initial_screening',
     round: input.round,
     scheduledAt: input.scheduledAt,
     duration: input.duration,
@@ -153,17 +156,26 @@ export const createInterview = async (
     meetingDetails,
   });
 
+  const job = await Job.findById(input.jobId);
+  const jobTitle = job?.title ?? 'this job';
+  const interviewType = input.interviewType ?? ('initial_screening' as const);
+  const interviewTypeLabel =
+    INTERVIEW_MEETING_TYPE_LABELS[interviewType] ?? interviewType;
+
   createLog({
     action: 'interview_scheduled',
     resourceType: 'application',
     resourceId: input.applicationId,
     relatedType: 'interview',
     relatedId: interview._id.toString(),
-    description: 'Interview scheduled',
+    description: `Interview scheduled: ${interviewTypeLabel} for ${jobTitle}`,
     metadata: {
       interviewId: interview._id.toString(),
       type: input.type,
+      interviewType,
       round: input.round,
+      jobId: input.jobId,
+      jobTitle,
     },
     performedBy: input.organizerId,
   });

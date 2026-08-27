@@ -14,6 +14,7 @@ import {
   submitFeedback,
   updateInterview,
 } from './interview.controller';
+import { INTERVIEW_MEETING_TYPES } from './interview.types';
 
 const createInterviewSchema = z.object({
   applicationId: z.string(),
@@ -22,6 +23,7 @@ const createInterviewSchema = z.object({
   clientId: z.string(),
   title: z.string().min(1).max(200),
   type: z.enum(['zoom', 'google_meet', 'phone_call', 'in_person']),
+  interviewType: z.enum(INTERVIEW_MEETING_TYPES).optional(),
   round: z.number().int().min(1),
   scheduledAt: z.string().datetime(),
   duration: z.number().int().min(15).max(480),

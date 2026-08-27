@@ -1,3 +1,29 @@
+export const INTERVIEW_MEETING_TYPES = [
+  'initial_screening',
+  'group_interview',
+  'technical_interview',
+  'panel_interview',
+  'final_interview',
+  'hr_interview',
+  'culture_fit',
+  'other',
+] as const;
+export type InterviewMeetingType = (typeof INTERVIEW_MEETING_TYPES)[number];
+
+export const INTERVIEW_MEETING_TYPE_LABELS: Record<
+  InterviewMeetingType,
+  string
+> = {
+  initial_screening: 'Initial Screening',
+  group_interview: 'Group Interview',
+  technical_interview: 'Technical Interview',
+  panel_interview: 'Panel Interview',
+  final_interview: 'Final Interview',
+  hr_interview: 'HR Interview',
+  culture_fit: 'Culture Fit',
+  other: 'Other',
+};
+
 export interface IInterviewFeedback {
   _id: string;
   interviewerId: string;
@@ -23,6 +49,7 @@ export interface IInterview {
   clientId: string;
   title: string;
   type: string;
+  interviewType: InterviewMeetingType;
   round: number;
   status: string;
   scheduledAt: Date;
@@ -43,6 +70,7 @@ export interface CreateInterviewInput {
   jobId: string;
   clientId: string;
   title: string;
+  interviewType?: InterviewMeetingType;
   type: 'zoom' | 'google_meet' | 'phone_call' | 'in_person';
   round: number;
   scheduledAt: Date | string;

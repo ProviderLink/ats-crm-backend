@@ -1,5 +1,6 @@
 import mongoose, { Document, model, Schema } from 'mongoose';
 import type { IInterview } from './interview.types';
+import { INTERVIEW_MEETING_TYPES } from './interview.types';
 
 export interface IInterviewDocument
   extends
@@ -74,6 +75,11 @@ const interviewSchema = new Schema(
       type: String,
       enum: ['zoom', 'google_meet', 'phone_call', 'in_person'],
       required: true,
+    },
+    interviewType: {
+      type: String,
+      enum: INTERVIEW_MEETING_TYPES,
+      default: 'initial_screening',
     },
     round: { type: Number, required: true, min: 1 },
     status: {

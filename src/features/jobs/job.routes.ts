@@ -5,6 +5,7 @@ import {
   requireAppAccess,
   requirePermission,
 } from '../../shared/middleware/authorize';
+import { uploadResume } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import { PIPELINE_STAGE_ICONS } from '../pipeline-templates/pipelineTemplate.types';
 import {
@@ -80,7 +81,7 @@ const applyToJobSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   phone: z.string().min(1),
-  resumeUrl: z.string().url(),
+  resumeUrl: z.string().url().optional(),
   resumeOriginalName: z.string().optional(),
   resumeRawText: z.string().optional(),
   videoIntroUrl: z.string().url().optional().nullable(),
@@ -101,34 +102,47 @@ const applyToJobSchema = z.object({
   cityOfResidence: z.string().max(100).optional().nullable(),
   coverLetter: z.string().optional(),
   candidateId: z.string().optional(),
-  parsedData: z
-    .object({
-      summary: z.string().optional(),
-      skills: z.array(z.string()).optional(),
-      languages: z.array(z.string()).optional(),
-      certifications: z.array(z.string()).optional(),
-      experience: z
-        .array(
-          z.object({
-            company: z.string().optional(),
-            title: z.string().optional(),
-            duration: z.string().optional(),
-            description: z.string().optional(),
-          })
-        )
-        .optional(),
-      education: z
-        .array(
-          z.object({
-            institution: z.string().optional(),
-            degree: z.string().optional(),
-            field: z.string().optional(),
-            year: z.string().optional(),
-          })
-        )
-        .optional(),
-    })
-    .optional(),
+  parsedData: z.preprocess(
+    v => {
+      if (typeof v === 'string' && v.trim() !== '') {
+        try {
+          return JSON.parse(v);
+        } catch {
+          return null;
+        }
+      }
+      return v ?? null;
+    },
+    z
+      .object({
+        summary: z.string().optional(),
+        skills: z.array(z.string()).optional(),
+        languages: z.array(z.string()).optional(),
+        certifications: z.array(z.string()).optional(),
+        experience: z
+          .array(
+            z.object({
+              company: z.string().optional(),
+              title: z.string().optional(),
+              duration: z.string().optional(),
+              description: z.string().optional(),
+            })
+          )
+          .optional(),
+        education: z
+          .array(
+            z.object({
+              institution: z.string().optional(),
+              degree: z.string().optional(),
+              field: z.string().optional(),
+              year: z.string().optional(),
+            })
+          )
+          .optional(),
+      })
+      .optional()
+      .nullable()
+  ),
 });
 
 const router = Router();
@@ -136,7 +150,7 @@ const router = Router();
 // Public routes — must be registered before authenticate middleware
 router.get('/', getAllJobs);
 router.get('/:id', getJobById);
-router.post('/:id/apply', validate(applyToJobSchema), applyToJob);
+router.post('/:id/apply', uploadResume, validate(applyToJobSchema), applyToJob);
 
 router.use(authenticate);
 router.use(requireAppAccess('ats'));

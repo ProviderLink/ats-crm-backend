@@ -162,9 +162,11 @@ router.post('/public/parse', uploadResume, publicParse);
 
 /**
  * @route   POST /api/v1/ats/candidates/public/upload-and-parse
- * @desc    Stateless — upload resume to Cloudinary, extract text, AI parse, and
- *          return { resumeUrl, resumeOriginalName, resumeRawText, parsedData }.
- *          NO candidate is created/saved here (persisted only on final submit).
+ * @desc    Stateless — extract text, AI parse, and return
+ *          { resumeOriginalName, resumeRawText, parsedData }.
+ *          NO Cloudinary upload and NO candidate is created/saved here
+ *          (the resume is uploaded and the candidate persisted only on final
+ *          submit via POST /jobs/:id/apply).
  * @access  Public
  */
 const publicApplySchema = z.object({

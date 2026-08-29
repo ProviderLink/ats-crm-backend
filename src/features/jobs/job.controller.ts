@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
+import { uploadToCloudinary } from '../../config/cloudinary';
 import { runCandidacyValidation, runResumeParsing } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
+import { extractResumeText } from '../../shared/utils/extract-resume-text';
 import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
 import { createLog } from '../activity-logs/activityLog.service';
@@ -93,6 +95,27 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     );
   }
 
+  // Resolve the resume at final submit: upload the file to Cloudinary here
+  // (instead of during the stateless parse step) so abandoned applications
+  // don't leave orphan files consuming storage.
+  let resumeUrl: string | undefined = body.resumeUrl;
+  let resumeRawText: string | undefined = body.resumeRawText;
+  let resumeOriginalName: string = body.resumeOriginalName || 'resume.pdf';
+
+  if (req.file) {
+    resumeOriginalName = req.file.originalname || resumeOriginalName;
+    resumeRawText =
+      body.resumeRawText && body.resumeRawText.trim() !== ''
+        ? body.resumeRawText
+        : await extractResumeText(req.file.buffer, req.file.mimetype);
+    const { url } = await uploadToCloudinary(req.file, 'resumes');
+    resumeUrl = url;
+  }
+
+  if (!resumeUrl) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
+  }
+
   let candidateId = body.candidateId;
 
   // If candidateId is provided, update the existing candidate with reviewed data
@@ -137,9 +160,9 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
           lastName: body.lastName,
           email: body.email,
           phone: body.phone,
-          resumeUrl: body.resumeUrl,
-          resumeOriginalName: body.resumeOriginalName || 'resume.pdf',
-          resumeRawText: body.resumeRawText || '',
+          resumeUrl,
+          resumeOriginalName,
+          resumeRawText,
           videoIntroUrl: body.videoIntroUrl ?? null,
           yearsOfExperience: body.yearsOfExperience ?? 0,
           englishProficiency: body.englishProficiency ?? null,

@@ -17,9 +17,25 @@ import type {
   UpdateCandidateInput,
 } from './candidate.types';
 
-function extractCloudinaryPublicId(url: string): string | null {
-  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
-  return match ? match[1] : null;
+function extractCloudinaryPublicId(
+  url: string,
+  resourceType: 'raw' | 'image' = 'image'
+): string | null {
+  const match = url.split('?')[0].match(/\/upload\/(?:v\d+\/)?(.+)$/);
+  if (!match) return null;
+  let publicId = match[1];
+  try {
+    publicId = decodeURIComponent(publicId);
+  } catch {
+    // Keep the raw path if decoding fails.
+  }
+  // Images store their format separately, so the extension is not part of the
+  // public_id. Raw assets keep the full uploaded path (extension included when
+  // the file was uploaded with one).
+  if (resourceType === 'image') {
+    publicId = publicId.replace(/\.[^.]+$/, '');
+  }
+  return publicId;
 }
 
 export const getAllCandidates = async (filters: {
@@ -116,6 +132,12 @@ export const findOrCreateCandidate = async (
   if (byEmail) {
     // Existing candidate — update resume if new one provided
     if (input.resumeUrl && input.resumeRawText) {
+      // Delete the previous resume file before replacing it so re-applicants
+      // don't leave orphaned files in Cloudinary.
+      if (byEmail.resumeUrl && byEmail.resumeUrl !== input.resumeUrl) {
+        const oldPublicId = extractCloudinaryPublicId(byEmail.resumeUrl, 'raw');
+        if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
+      }
       byEmail.resumeUrl = input.resumeUrl;
       byEmail.resumeOriginalName = input.resumeOriginalName;
       byEmail.resumeRawText = input.resumeRawText;
@@ -140,6 +162,15 @@ export const findOrCreateCandidate = async (
     });
     if (byPhone) {
       if (input.resumeUrl && input.resumeRawText) {
+        // Delete the previous resume file before replacing it so re-applicants
+        // don't leave orphaned files in Cloudinary.
+        if (byPhone.resumeUrl && byPhone.resumeUrl !== input.resumeUrl) {
+          const oldPublicId = extractCloudinaryPublicId(
+            byPhone.resumeUrl,
+            'raw'
+          );
+          if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
+        }
         byPhone.resumeUrl = input.resumeUrl;
         byPhone.resumeOriginalName = input.resumeOriginalName;
         byPhone.resumeRawText = input.resumeRawText;
@@ -458,12 +489,12 @@ export const deleteCandidate = async (
   }
 
   if (candidate.resumeUrl) {
-    const publicId = extractCloudinaryPublicId(candidate.resumeUrl);
+    const publicId = extractCloudinaryPublicId(candidate.resumeUrl, 'raw');
     if (publicId) await deleteFromCloudinary(publicId, 'raw');
   }
 
   if (candidate.avatar) {
-    const publicId = extractCloudinaryPublicId(candidate.avatar);
+    const publicId = extractCloudinaryPublicId(candidate.avatar, 'image');
     if (publicId) await deleteFromCloudinary(publicId, 'image');
   }
 

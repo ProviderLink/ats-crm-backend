@@ -38,9 +38,12 @@ export const deleteFromCloudinary = async (
   resourceType: 'raw' | 'image' = 'image'
 ): Promise<void> => {
   try {
-    await cloudinary.uploader.destroy(publicId, {
+    const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,
     });
+    if (result?.result !== 'ok') {
+      console.warn('Cloudinary delete did not report ok:', publicId, result);
+    }
   } catch (error) {
     console.error('Failed to delete file from Cloudinary:', error);
   }

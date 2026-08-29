@@ -412,12 +412,10 @@ export const publicUploadAndParse = catchAsync(
       req.file.mimetype
     );
 
-    // Upload resume to Cloudinary
-    const { url: resumeUrl } = await uploadToCloudinary(req.file, 'resumes');
-
-    // Parse with AI — stateless: NO candidate is created or saved here.
-    // The candidate is only persisted on final submit (POST /jobs/:id/apply),
-    // which prevents orphan records when a user abandons before submitting.
+    // Parse with AI — stateless: NO candidate is created or saved here, and
+    // NO Cloudinary upload happens here. The resume is uploaded to Cloudinary
+    // only on final submit (POST /jobs/:id/apply) so abandoned applications
+    // don't leave orphan files consuming storage.
     const parsedData = await parseResumeTextWithAI(resumeRawText);
 
     logger.info(
@@ -427,12 +425,11 @@ export const publicUploadAndParse = catchAsync(
     sendSuccess(
       res,
       {
-        resumeUrl,
         resumeOriginalName: req.file.originalname,
         resumeRawText,
         parsedData,
       },
-      'Resume uploaded and parsed',
+      'Resume parsed successfully',
       201
     );
   }

@@ -21,9 +21,20 @@ export const getDashboardStats = async () => {
     scheduledInterviews,
     completedInterviews,
   ] = await Promise.all([
-    Candidate.countDocuments({}),
-    Candidate.countDocuments({ status: 'approved' }),
-    Candidate.countDocuments({ status: 'hired' }),
+    // Match the candidates list endpoint, which excludes permanently
+    // ineligible candidates by default, so dashboard totals stay consistent
+    // with the candidates page.
+    Candidate.countDocuments({
+      eligibilityStatus: { $ne: 'permanently_ineligible' },
+    }),
+    Candidate.countDocuments({
+      status: 'approved',
+      eligibilityStatus: { $ne: 'permanently_ineligible' },
+    }),
+    Candidate.countDocuments({
+      status: 'hired',
+      eligibilityStatus: { $ne: 'permanently_ineligible' },
+    }),
     Job.countDocuments({}),
     Job.countDocuments({ status: 'open' }),
     Client.countDocuments({}),

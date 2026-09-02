@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
+import { sanitizeJobDescription } from '../../shared/utils/sanitize-job-description';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Application from '../applications/application.model';
@@ -107,6 +108,7 @@ export const createJob = async (
 
   const job = await Job.create({
     ...restInput,
+    description: sanitizeJobDescription(restInput.description),
     status: 'draft',
     pipeline: {
       templateId: pipelineTemplate._id as mongoose.Types.ObjectId,
@@ -160,7 +162,10 @@ export const updateJob = async (
   for (const field of fields) {
     if (input[field] !== undefined) {
       const oldVal = (job as unknown as Record<string, unknown>)[field];
-      const newVal = input[field];
+      const newVal =
+        field === 'description'
+          ? sanitizeJobDescription(String(input[field]))
+          : input[field];
       const label = fieldLabels[field] ?? field;
       if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
         if (Array.isArray(newVal) || typeof newVal === 'object') {
@@ -171,7 +176,7 @@ export const updateJob = async (
           );
         }
       }
-      (job as unknown as Record<string, unknown>)[field] = input[field];
+      (job as unknown as Record<string, unknown>)[field] = newVal;
     }
   }
   job.updatedBy = new mongoose.Types.ObjectId(

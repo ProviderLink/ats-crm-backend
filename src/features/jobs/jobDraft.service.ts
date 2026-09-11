@@ -107,7 +107,23 @@ explanation, no text before or after. Use exactly this structure:
 }
 `.trim();
 
-function toStringArray(value: unknown): string[] {
+/**
+ * Optional overrides so other AI helpers (e.g. the job standardizer, which
+ * rewrites lists that already exist on stored jobs) can use far more generous
+ * limits without duplicating the sanitising logic.
+ */
+export interface ListLimits {
+  maxItems?: number;
+  maxItemLength?: number;
+}
+
+export function toStringArray(
+  value: unknown,
+  limits: ListLimits = {}
+): string[] {
+  const maxItems = limits.maxItems ?? MAX_LIST_ITEMS;
+  const maxItemLength = limits.maxItemLength ?? MAX_ITEM_LENGTH;
+
   if (!Array.isArray(value)) return [];
 
   const seen = new Set<string>();
@@ -118,7 +134,7 @@ function toStringArray(value: unknown): string[] {
     const item = raw
       .replace(/^\s*(?:[-*•·]|\d+[.)])\s*/, '')
       .trim()
-      .slice(0, MAX_ITEM_LENGTH);
+      .slice(0, maxItemLength);
     if (!item) continue;
 
     const key = item.toLowerCase();
@@ -126,13 +142,13 @@ function toStringArray(value: unknown): string[] {
 
     seen.add(key);
     result.push(item);
-    if (result.length >= MAX_LIST_ITEMS) break;
+    if (result.length >= maxItems) break;
   }
 
   return result;
 }
 
-function toCleanString(value: unknown): string {
+export function toCleanString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 

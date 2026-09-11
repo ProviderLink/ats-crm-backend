@@ -13,6 +13,7 @@ import * as emailService from '../emails/email.service';
 import * as settingsService from '../settings/settings.service';
 import * as jobService from './job.service';
 import { generateJobDraft } from './jobDraft.service';
+import { standardizeJobContent } from './jobStandardize.service';
 
 export const getAllJobs = catchAsync(async (req: Request, res: Response) => {
   const { clientId, status, search, page, limit } = req.query as Record<
@@ -87,6 +88,13 @@ export const generateDraft = catchAsync(async (req: Request, res: Response) => {
   const draft = await generateJobDraft({ notes });
   sendSuccess(res, draft, 'Job draft generated', 200);
 });
+
+export const standardizeContent = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await standardizeJobContent(req.body);
+    sendSuccess(res, result, 'Job content standardized', 200);
+  }
+);
 
 export const applyToJob = catchAsync(async (req: Request, res: Response) => {
   const { id: jobId } = req.params;

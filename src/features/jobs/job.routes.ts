@@ -16,6 +16,7 @@ import {
   generateDraft,
   getAllJobs,
   getJobById,
+  standardizeContent,
   updateJob,
   updateJobStatus,
 } from './job.controller';
@@ -79,6 +80,32 @@ const updateStatusSchema = z.object({
 const generateDraftSchema = z.object({
   notes: z.string().trim().min(10).max(20000),
 });
+
+/**
+ * Existing list content lifted from the job form. Tidied and returned — never
+ * persisted, so an older job can only change if the user saves it afterwards.
+ * Limits are deliberately generous because these values already exist on
+ * stored records and must not be truncated on the way in.
+ */
+const standardizeContentSchema = z
+  .object({
+    requirements: z.array(z.string().max(1000)).max(60).optional().default([]),
+    responsibilities: z
+      .array(z.string().max(1000))
+      .max(60)
+      .optional()
+      .default([]),
+    skills: z.array(z.string().max(1000)).max(60).optional().default([]),
+    benefits: z.array(z.string().max(1000)).max(60).optional().default([]),
+  })
+  .refine(
+    v =>
+      v.requirements.length > 0 ||
+      v.responsibilities.length > 0 ||
+      v.skills.length > 0 ||
+      v.benefits.length > 0,
+    { message: 'Nothing to improve yet' }
+  );
 
 const assignPipelineSchema = z.object({
   templateId: z.string(),
@@ -179,6 +206,15 @@ router.post(
   requirePermission('jobs', 'write'),
   validate(generateDraftSchema),
   generateDraft
+);
+
+// Stateless helper: tidies the list fields the client already has, returns
+// them, and writes nothing. Same literal-path reasoning as '/generate-draft'.
+router.post(
+  '/standardize',
+  requirePermission('jobs', 'write'),
+  validate(standardizeContentSchema),
+  standardizeContent
 );
 
 router.patch(

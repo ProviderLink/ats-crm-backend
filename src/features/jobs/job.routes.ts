@@ -13,6 +13,7 @@ import {
   assignPipeline,
   createJob,
   deleteJob,
+  generateDraft,
   getAllJobs,
   getJobById,
   updateJob,
@@ -69,6 +70,14 @@ const updateJobSchema = createJobSchema.omit({ clientId: true }).partial();
 
 const updateStatusSchema = z.object({
   status: z.enum(['draft', 'open', 'on_hold', 'closed']),
+});
+
+/**
+ * Free-form brief supplied by the user. Only used to produce a draft that the
+ * client shows in the job form — nothing is persisted by this endpoint.
+ */
+const generateDraftSchema = z.object({
+  notes: z.string().trim().min(10).max(20000),
 });
 
 const assignPipelineSchema = z.object({
@@ -160,6 +169,16 @@ router.post(
   requirePermission('jobs', 'write'),
   validate(createJobSchema),
   createJob
+);
+
+// Stateless helper: reads the brief, returns a draft, writes nothing.
+// Every '/:id' route is a different method or has an extra path segment, so
+// this literal path can never be captured as a job id.
+router.post(
+  '/generate-draft',
+  requirePermission('jobs', 'write'),
+  validate(generateDraftSchema),
+  generateDraft
 );
 
 router.patch(

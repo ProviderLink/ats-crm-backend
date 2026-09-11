@@ -12,6 +12,7 @@ import EmailTemplate from '../email-templates/emailTemplate.model';
 import * as emailService from '../emails/email.service';
 import * as settingsService from '../settings/settings.service';
 import * as jobService from './job.service';
+import { generateJobDraft } from './jobDraft.service';
 
 export const getAllJobs = catchAsync(async (req: Request, res: Response) => {
   const { clientId, status, search, page, limit } = req.query as Record<
@@ -80,6 +81,12 @@ export const assignPipeline = catchAsync(
     sendSuccess(res, job, 'Pipeline assigned', 200);
   }
 );
+
+export const generateDraft = catchAsync(async (req: Request, res: Response) => {
+  const { notes } = req.body as { notes: string };
+  const draft = await generateJobDraft({ notes });
+  sendSuccess(res, draft, 'Job draft generated', 200);
+});
 
 export const applyToJob = catchAsync(async (req: Request, res: Response) => {
   const { id: jobId } = req.params;

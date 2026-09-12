@@ -1,3 +1,5 @@
+import { getCompanyTimezone } from '../../../shared/utils/companyTimezone';
+import { formatDateKey } from '../../../shared/utils/timezone';
 import Assignment from '../../assignments/assignment.model';
 import Candidate from '../../candidates/candidate.model';
 import Client from '../../clients/client.model';
@@ -18,6 +20,12 @@ export const getDashboardStats = async (accountManagerId?: string) => {
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
+
+  // EOD counts use the company business day, not a server-local window, so the
+  // dashboard agrees with the compliance job and the EOD list for VAs spread
+  // across the world.
+  const companyTimezone = await getCompanyTimezone();
+  const companyTodayKey = formatDateKey(new Date(), companyTimezone);
 
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 7);
@@ -56,7 +64,7 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     Assignment.countDocuments({ ...assignmentBase, status: 'on_hold' }),
     Assignment.countDocuments({ ...assignmentBase, status: 'ended' }),
     EodSubmission.countDocuments({
-      date: { $gte: todayStart, $lte: todayEnd },
+      dateKey: companyTodayKey,
       ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
     WorkEntry.countDocuments({

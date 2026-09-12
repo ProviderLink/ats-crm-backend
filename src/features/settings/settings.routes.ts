@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
 import { requirePermission } from '../../shared/middleware/authorize';
+import { isValidTimeZone } from '../../shared/utils/timezone';
 import { validate } from '../../shared/validators/common.validator';
 import { getSettings, updateSettings } from './settings.controller';
 
@@ -22,7 +23,13 @@ const updateSettingsSchema = z.object({
       resumeParsing: z.boolean().optional(),
     })
     .optional(),
-  companyTimezone: z.string().min(1).optional(),
+  companyTimezone: z
+    .string()
+    .min(1)
+    .refine(isValidTimeZone, {
+      message: 'Must be a valid IANA timezone (e.g. America/Chicago)',
+    })
+    .optional(),
   applicationConfirmation: z
     .object({
       enabled: z.boolean().optional(),

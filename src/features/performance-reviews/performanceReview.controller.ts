@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
+import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
 import { buildReviewPdf } from '../../shared/utils/pdf';
 import { sendSuccess } from '../../shared/utils/response';
 import Candidate from '../candidates/candidate.model';
@@ -106,20 +107,24 @@ export const exportReviewPdf = catchAsync(
     const review = await reviewService.getReviewById(id);
 
     // Populate names for the PDF
-    const [candidate, client, job] = await Promise.all([
+    const [candidate, client, job, timezone] = await Promise.all([
       Candidate.findById(review.candidateId).lean(),
       Client.findById(review.clientId).lean(),
       Job.findById(review.jobId).lean(),
+      getCompanyTimezone(),
     ]);
 
-    const pdfBuffer = await buildReviewPdf({
-      ...review,
-      candidateName: candidate
-        ? `${candidate.firstName} ${candidate.lastName}`
-        : undefined,
-      clientName: client?.companyName,
-      jobTitle: job?.title,
-    });
+    const pdfBuffer = await buildReviewPdf(
+      {
+        ...review,
+        candidateName: candidate
+          ? `${candidate.firstName} ${candidate.lastName}`
+          : undefined,
+        clientName: client?.companyName,
+        jobTitle: job?.title,
+      },
+      timezone
+    );
 
     const filename = `performance-review-${id}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

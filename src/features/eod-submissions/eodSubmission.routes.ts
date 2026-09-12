@@ -20,10 +20,19 @@ const workEntrySchema = z.object({
 
 const createEodObjectSchema = z.object({
   assignmentId: z.string(),
-  date: z.string().date(),
+  /**
+   * Company business day, `YYYY-MM-DD`. Optional — when omitted the server
+   * derives the company's current day from the configured timezone, which is
+   * the preferred path for VAs submitting from anywhere in the world.
+   */
+  date: z.string().date().optional(),
   shiftStart: z.string().regex(timeRegex, 'Time must be in HH:MM format'),
   shiftEnd: z.string().regex(timeRegex, 'Time must be in HH:MM format'),
-  hoursWorked: z.number().min(0).max(24),
+  /**
+   * Ignored by the server, which recomputes hours from the shift times. Kept in
+   * the schema so older clients that still send it are not rejected.
+   */
+  hoursWorked: z.number().min(0).max(24).optional(),
   summaryOfWork: z.string().optional().nullable(),
   workEntries: z.array(workEntrySchema).optional(),
   pendingTasks: z.string(),
@@ -62,6 +71,13 @@ const router = Router();
 
 router.use(authenticate);
 router.use(requireAppAccess('crm'));
+
+// Must be declared before `/:id` so it is not swallowed by the id route.
+router.get(
+  '/context',
+  requireRoles('admin', 'account_manager', 'client', 'va'),
+  eodController.getEodContext
+);
 
 router.get(
   '/',

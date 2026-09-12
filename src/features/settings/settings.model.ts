@@ -1,4 +1,5 @@
 import { Document, Model, Schema, model } from 'mongoose';
+import { DEFAULT_TIMEZONE, isValidTimeZone } from '../../shared/utils/timezone';
 import type { ISettings } from './settings.types';
 
 export interface ISettingsDocument extends Omit<ISettings, '_id'>, Document {
@@ -47,7 +48,15 @@ const settingsSchema = new Schema<ISettingsDocument, ISettingsModel>(
       type: applicationConfirmationSchema,
       default: () => ({}),
     },
-    companyTimezone: { type: String, default: 'America/New_York' },
+    companyTimezone: {
+      type: String,
+      default: DEFAULT_TIMEZONE,
+      validate: {
+        validator: (v: string) => isValidTimeZone(v),
+        message: (props: { value: string }) =>
+          `"${props.value}" is not a valid IANA timezone`,
+      },
+    },
   },
   { timestamps: true }
 );

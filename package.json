@@ -14,7 +14,9 @@
     "start": "node dist/app.ts",
     "seed:admin": "ts-node src/scripts/seed-admin.ts",
     "seed:demo": "ts-node src/scripts/seed-demo.ts",
-    "migrate:user-permissions": "ts-node src/scripts/migrate-user-permissions.ts"
+    "migrate:user-permissions": "ts-node src/scripts/migrate-user-permissions.ts",
+    "migrate:company-timezone": "ts-node src/scripts/migrate-company-timezone.ts",
+    "migrate:eod-time": "ts-node src/scripts/migrate-eod-time.ts"
   },
   "dependencies": {
     "@sentry/node": "^8.0.0",

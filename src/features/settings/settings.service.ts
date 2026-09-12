@@ -1,4 +1,5 @@
 import { clearAiProviderCache } from '../../shared/utils/ai/index';
+import { clearCompanyTimezoneCache } from '../../shared/utils/companyTimezone';
 import { createLog } from '../activity-logs/activityLog.service';
 import Settings from './settings.model';
 import type { ISettings, UpdateSettingsInput } from './settings.types';
@@ -58,6 +59,9 @@ export const updateSettings = async (
   }
 
   await settings.save();
+
+  // The resolver caches for 60s — drop it so the new value applies immediately.
+  if (input.companyTimezone) clearCompanyTimezoneCache();
 
   createLog({
     action: 'settings_updated',

@@ -144,13 +144,11 @@ export const getEodSubmissionsReport = async (filters: {
   const query: Record<string, any> = {};
 
   if (filters.startDate || filters.endDate) {
-    query.date = {};
-    if (filters.startDate) query.date.$gte = new Date(filters.startDate);
-    if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      query.date.$lte = end;
-    }
+    // `dateKey` is the company business day, so a plain inclusive string range
+    // is exactly the requested day range — no timezone shifting required.
+    query.dateKey = {};
+    if (filters.startDate) query.dateKey.$gte = filters.startDate;
+    if (filters.endDate) query.dateKey.$lte = filters.endDate;
   }
   if (filters.candidateId) query.candidateId = filters.candidateId;
   if (filters.clientId) query.clientId = filters.clientId;

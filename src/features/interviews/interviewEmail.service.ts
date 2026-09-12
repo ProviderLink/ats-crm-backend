@@ -1,10 +1,26 @@
 import { env } from '../../config/env';
+import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
 import { sendEmail } from '../../shared/utils/email';
 import logger from '../../shared/utils/logger';
 import Candidate from '../candidates/candidate.model';
 import Job from '../jobs/job.model';
 import User from '../users/user.model';
 import type { IInterview, IInterviewMeetingDetails } from './interview.types';
+
+/**
+ * Company timezone used when an interview has no explicit timezone.
+ * Resolved from settings (refreshed per batch), with an env fallback.
+ */
+let fallbackTimezone = env.COMPANY_TIMEZONE || 'America/Chicago';
+
+/** Refresh the fallback timezone from settings (best-effort). */
+const refreshTimezoneFallback = async (): Promise<void> => {
+  try {
+    fallbackTimezone = await getCompanyTimezone();
+  } catch {
+    // keep the previous value
+  }
+};
 
 /**
  * Format a date for display in email.
@@ -18,7 +34,7 @@ const formatDateTime = (date: Date | string, timezone?: string): string => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: timezone || env.COMPANY_TIMEZONE,
+    timeZone: timezone || fallbackTimezone,
     timeZoneName: 'short',
   });
 };
@@ -543,6 +559,7 @@ export const sendInterviewScheduledEmails = async (
   interview: IInterview
 ): Promise<void> => {
   try {
+    await refreshTimezoneFallback();
     const ctx = await gatherEmailContext(interview);
     if (!ctx.candidateEmail) {
       logger.warn('Cannot send interview invitation: candidate has no email');
@@ -582,6 +599,7 @@ export const sendInterviewUpdatedEmails = async (
   changes: string[]
 ): Promise<void> => {
   try {
+    await refreshTimezoneFallback();
     const ctx = await gatherEmailContext(interview);
 
     const candidateCtx = {
@@ -621,6 +639,7 @@ export const sendInterviewCancelledEmails = async (
   interview: IInterview
 ): Promise<void> => {
   try {
+    await refreshTimezoneFallback();
     const ctx = await gatherEmailContext(interview);
 
     const candidateCtx = {

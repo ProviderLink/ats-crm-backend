@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import {
+  computeShiftHours,
+  resolveCompanyDay,
+} from '../../shared/utils/companyDay';
 import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
@@ -11,6 +15,29 @@ import type {
   IEodSubmission,
   UpdateEodSubmissionInput,
 } from './eodSubmission.types';
+
+/**
+ * Build a `dateKey` query fragment for the company business-day filters.
+ *
+ * `dateKey` (not `date`) is the field every day comparison uses, because a
+ * `YYYY-MM-DD` string is exactly "which company day" with no timezone
+ * ambiguity. Range filters (dateFrom/dateTo) are likewise plain string
+ * comparisons, which sort lexicographically for this format.
+ */
+function buildDateKeyFilter(
+  date?: string,
+  dateFrom?: string,
+  dateTo?: string
+): Record<string, string> | undefined {
+  if (date) return { $gte: date, $lte: date };
+
+  if (!dateFrom && !dateTo) return undefined;
+
+  const range: Record<string, string> = {};
+  if (dateFrom) range['$gte'] = dateFrom;
+  if (dateTo) range['$lte'] = dateTo;
+  return range;
+}
 
 export const getAllEodSubmissions = async (filters: {
   assignmentId?: string;
@@ -46,30 +73,17 @@ export const getAllEodSubmissions = async (filters: {
     query['candidateId'] = new mongoose.Types.ObjectId(candidateId);
   if (clientId !== undefined)
     query['clientId'] = new mongoose.Types.ObjectId(clientId);
-  if (date !== undefined) {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
-    query['date'] = { $gte: start, $lte: end };
-  } else if (dateFrom !== undefined || dateTo !== undefined) {
-    const range: Record<string, Date> = {};
-    if (dateFrom !== undefined) {
-      const from = new Date(dateFrom);
-      from.setHours(0, 0, 0, 0);
-      range['$gte'] = from;
-    }
-    if (dateTo !== undefined) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
-      range['$lte'] = to;
-    }
-    query['date'] = range;
+  if (date !== undefined || dateFrom !== undefined || dateTo !== undefined) {
+    const dateKeyFilter = buildDateKeyFilter(date, dateFrom, dateTo);
+    if (dateKeyFilter) query['dateKey'] = dateKeyFilter;
   }
 
   const skip = (page - 1) * limit;
   const [eodSubmissions, total] = await Promise.all([
-    EodSubmission.find(query).sort({ date: -1 }).skip(skip).limit(limit),
+    EodSubmission.find(query)
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
     EodSubmission.countDocuments(query),
   ]);
 
@@ -174,6 +188,22 @@ export const getEodSubmissionById = async (
   };
 };
 
+/**
+ * Company-day context for the EOD submission form.
+ *
+ * The form must show the company's business day (and name its timezone) rather
+ * than the VA's local date, otherwise a VA several hours ahead could be told
+ * they are filing for tomorrow. Clients fetch this once and use `dateKey` as
+ * the authoritative day.
+ */
+export const getEodContext = async (): Promise<{
+  dateKey: string;
+  timezone: string;
+}> => {
+  const companyDay = await resolveCompanyDay();
+  return { dateKey: companyDay.dateKey, timezone: companyDay.timezone };
+};
+
 export const createEodSubmission = async (
   input: CreateEodSubmissionInput
 ): Promise<IEodSubmission> => {
@@ -188,29 +218,39 @@ export const createEodSubmission = async (
     );
   }
 
-  const submissionDate = new Date(input.date); // "YYYY-MM-DD" parses as UTC midnight
-  const nextDay = new Date(submissionDate);
-  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  // Resolve the company business day. When the client omits `date` (the
+  // preferred path) this is the company's *current* day, so a VA in any
+  // timezone always files against the day the company is working.
+  const companyDay = await resolveCompanyDay(input.date ?? null);
 
+  // Hours are derived from the shift times rather than trusted from the client:
+  // the VA's device clock and locale must not influence a reported figure.
+  const hoursWorked = computeShiftHours(input.shiftStart, input.shiftEnd);
+
+  // One EOD per assignment per company business day. Matching on `dateKey`
+  // makes the guard timezone-proof; the unique index backs it up so a race
+  // cannot slip a duplicate through.
   const existing = await EodSubmission.findOne({
     assignmentId: input.assignmentId,
-    date: { $gte: submissionDate, $lt: nextDay },
+    dateKey: companyDay.dateKey,
   });
   if (existing)
     throw new AppError(
       409,
       'EOD_ALREADY_SUBMITTED',
-      'EOD already submitted for this assignment today'
+      `EOD already submitted for this assignment on ${companyDay.dateKey} (company time)`
     );
 
   const eodSubmission = await EodSubmission.create({
     assignmentId: new mongoose.Types.ObjectId(input.assignmentId),
     candidateId: assignment.candidateId,
     clientId: assignment.clientId,
-    date: submissionDate,
+    date: companyDay.start,
+    dateKey: companyDay.dateKey,
+    dateTimezone: companyDay.timezone,
     shiftStart: input.shiftStart,
     shiftEnd: input.shiftEnd,
-    hoursWorked: input.hoursWorked,
+    hoursWorked,
     summaryOfWork: input.summaryOfWork ?? null,
     workEntries: input.workEntries ?? [],
     pendingTasks: input.pendingTasks,
@@ -249,8 +289,16 @@ export const updateEodSubmission = async (
   if (input.shiftStart !== undefined)
     eodSubmission.shiftStart = input.shiftStart;
   if (input.shiftEnd !== undefined) eodSubmission.shiftEnd = input.shiftEnd;
-  if (input.hoursWorked !== undefined)
+  // Whenever the shift changes, re-derive the hours server-side so the stored
+  // figure stays consistent with the recorded shift times.
+  if (input.shiftStart !== undefined || input.shiftEnd !== undefined) {
+    eodSubmission.hoursWorked = computeShiftHours(
+      eodSubmission.shiftStart,
+      eodSubmission.shiftEnd
+    );
+  } else if (input.hoursWorked !== undefined) {
     eodSubmission.hoursWorked = input.hoursWorked;
+  }
   if (input.summaryOfWork !== undefined)
     eodSubmission.summaryOfWork = input.summaryOfWork ?? null;
   if (input.workEntries !== undefined)

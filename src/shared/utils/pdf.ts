@@ -1,5 +1,10 @@
 import PDFDocument from 'pdfkit';
 import type { IPerformanceReview } from '../../features/performance-reviews/performanceReview.types';
+import {
+  DEFAULT_TIMEZONE,
+  formatInTimeZone,
+  isValidTimeZone,
+} from './timezone';
 
 const REVIEW_TYPE_LABELS: Record<string, string> = {
   '30_day': '30-Day Review',
@@ -21,10 +26,10 @@ const RATING_LABELS: Record<number, string> = {
 const ratingLabel = (r: number | null | undefined): string =>
   r != null ? `${r} — ${RATING_LABELS[r] ?? ''}` : 'N/A';
 
-const formatDate = (d: unknown): string => {
+const formatDate = (d: unknown, timeZone: string): string => {
   if (!d) return '\u2014';
   try {
-    return new Date(d as string).toLocaleDateString('en-US', {
+    return formatInTimeZone(new Date(d as string), timeZone, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -92,9 +97,13 @@ export const buildReviewPdf = (
     candidateName?: string;
     clientName?: string;
     jobTitle?: string;
-  }
+  },
+  timezone?: string
 ): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
+    const timeZone = isValidTimeZone(timezone)
+      ? (timezone as string)
+      : DEFAULT_TIMEZONE;
     const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -145,7 +154,7 @@ export const buildReviewPdf = (
     const statusLabel = review.status
       ? review.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
       : '—';
-    const reviewPeriod = `${formatDate(review.reviewPeriodStart)} \u2013 ${formatDate(review.reviewPeriodEnd)}`;
+    const reviewPeriod = `${formatDate(review.reviewPeriodStart, timeZone)} \u2013 ${formatDate(review.reviewPeriodEnd, timeZone)}`;
 
     metaRow(doc, 'Candidate (VA)', candidateName, W);
     metaRow(doc, 'Client', clientName, W);
@@ -168,7 +177,7 @@ export const buildReviewPdf = (
       review.finalRecommendation ?? '\u2014',
       W
     );
-    metaRow(doc, 'Generated', formatDate(review.createdAt), W);
+    metaRow(doc, 'Generated', formatDate(review.createdAt, timeZone), W);
 
     doc.moveDown(0.8);
 
@@ -182,7 +191,11 @@ export const buildReviewPdf = (
           .font('Helvetica')
           .fontSize(9.5)
           .fillColor('#222222')
-          .text(ai.roleSummary, 50, doc.y, { align: 'left', width: W, lineGap: 2 });
+          .text(ai.roleSummary, 50, doc.y, {
+            align: 'left',
+            width: W,
+            lineGap: 2,
+          });
         doc.moveDown(0.6);
       }
 
@@ -199,7 +212,12 @@ export const buildReviewPdf = (
             .font('Helvetica')
             .fontSize(9.5)
             .fillColor('#222222')
-            .text(`\u2022  ${resp}`, 50, doc.y, { align: 'left', width: W, indent: 10, lineGap: 2 });
+            .text(`\u2022  ${resp}`, 50, doc.y, {
+              align: 'left',
+              width: W,
+              indent: 10,
+              lineGap: 2,
+            });
         });
         doc.moveDown(0.6);
       }
@@ -211,7 +229,11 @@ export const buildReviewPdf = (
           .font('Helvetica')
           .fontSize(9.5)
           .fillColor('#222222')
-          .text(ai.strengths, 50, doc.y, { align: 'left', width: W, lineGap: 2 });
+          .text(ai.strengths, 50, doc.y, {
+            align: 'left',
+            width: W,
+            lineGap: 2,
+          });
         doc.moveDown(0.6);
       }
 
@@ -222,7 +244,11 @@ export const buildReviewPdf = (
           .font('Helvetica')
           .fontSize(9.5)
           .fillColor('#222222')
-          .text(ai.areasForImprovement, 50, doc.y, { align: 'left', width: W, lineGap: 2 });
+          .text(ai.areasForImprovement, 50, doc.y, {
+            align: 'left',
+            width: W,
+            lineGap: 2,
+          });
         doc.moveDown(0.6);
       }
 
@@ -234,7 +260,12 @@ export const buildReviewPdf = (
             .font('Helvetica')
             .fontSize(9.5)
             .fillColor('#222222')
-            .text(`\u2022  ${goal}`, 50, doc.y, { align: 'left', width: W, indent: 10, lineGap: 2 });
+            .text(`\u2022  ${goal}`, 50, doc.y, {
+              align: 'left',
+              width: W,
+              indent: 10,
+              lineGap: 2,
+            });
         });
         doc.moveDown(0.6);
       }
@@ -246,7 +277,11 @@ export const buildReviewPdf = (
           .font('Helvetica')
           .fontSize(9.5)
           .fillColor('#222222')
-          .text(review.finalManagerSummary, 50, doc.y, { align: 'left', width: W, lineGap: 2 });
+          .text(review.finalManagerSummary, 50, doc.y, {
+            align: 'left',
+            width: W,
+            lineGap: 2,
+          });
         doc.moveDown(0.6);
       }
     }
@@ -279,14 +314,24 @@ export const buildReviewPdf = (
             .font('Helvetica-Bold')
             .fontSize(10)
             .fillColor('#333333')
-            .text(`${cat.categoryName}  \u2014  ${ratingLabel(cat.rating)}`, 50, doc.y, { align: 'left', width: W });
+            .text(
+              `${cat.categoryName}  \u2014  ${ratingLabel(cat.rating)}`,
+              50,
+              doc.y,
+              { align: 'left', width: W }
+            );
 
           if (cat.categoryDescription) {
             doc
               .font('Helvetica-Oblique')
               .fontSize(8.5)
               .fillColor('#666666')
-              .text(cat.categoryDescription, 50, doc.y, { align: 'left', width: W, indent: 10, lineGap: 1 });
+              .text(cat.categoryDescription, 50, doc.y, {
+                align: 'left',
+                width: W,
+                indent: 10,
+                lineGap: 1,
+              });
           }
 
           if (cat.managerComments) {
@@ -294,7 +339,12 @@ export const buildReviewPdf = (
               .font('Helvetica')
               .fontSize(9)
               .fillColor('#555555')
-              .text(cat.managerComments, 50, doc.y, { align: 'left', width: W, indent: 10, lineGap: 1 });
+              .text(cat.managerComments, 50, doc.y, {
+                align: 'left',
+                width: W,
+                indent: 10,
+                lineGap: 1,
+              });
           }
           doc.moveDown(0.4);
         });
@@ -307,7 +357,7 @@ export const buildReviewPdf = (
       .fontSize(8)
       .fillColor('#999999')
       .text(
-        `Generated on ${new Date().toLocaleDateString('en-US', {
+        `Generated on ${formatInTimeZone(new Date(), timeZone, {
           year: 'numeric',
           month: 'long',
           day: 'numeric',

@@ -67,6 +67,13 @@ export const getEodSubmissionById = catchAsync(
   }
 );
 
+export const getEodContext = catchAsync(
+  async (_req: Request, res: Response) => {
+    const context = await eodService.getEodContext();
+    sendSuccess(res, context, 'EOD context retrieved', 200);
+  }
+);
+
 export const createEodSubmission = catchAsync(
   async (req: Request, res: Response) => {
     const body = req.body;

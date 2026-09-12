@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
+import { formatDateKey } from '../../shared/utils/timezone';
 import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
 import Candidate from '../candidates/candidate.model';
@@ -131,6 +133,7 @@ export const generateScorecards = async (
   }
   const activeAssignments = await Assignment.find(assignmentFilter);
   const { weekStart, weekEnd } = getWeekRange(new Date());
+  const companyTimezone = await getCompanyTimezone();
   let generated = 0;
 
   for (const assignment of activeAssignments) {
@@ -160,22 +163,33 @@ export const generateScorecards = async (
       categoryDistribution[cat] = (categoryDistribution[cat] ?? 0) + 1;
     }
 
-    // EOD compliance: how many days had an EOD submission
+    // EOD compliance: how many company business days had a submission.
+    // `dateKeyFrom`/`dateKeyTo` mirror the week window on the company calendar.
+    const dateKeyFrom = formatDateKey(weekStart, companyTimezone);
+    const dateKeyTo = formatDateKey(weekEnd, companyTimezone);
+
     const eodCount = await EodSubmission.countDocuments({
       assignmentId: assignment._id,
-      date: { $gte: weekStart, $lte: weekEnd },
+      dateKey: { $gte: dateKeyFrom, $lte: dateKeyTo },
     });
-    const eodComplianceRate = Math.round((eodCount / DAYS_IN_WEEK) * 100);
+    const eodComplianceRate = Math.min(
+      100,
+      Math.round((eodCount / DAYS_IN_WEEK) * 100)
+    );
 
-    // On-time: EODs submitted on the same day (crude proxy — check createdAt vs date)
+    // On-time = submitted during the company day it reports on. Comparing ISO
+    // dates (rather than parsed local dates) keeps this correct for a VA whose
+    // device is in a different timezone from the company.
     const eodSubmissions = await EodSubmission.find({
       assignmentId: assignment._id,
-      date: { $gte: weekStart, $lte: weekEnd },
+      dateKey: { $gte: dateKeyFrom, $lte: dateKeyTo },
     });
     const onTimeCount = eodSubmissions.filter(eod => {
-      const submissionDay = new Date(eod.createdAt).toDateString();
-      const eodDay = new Date(eod.date).toDateString();
-      return submissionDay === eodDay;
+      const submittedOn = formatDateKey(
+        new Date(eod.createdAt as unknown as Date),
+        companyTimezone
+      );
+      return submittedOn === eod.dateKey;
     }).length;
     const onTimeSubmissionRate =
       eodCount > 0 ? Math.round((onTimeCount / eodCount) * 100) : 0;

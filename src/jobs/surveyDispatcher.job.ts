@@ -1,25 +1,34 @@
-import cron from 'node-cron';
 import os from 'os';
 import { createLog } from '../features/activity-logs/activityLog.service';
 import SurveyReminder from '../features/survey-reminders/surveyReminder.model';
 import User from '../features/users/user.model';
+import { getCompanyTimezone } from '../shared/utils/companyTimezone';
 import { sendEmail } from '../shared/utils/email';
 import logger from '../shared/utils/logger';
+import { getDayRangeInTimeZone } from '../shared/utils/timezone';
+import { scheduleDailyInCompanyTimezone } from './companyScheduler';
 import { acquireLock, releaseLock } from './cronLock';
 
 const JOB_NAME = 'survey-dispatcher';
 const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 
+/** Survey reminders are dispatched at 9:00 AM company time. */
+const SURVEY_HOUR = 9;
+const SURVEY_MINUTE = 0;
+
 async function runSurveyDispatcher(): Promise<void> {
   try {
-    logger.info('Running survey reminder dispatcher');
+    const timeZone = await getCompanyTimezone();
+    logger.info('Running survey reminder dispatcher', { timeZone });
 
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    // End of the company-local calendar day (exclusive), so the boundary does
+    // not depend on the server's timezone.
+    const { end } = getDayRangeInTimeZone(new Date(), timeZone);
+    const endOfToday = new Date(end.getTime() - 1);
 
     const reminders = await SurveyReminder.find({
       status: 'pending',
-      dueDate: { $lte: today },
+      dueDate: { $lte: endOfToday },
     });
 
     for (const reminder of reminders) {
@@ -62,16 +71,23 @@ async function runSurveyDispatcher(): Promise<void> {
 }
 
 export function scheduleSurveyDispatcherJob(): void {
-  cron.schedule('0 9 * * *', async () => {
-    const locked = await acquireLock(JOB_NAME, INSTANCE_ID);
-    if (!locked) {
-      logger.debug('Survey dispatcher skipped — lock held by another instance');
-      return;
+  scheduleDailyInCompanyTimezone(
+    JOB_NAME,
+    SURVEY_HOUR,
+    SURVEY_MINUTE,
+    async () => {
+      const locked = await acquireLock(JOB_NAME, INSTANCE_ID);
+      if (!locked) {
+        logger.debug(
+          'Survey dispatcher skipped — lock held by another instance'
+        );
+        return;
+      }
+      try {
+        await runSurveyDispatcher();
+      } finally {
+        await releaseLock(JOB_NAME);
+      }
     }
-    try {
-      await runSurveyDispatcher();
-    } finally {
-      await releaseLock(JOB_NAME);
-    }
-  });
+  );
 }

@@ -1,34 +1,39 @@
-import cron from 'node-cron';
 import os from 'os';
 import { createLog } from '../features/activity-logs/activityLog.service';
 import Assignment from '../features/assignments/assignment.model';
 import Candidate from '../features/candidates/candidate.model';
 import { createEodReminder } from '../features/eod-reminders/eodReminder.service';
 import EodSubmission from '../features/eod-submissions/eodSubmission.model';
-import Settings from '../features/settings/settings.model';
+import { resolveCompanyDay } from '../shared/utils/companyDay';
 import { sendEmail } from '../shared/utils/email';
 import logger from '../shared/utils/logger';
+import { scheduleDailyInCompanyTimezone } from './companyScheduler';
 import { acquireLock, releaseLock } from './cronLock';
 
 const JOB_NAME = 'eod-compliance';
 const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 
+/** EOD compliance runs at 5:00 PM company time. */
+const EOD_HOUR = 17;
+const EOD_MINUTE = 0;
+
 async function runEodComplianceCheck(): Promise<void> {
   try {
-    const settings = await Settings.getSettings();
-    logger.info('Running EOD compliance check');
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Resolve "today" as the company's business day, using exactly the same
+    // helper the EOD API uses. The two can no longer disagree, which is what
+    // previously caused VAs who had already submitted to be emailed again.
+    const companyDay = await resolveCompanyDay();
+    logger.info('Running EOD compliance check', {
+      dateKey: companyDay.dateKey,
+      timeZone: companyDay.timezone,
+    });
 
     const assignments = await Assignment.find({ status: 'active' });
 
     for (const assignment of assignments) {
       const eodExists = await EodSubmission.findOne({
         assignmentId: assignment._id,
-        date: { $gte: today, $lt: tomorrow },
+        dateKey: companyDay.dateKey,
       });
 
       if (eodExists) continue;
@@ -79,7 +84,7 @@ async function runEodComplianceCheck(): Promise<void> {
 }
 
 export function scheduleEodComplianceJob(): void {
-  cron.schedule('0 17 * * *', async () => {
+  scheduleDailyInCompanyTimezone(JOB_NAME, EOD_HOUR, EOD_MINUTE, async () => {
     const locked = await acquireLock(JOB_NAME, INSTANCE_ID);
     if (!locked) {
       logger.debug(

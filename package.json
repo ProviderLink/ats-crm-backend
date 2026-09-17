@@ -16,8 +16,7 @@
     "seed:demo": "ts-node src/scripts/seed-demo.ts",
     "migrate:user-permissions": "ts-node src/scripts/migrate-user-permissions.ts",
     "migrate:company-timezone": "ts-node src/scripts/migrate-company-timezone.ts",
-    "migrate:eod-time": "ts-node src/scripts/migrate-eod-time.ts",
-    "migrate:legacy-activity-logs": "ts-node src/scripts/migrate-legacy-activity-logs.ts"
+    "migrate:eod-time": "ts-node src/scripts/migrate-eod-time.ts"
   },
   "dependencies": {
     "@sentry/node": "^8.0.0",

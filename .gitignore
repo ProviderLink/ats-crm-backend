@@ -2,6 +2,3 @@ node_modules/
 dist/
 .env
 *.log
-
-# Migration data exports — contain production rows, never commit.
-migration-backups/

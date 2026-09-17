@@ -92,11 +92,6 @@ export interface IActivityLog {
   description: string | null;
   metadata: Record<string, unknown>;
   performedBy: string | null;
-  /** Display name and avatar of `performedBy`, resolved at read time by the
-   * service. `null` when `performedBy` is unset (AI/cron entries) or the user
-   * no longer exists. Never stored on the document. */
-  performerName?: string | null;
-  performerAvatar?: string | null;
   createdAt: Date;
 }
 

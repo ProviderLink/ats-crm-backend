@@ -11,7 +11,7 @@ export const getSettings = catchAsync(async (_req: Request, res: Response) => {
 export const updateSettings = catchAsync(
   async (req: Request, res: Response) => {
     const body = req.body;
-    const settings = await settingsService.updateSettings(body);
+    const settings = await settingsService.updateSettings(body, req.user!._id);
     sendSuccess(res, settings, 'Settings updated', 200);
   }
 );

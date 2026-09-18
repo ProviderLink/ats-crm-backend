@@ -77,7 +77,10 @@ export const getEodContext = catchAsync(
 export const createEodSubmission = catchAsync(
   async (req: Request, res: Response) => {
     const body = req.body;
-    const eodSubmission = await eodService.createEodSubmission(body);
+    const eodSubmission = await eodService.createEodSubmission(
+      body,
+      req.user!._id
+    );
     sendSuccess(res, eodSubmission, 'EOD submitted successfully', 201);
   }
 );
@@ -94,7 +97,7 @@ export const updateEodSubmission = catchAsync(
 export const deleteEodSubmission = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    await eodService.deleteEodSubmission(id);
+    await eodService.deleteEodSubmission(id, req.user!._id);
     sendSuccess(res, null, 'EOD submission deleted', 200);
   }
 );

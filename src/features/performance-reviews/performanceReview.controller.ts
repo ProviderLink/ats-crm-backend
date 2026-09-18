@@ -88,7 +88,7 @@ export const completeReview = catchAsync(
 
 export const deleteReview = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  await reviewService.deleteReview(id);
+  await reviewService.deleteReview(id, req.user!._id);
   sendSuccess(res, null, 'Performance review deleted', 200);
 });
 

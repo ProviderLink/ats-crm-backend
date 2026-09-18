@@ -350,7 +350,10 @@ export const completeReview = async (
   return result;
 };
 
-export const deleteReview = async (id: string): Promise<void> => {
+export const deleteReview = async (
+  id: string,
+  deletedBy?: string | null
+): Promise<void> => {
   const review = await PerformanceReview.findById(id);
   if (!review) {
     throw new AppError(
@@ -366,6 +369,7 @@ export const deleteReview = async (id: string): Promise<void> => {
     action: 'review_deleted',
     resourceType: 'performance_review',
     resourceId: id,
+    performedBy: deletedBy ?? null,
   });
 
   emitToCrm('assignments', 'performanceReview:deleted', { reviewId: id });

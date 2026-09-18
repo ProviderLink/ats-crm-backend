@@ -1,10 +1,21 @@
-import { createLog } from '../features/activity-logs/activityLog.service';
 import Candidate from '../features/candidates/candidate.model';
 import { updateParsedData } from '../features/candidates/candidate.service';
+import { coalesce } from '../shared/utils/coalesce';
 import logger from '../shared/utils/logger';
 import { parseResumeTextWithAI } from '../shared/utils/parseResumeWithAI';
 
-export async function runResumeParsing(candidateId: string): Promise<void> {
+/**
+ * Parse a candidate's resume with AI.
+ *
+ * Wrapped in `coalesce` because several call sites fire this without awaiting
+ * (public apply, internal create, assign-job), so one application could start
+ * three concurrent parses and write three `parsed_data_updated` activities.
+ */
+export function runResumeParsing(candidateId: string): Promise<void> {
+  return coalesce(`parse:${candidateId}`, () => parseResume(candidateId));
+}
+
+async function parseResume(candidateId: string): Promise<void> {
   const candidate = await Candidate.findById(candidateId);
   if (!candidate) return;
 
@@ -54,15 +65,9 @@ export async function runResumeParsing(candidateId: string): Promise<void> {
       experience: result.experience ?? [],
       education: result.education ?? [],
     });
-    await createLog({
-      action: 'parsed_data_updated',
-      resourceType: 'candidate',
-      resourceId: candidateId,
-      metadata: {
-        skillsCount: result.skills?.length ?? 0,
-        experienceCount: result.experience?.length ?? 0,
-      },
-    });
+    // NOTE: no createLog here. `updateParsedData` already writes the
+    // `parsed_data_updated` activity; logging again produced a second, nearly
+    // identical entry in the candidate timeline milliseconds later.
     logger.info('AI resume parsing completed', {
       candidateId,
       skillsCount: result.skills?.length ?? 0,

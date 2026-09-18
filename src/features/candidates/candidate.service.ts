@@ -571,6 +571,15 @@ export const updateCandidateStatus = async (
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
 
   const previousStatus = candidate.status;
+
+  // A no-op transition must not be logged. Callers mirror an application's
+  // phase onto the candidate without first checking the current status, which
+  // produced noise like "changed the candidate status from approved to
+  // approved" in the timeline.
+  if (previousStatus === status) {
+    return candidate.toSafeObject();
+  }
+
   candidate.status = status;
   await candidate.save();
 

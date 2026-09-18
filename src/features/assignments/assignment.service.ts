@@ -149,7 +149,8 @@ export const createAssignment = async (
     String(client._id),
     firstName,
     lastName,
-    clientEmail
+    clientEmail,
+    createdBy
   );
 
   if (inviteToken !== null) {

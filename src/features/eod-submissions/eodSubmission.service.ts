@@ -205,7 +205,8 @@ export const getEodContext = async (): Promise<{
 };
 
 export const createEodSubmission = async (
-  input: CreateEodSubmissionInput
+  input: CreateEodSubmissionInput,
+  submittedBy?: string | null
 ): Promise<IEodSubmission> => {
   const assignment = await Assignment.findById(input.assignmentId);
   if (!assignment)
@@ -273,6 +274,7 @@ export const createEodSubmission = async (
     resourceId: eodSubmission._id.toString(),
     relatedType: 'assignment',
     relatedId: input.assignmentId,
+    performedBy: submittedBy ?? null,
   });
 
   return eodSubmission.toSafeObject();
@@ -319,7 +321,10 @@ export const updateEodSubmission = async (
   return result;
 };
 
-export const deleteEodSubmission = async (id: string): Promise<void> => {
+export const deleteEodSubmission = async (
+  id: string,
+  deletedBy?: string | null
+): Promise<void> => {
   const eodSubmission = await EodSubmission.findById(id);
   if (!eodSubmission)
     throw new AppError(404, 'EOD_NOT_FOUND', 'EOD submission not found');
@@ -332,6 +337,7 @@ export const deleteEodSubmission = async (id: string): Promise<void> => {
     resourceId: id,
     relatedType: 'assignment',
     relatedId: String(eodSubmission.assignmentId),
+    performedBy: deletedBy ?? null,
   });
 
   emitToCrm('assignments', 'eod:deleted', { eodId: id });

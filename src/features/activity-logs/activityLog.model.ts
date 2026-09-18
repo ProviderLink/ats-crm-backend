@@ -25,10 +25,18 @@ const activityLogSchema = new Schema(
   { timestamps: true }
 );
 
-activityLogSchema.index({ resourceType: 1, resourceId: 1 });
+// Indexes.
+//
+// NOTE: `{ resourceType, resourceId }` is deliberately NOT declared here. It
+// is a strict left-prefix of the compound below, so it can never win the
+// planner's choice for any query this collection serves — and a redundant
+// prefix index still costs write throughput and memory. Do not re-add it.
+//
+// `type_1` (an index on the pre-`fa6af42` field name) was dropped by
+// `scripts/cleanup-activity-indexes.ts`; `action` replaced it.
 activityLogSchema.index({ resourceType: 1, resourceId: 1, createdAt: -1 });
-activityLogSchema.index({ performedBy: 1 });
-activityLogSchema.index({ action: 1 });
+activityLogSchema.index({ performedBy: 1, createdAt: -1 });
+activityLogSchema.index({ action: 1, createdAt: -1 });
 activityLogSchema.index({ createdAt: -1 });
 
 activityLogSchema.methods.toSafeObject = function (): IActivityLog {

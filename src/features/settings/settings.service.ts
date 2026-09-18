@@ -10,7 +10,8 @@ export const getSettings = async (): Promise<ISettings> => {
 };
 
 export const updateSettings = async (
-  input: UpdateSettingsInput
+  input: UpdateSettingsInput,
+  updatedBy?: string | null
 ): Promise<ISettings> => {
   const settings = await Settings.getSettings();
 
@@ -67,6 +68,7 @@ export const updateSettings = async (
     action: 'settings_updated',
     resourceType: 'settings',
     resourceId: settings._id.toString(),
+    performedBy: updatedBy ?? null,
   });
 
   return settings.toSafeObject();

@@ -350,7 +350,8 @@ export const sendTeamMemberInvite = async (params: {
 
 export const updateUser = async (
   id: string,
-  input: UpdateUserInput
+  input: UpdateUserInput,
+  updatedBy?: string | null
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
@@ -377,6 +378,7 @@ export const updateUser = async (
     action: 'updated',
     resourceType: 'user',
     resourceId: id,
+    performedBy: updatedBy ?? null,
   });
 
   return user.toSafeObject();
@@ -384,7 +386,8 @@ export const updateUser = async (
 
 export const updatePermissions = async (
   id: string,
-  permissions: UserPermissions
+  permissions: UserPermissions,
+  updatedBy?: string | null
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
@@ -409,12 +412,16 @@ export const updatePermissions = async (
     action: 'permissions_updated',
     resourceType: 'user',
     resourceId: id,
+    performedBy: updatedBy ?? null,
   });
 
   return user.toSafeObject();
 };
 
-export const deactivateUser = async (id: string): Promise<SafeUser> => {
+export const deactivateUser = async (
+  id: string,
+  deactivatedBy?: string | null
+): Promise<SafeUser> => {
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
@@ -425,6 +432,7 @@ export const deactivateUser = async (id: string): Promise<SafeUser> => {
     action: 'deactivated',
     resourceType: 'user',
     resourceId: id,
+    performedBy: deactivatedBy ?? null,
   });
 
   return safeUser;
@@ -449,7 +457,8 @@ export const provisionVA = async (
   candidateId: string,
   firstName: string,
   lastName: string,
-  email: string
+  email: string,
+  createdBy?: string | null
 ): Promise<{ user: SafeUser; inviteToken: string | null }> => {
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
@@ -478,6 +487,7 @@ export const provisionVA = async (
         resourceId: existing._id.toString(),
         relatedType: 'candidate',
         relatedId: candidateId,
+        performedBy: createdBy ?? null,
       });
       return { user: existing.toSafeObject(), inviteToken: newInviteToken };
     }
@@ -524,7 +534,8 @@ export const provisionClient = async (
   clientId: string,
   firstName: string,
   lastName: string,
-  email: string
+  email: string,
+  createdBy?: string | null
 ): Promise<{ user: SafeUser; inviteToken: string | null }> => {
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
@@ -552,6 +563,7 @@ export const provisionClient = async (
         resourceId: existing._id.toString(),
         relatedType: 'client',
         relatedId: clientId,
+        performedBy: createdBy ?? null,
       });
       return { user: existing.toSafeObject(), inviteToken: newInviteToken };
     }
@@ -587,6 +599,7 @@ export const provisionClient = async (
     resourceId: user._id.toString(),
     relatedType: 'client',
     relatedId: clientId,
+    performedBy: createdBy ?? null,
   });
 
   return { user: user.toSafeObject(), inviteToken };
@@ -596,7 +609,10 @@ export const provisionClient = async (
  * Revoke CRM access for a user.
  * Removes 'crm' from appAccess and deactivates the account.
  */
-export const revokeCrmAccess = async (id: string): Promise<SafeUser> => {
+export const revokeCrmAccess = async (
+  id: string,
+  revokedBy?: string | null
+): Promise<SafeUser> => {
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
@@ -609,6 +625,7 @@ export const revokeCrmAccess = async (id: string): Promise<SafeUser> => {
     action: 'revoked_crm',
     resourceType: 'user',
     resourceId: id,
+    performedBy: revokedBy ?? null,
   });
 
   return user.toSafeObject();

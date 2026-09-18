@@ -40,7 +40,8 @@ export const createTag = async (
 
 export const updateTag = async (
   id: string,
-  input: UpdateTagInput
+  input: UpdateTagInput,
+  updatedBy?: string | null
 ): Promise<ITag> => {
   const tag = await Tag.findById(id);
   if (!tag) {
@@ -67,6 +68,7 @@ export const updateTag = async (
     action: 'updated',
     resourceType: 'tag',
     resourceId: id,
+    performedBy: updatedBy ?? null,
   });
 
   const result = tag.toSafeObject();
@@ -74,7 +76,10 @@ export const updateTag = async (
   return result;
 };
 
-export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
+export const deleteTag = async (
+  id: string,
+  deletedBy?: string | null
+): Promise<{ deleted: boolean }> => {
   const tag = await Tag.findById(id);
   if (!tag) {
     throw new AppError(404, 'TAG_NOT_FOUND', 'Tag not found');
@@ -85,6 +90,7 @@ export const deleteTag = async (id: string): Promise<{ deleted: boolean }> => {
     action: 'deleted',
     resourceType: 'tag',
     resourceId: id,
+    performedBy: deletedBy ?? null,
   });
 
   emitToAts('tags', 'tag:deleted', { _id: id });

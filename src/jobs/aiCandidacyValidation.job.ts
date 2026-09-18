@@ -1,4 +1,3 @@
-import { createLog } from '../features/activity-logs/activityLog.service';
 import Candidate from '../features/candidates/candidate.model';
 import { updateAiValidation } from '../features/candidates/candidate.service';
 import { getSettings } from '../features/settings/settings.service';
@@ -7,6 +6,7 @@ import {
   parseJsonResponse,
   withRetry,
 } from '../shared/utils/ai/index';
+import { coalesce } from '../shared/utils/coalesce';
 import logger from '../shared/utils/logger';
 
 /**
@@ -15,10 +15,17 @@ import logger from '../shared/utils/logger';
  * Runs ONCE when a candidate first applies (public apply, status: pending).
  * Determines if the candidate/resume is real or fake/garbage.
  * Result is stored on Candidate.aiValidation.
+ *
+ * Coalesced so the several fire-and-forget call sites cannot race each other
+ * into writing duplicate `ai_validation_updated` activities.
  */
-export async function runCandidacyValidation(
-  candidateId: string
-): Promise<void> {
+export function runCandidacyValidation(candidateId: string): Promise<void> {
+  return coalesce(`candidacy:${candidateId}`, () =>
+    validateCandidacy(candidateId)
+  );
+}
+
+async function validateCandidacy(candidateId: string): Promise<void> {
   const candidate = await Candidate.findById(candidateId);
   if (!candidate) return;
 
@@ -95,16 +102,8 @@ Be conservative — only mark as invalid (isValid: false) if clearly fake/garbag
         reason: result.reason,
         completedAt: new Date(),
       });
-      await createLog({
-        action: 'ai_validation_updated',
-        resourceType: 'candidate',
-        resourceId: candidateId,
-        metadata: {
-          score: result.score,
-          isValid: result.isValid,
-          provider: provider.name,
-        },
-      });
+      // NOTE: no createLog here — `updateAiValidation` already records the
+      // `ai_validation_updated` activity, which doubled the timeline entry.
       logger.info('Candidacy validation completed', {
         candidateId,
         score: result.score,

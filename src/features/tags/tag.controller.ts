@@ -15,12 +15,12 @@ export const createTag = catchAsync(async (req: Request, res: Response) => {
 
 export const updateTag = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const tag = await tagService.updateTag(id, req.body);
+  const tag = await tagService.updateTag(id, req.body, req.user!._id);
   sendSuccess(res, tag, 'Tag updated', 200);
 });
 
 export const deleteTag = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  await tagService.deleteTag(id);
+  await tagService.deleteTag(id, req.user!._id);
   sendSuccess(res, { deleted: true }, 'Tag deleted', 200);
 });

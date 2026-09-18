@@ -1,4 +1,3 @@
-import { createLog } from '../features/activity-logs/activityLog.service';
 import Application from '../features/applications/application.model';
 import { updateAiValidation } from '../features/applications/application.service';
 import Candidate from '../features/candidates/candidate.model';
@@ -9,11 +8,23 @@ import {
   parseJsonResponse,
   withRetry,
 } from '../shared/utils/ai/index';
+import { coalesce } from '../shared/utils/coalesce';
 import logger from '../shared/utils/logger';
 
-export async function runResumeValidation(
-  applicationId: string
-): Promise<void> {
+/**
+ * Validate the application against the job requirements with AI.
+ *
+ * Coalesced: `createApplication` and the apply flow can both start this for the
+ * same application, which previously produced duplicate
+ * `ai_validation_updated` activities.
+ */
+export function runResumeValidation(applicationId: string): Promise<void> {
+  return coalesce(`validate:${applicationId}`, () =>
+    validateResume(applicationId)
+  );
+}
+
+async function validateResume(applicationId: string): Promise<void> {
   const application = await Application.findById(applicationId);
   if (!application) return;
 
@@ -67,16 +78,9 @@ Respond with exactly this JSON structure:
         score: result.score,
         reason: result.reason,
       });
-      await createLog({
-        action: 'ai_validation_updated',
-        resourceType: 'application',
-        resourceId: applicationId,
-        metadata: {
-          score: result.score,
-          isValid: result.isValid,
-          provider: provider.name,
-        },
-      });
+      // NOTE: no createLog here — `updateAiValidation` already records the
+      // `ai_validation_updated` activity. The duplicate was written within the
+      // same millisecond and doubled every row in the timeline.
       logger.info('AI resume validation completed', {
         applicationId,
         score: result.score,

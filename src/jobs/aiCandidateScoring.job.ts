@@ -1,4 +1,3 @@
-import { createLog } from '../features/activity-logs/activityLog.service';
 import Application from '../features/applications/application.model';
 import * as applicationService from '../features/applications/application.service';
 import Candidate from '../features/candidates/candidate.model';
@@ -10,6 +9,7 @@ import {
   parseJsonResponse,
   withRetry,
 } from '../shared/utils/ai/index';
+import { coalesce } from '../shared/utils/coalesce';
 import logger from '../shared/utils/logger';
 
 /**
@@ -19,8 +19,20 @@ import logger from '../shared/utils/logger';
  * Evaluates the candidate's competency for this specific job.
  * Primary result: Application.aiScore
  * Convenience copy: Candidate.aiScore (shows latest score in list views)
+ *
+ * Coalesced per candidate+job: the approve, assign and apply paths can all
+ * trigger scoring for the same pair, which tripled the timeline entry.
  */
-export async function runCandidateScoring(
+export function runCandidateScoring(
+  candidateId: string,
+  jobId: string
+): Promise<void> {
+  return coalesce(`score:${candidateId}:${jobId}`, () =>
+    scoreCandidate(candidateId, jobId)
+  );
+}
+
+async function scoreCandidate(
   candidateId: string,
   jobId: string
 ): Promise<void> {
@@ -106,17 +118,12 @@ Respond with exactly this JSON structure:
       // Also write to Candidate.aiScore (convenience copy for list views)
       await candidateService.updateAiScore(candidateId, scoreData);
 
-      await createLog({
-        action: 'ai_score_updated',
-        resourceType: 'application',
-        resourceId: application._id.toString(),
-        relatedType: 'job',
-        relatedId: jobId,
-        metadata: {
-          score: result.score,
-          recommendation: result.recommendation,
-          provider: provider.name,
-        },
+      // NOTE: no createLog here. Both service calls above record their own
+      // `ai_score_updated` activity, so logging again tripled the entry.
+      logger.info('AI candidate scoring completed', {
+        candidateId,
+        applicationId: application._id.toString(),
+        score: result.score,
       });
       logger.info('AI candidate scoring completed', {
         candidateId,

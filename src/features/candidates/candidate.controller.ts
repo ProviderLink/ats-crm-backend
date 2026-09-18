@@ -301,7 +301,7 @@ export const approveCandidate = catchAsync(
     }
 
     // Change candidate status to approved
-    await candidateService.updateCandidateStatus(id, 'approved');
+    await candidateService.updateCandidateStatus(id, 'approved', updatedBy);
 
     // Create Application — the link between candidate and job.
     const application = await applicationService.createApplication({

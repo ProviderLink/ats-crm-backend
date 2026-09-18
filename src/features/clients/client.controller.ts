@@ -55,7 +55,7 @@ export const updateClient = catchAsync(async (req: Request, res: Response) => {
 
 export const deleteClient = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  await clientService.deleteClient(id);
+  await clientService.deleteClient(id, req.user!._id);
   sendSuccess(res, { deleted: true }, 'Client deleted', 200);
 });
 

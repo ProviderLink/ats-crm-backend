@@ -16,7 +16,12 @@
     "seed:demo": "ts-node src/scripts/seed-demo.ts",
     "migrate:user-permissions": "ts-node src/scripts/migrate-user-permissions.ts",
     "migrate:company-timezone": "ts-node src/scripts/migrate-company-timezone.ts",
-    "migrate:eod-time": "ts-node src/scripts/migrate-eod-time.ts"
+    "migrate:eod-time": "ts-node src/scripts/migrate-eod-time.ts",
+    "migrate:activity-action": "ts-node --transpile-only src/scripts/migrate-activity-action.ts",
+    "migrate:activity-timestamps": "ts-node --transpile-only src/scripts/migrate-activity-timestamps.ts",
+    "backfill:activity-performers": "ts-node --transpile-only src/scripts/backfill-activity-performers.ts",
+    "dedupe:activity-logs": "ts-node --transpile-only src/scripts/dedupe-activity-logs.ts",
+    "cleanup:activity-indexes": "ts-node --transpile-only src/scripts/cleanup-activity-indexes.ts"
   },
   "dependencies": {
     "@sentry/node": "^8.0.0",

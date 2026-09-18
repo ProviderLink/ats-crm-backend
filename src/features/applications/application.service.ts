@@ -153,7 +153,14 @@ export const createApplication = async (
     (input.source === 'internal_upload' || input.source === 'assigned') &&
     !isBlocked
   ) {
-    await candidateService.updateCandidateStatus(input.candidateId, 'approved');
+    // Attribute the derived status change to whoever created the application,
+    // otherwise the candidate timeline shows an unattributed "changed the
+    // candidate status" entry that reads as a system event.
+    await candidateService.updateCandidateStatus(
+      input.candidateId,
+      'approved',
+      input.createdBy ?? null
+    );
   }
 
   if (input.source === 'direct_apply' && !isBlocked) {
@@ -245,7 +252,8 @@ export const approveApplication = async (
 
   await candidateService.updateCandidateStatus(
     String(application.candidateId),
-    'approved'
+    'approved',
+    input.approvedBy
   );
 
   createLog({
@@ -571,7 +579,8 @@ export const hireApplication = async (
 
   await candidateService.updateCandidateStatus(
     String(application.candidateId),
-    'hired'
+    'hired',
+    input.hiredBy
   );
 
   const candidate = await Candidate.findById(application.candidateId);
@@ -583,7 +592,8 @@ export const hireApplication = async (
     String(candidate._id),
     candidate.firstName,
     candidate.lastName,
-    candidate.email
+    candidate.email,
+    input.hiredBy
   );
 
   if (inviteToken !== null) {

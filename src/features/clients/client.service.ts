@@ -343,7 +343,8 @@ export const removeContact = async (
 };
 
 export const deleteClient = async (
-  id: string
+  id: string,
+  deletedBy?: string | null
 ): Promise<{ deleted: boolean }> => {
   const client = await Client.findById(id);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
@@ -366,6 +367,7 @@ export const deleteClient = async (
     action: 'deleted',
     resourceType: 'client',
     resourceId: id,
+    performedBy: deletedBy ?? null,
   });
 
   emitToAts('clients', 'client:deleted', { _id: id });

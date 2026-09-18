@@ -146,7 +146,7 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
 export const updateUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
-  const user = await userService.updateUser(id, body);
+  const user = await userService.updateUser(id, body, req.user!._id);
   sendSuccess(res, user, 'User updated', 200);
 });
 
@@ -169,7 +169,7 @@ export const deactivateUser = catchAsync(
       );
     }
 
-    const user = await userService.deactivateUser(id);
+    const user = await userService.deactivateUser(id, req.user!._id);
     sendSuccess(res, user, 'User deactivated', 200);
   }
 );
@@ -178,7 +178,11 @@ export const updatePermissions = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const body = req.body;
-    const user = await userService.updatePermissions(id, body.permissions);
+    const user = await userService.updatePermissions(
+      id,
+      body.permissions,
+      req.user!._id
+    );
     sendSuccess(res, user, 'Permissions updated', 200);
   }
 );
@@ -202,7 +206,11 @@ export const uploadAvatar = catchAsync(async (req: Request, res: Response) => {
     }
   }
 
-  const updatedUser = await userService.updateUser(userId, { avatar: url });
+  const updatedUser = await userService.updateUser(
+    userId,
+    { avatar: url },
+    userId
+  );
   sendSuccess(res, updatedUser, 'Avatar uploaded', 200);
 });
 
@@ -242,7 +250,8 @@ export const provisionClient = catchAsync(
       clientId,
       firstName,
       lastName,
-      email
+      email,
+      req.user!._id
     );
 
     if (inviteToken) {
@@ -294,7 +303,8 @@ export const provisionVA = catchAsync(async (req: Request, res: Response) => {
     candidateId,
     candidate.firstName,
     candidate.lastName,
-    candidate.email
+    candidate.email,
+    req.user!._id
   );
 
   if (inviteToken) {
@@ -337,7 +347,7 @@ export const revokeCrmAccess = catchAsync(
       );
     }
 
-    const user = await userService.revokeCrmAccess(id);
+    const user = await userService.revokeCrmAccess(id, req.user!._id);
     sendSuccess(res, user, 'CRM access revoked', 200);
   }
 );

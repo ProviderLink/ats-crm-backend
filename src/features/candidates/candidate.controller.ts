@@ -341,10 +341,7 @@ export const changeJob = catchAsync(async (req: Request, res: Response) => {
 
   // Refuse when they already hold an application for the target job, rather
   // than letting the unique index throw a raw duplicate-key error.
-  const existing = await applicationService.findApplication(
-    id,
-    targetJobId
-  );
+  const existing = await applicationService.findApplication(id, targetJobId);
   if (existing) {
     throw new AppError(
       409,
@@ -355,8 +352,7 @@ export const changeJob = catchAsync(async (req: Request, res: Response) => {
 
   if (startStageId && targetJob.pipeline?.stages) {
     const stage = targetJob.pipeline.stages.find(
-      (s: { _id: { toString(): string } }) =>
-        s._id.toString() === startStageId
+      (s: { _id: { toString(): string } }) => s._id.toString() === startStageId
     );
     if (!stage) {
       throw new AppError(

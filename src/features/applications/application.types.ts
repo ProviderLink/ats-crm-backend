@@ -78,13 +78,6 @@ export interface RejectApplicationInput {
   internalNotes?: string;
 }
 
-export interface DisposeApplicationInput {
-  dispositionReasonId: string;
-  destination: 'candidate_pool' | 'permanently_ineligible';
-  internalNotes?: string;
-  performedBy: string;
-}
-
 export interface MoveStageInput {
   stageId: string;
   movedBy: string;

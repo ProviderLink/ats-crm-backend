@@ -480,8 +480,20 @@ export const deleteCandidate = async (
     );
   }
 
+  // Permanent deletion is only allowed from the Ineligible list.
+  // Everywhere else a candidate is closed out by rejecting them, never deleted,
+  // so their history stays intact. This mirrors the UI, which only exposes
+  // Delete on the Ineligible page.
+  if (candidate.eligibilityStatus !== 'permanently_ineligible') {
+    throw new AppError(
+      409,
+      'CANDIDATE_NOT_INELIGIBLE',
+      'Candidates can only be permanently deleted from the Ineligible list. Reject the candidate instead.'
+    );
+  }
+
   // Permanently ineligible — only admins
-  if (candidate.eligibilityStatus === 'permanently_ineligible' && !isAdmin) {
+  if (!isAdmin) {
     throw new AppError(
       403,
       'CANDIDATE_PERMANENTLY_INELIGIBLE',

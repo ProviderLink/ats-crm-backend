@@ -579,11 +579,14 @@ export const updateTalentPool = async (
  *
  * A candidate sitting In Review normally has NO application: a public apply
  * only creates the candidate, and the application is created later, at
- * approval. So this closes the candidate out directly (via the talent-pool /
- * eligibility flags) instead of through an application.
+ * approval. So this closes the candidate out directly via the talent-pool /
+ * eligibility flags, which is what removes them from In Review.
  *
- * Any leftover open application is closed too, so the job board stops
- * showing the candidate in a live pipeline.
+ * It deliberately refuses when the candidate holds a live application. In that
+ * case they are really a pipeline candidate, and applying a destination here
+ * would ban or pool them platform-wide — silently destroying every other job's
+ * pipeline. Callers must use the application-level reject instead, which knows
+ * how to remove them from a single job.
  */
 export const rejectCandidate = async (
   id: string,
@@ -649,58 +652,23 @@ export const rejectCandidate = async (
   const performedById = new mongoose.Types.ObjectId(performedBy);
   const reasonId = new mongoose.Types.ObjectId(input.rejectionReasonId);
 
-  // Defensive: In Review candidates normally have no application, but close
-  // any leftover open one so the job board stays clean.
-  const openApplications = await Application.find({
+  // This endpoint exists for candidates who hold no application — the normal
+  // In Review case. If they DO hold a live application, they are really a
+  // pipeline candidate: closing their applications here would apply the
+  // destination (ban / talent pool) platform-wide and silently destroy every
+  // other job's pipeline. Refuse, and send the caller to the application-level
+  // reject, which knows how to remove them from one job only.
+  const liveApplicationCount = await Application.countDocuments({
     candidateId: id,
     phase: { $in: ['pending', 'approved'] },
   });
 
-  const closedApplicationIds: string[] = [];
-
-  for (const application of openApplications) {
-    if (application.currentStage) {
-      application.lastStage = application.currentStage;
-    } else {
-      application.lastStage = null;
-    }
-    application.currentStage = null;
-    application.phase = 'rejected';
-    application.rejectedAt = now;
-    application.rejectedBy = performedById;
-    application.rejectionReason = reason.label;
-    application.closedAt = now;
-    application.closedBy = performedById;
-    application.dispositionDate = now;
-    application.dispositionReasonId = reasonId;
-    application.dispositionDestination = destination;
-    application.internalNotes = input.internalNotes ?? null;
-    await application.save();
-
-    createLog({
-      action: 'rejected',
-      resourceType: 'application',
-      resourceId: application._id.toString(),
-      relatedType: 'candidate',
-      relatedId: id,
-      metadata: {
-        reason: reason.label,
-        reasonId: input.rejectionReasonId,
-        destination,
-        internalNotes: input.internalNotes ?? null,
-        scope: 'candidate',
-      },
-      performedBy,
-    });
-
-    const appResult = application.toSafeObject();
-    emitToAts('applications', 'application:updated', appResult);
-    emitToAts('applications', 'application:phaseChanged', {
-      _id: appResult._id,
-      phase: 'rejected',
-    });
-
-    closedApplicationIds.push(application._id.toString());
+  if (liveApplicationCount > 0) {
+    throw new AppError(
+      409,
+      'CANDIDATE_HAS_ACTIVE_APPLICATION',
+      'This candidate still has an active application. Reject them from the pipeline so only that job is affected.'
+    );
   }
 
   if (destination === 'permanently_ineligible') {
@@ -729,7 +697,6 @@ export const rejectCandidate = async (
       reasonId: input.rejectionReasonId,
       destination,
       internalNotes: input.internalNotes ?? null,
-      closedApplicationIds,
     },
     performedBy,
   });

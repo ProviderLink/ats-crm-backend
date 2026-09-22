@@ -168,11 +168,18 @@ export const createApplication = async (
     // Attribute the derived status change to whoever created the application,
     // otherwise the candidate timeline shows an unattributed "changed the
     // candidate status" entry that reads as a system event.
-    await candidateService.updateCandidateStatus(
-      input.candidateId,
-      'approved',
-      input.createdBy ?? null
-    );
+    //
+    // A hired candidate must stay hired. Assigning them to a further job is
+    // additive — they join that job's pipeline while remaining an employee —
+    // so mirroring the new phase onto the candidate would silently un-hire
+    // them and hide their CRM access.
+    if (candidate.status !== 'hired') {
+      await candidateService.updateCandidateStatus(
+        input.candidateId,
+        'approved',
+        input.createdBy ?? null
+      );
+    }
   }
 
   if (input.source === 'direct_apply' && !isBlocked) {

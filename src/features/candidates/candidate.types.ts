@@ -84,6 +84,8 @@ export interface ICandidate {
   permanentlyIneligibleAt: Date | null;
   permanentlyIneligibleBy: string | null;
   permanentlyIneligibleReason: string | null;
+  /** Derived, not stored — resolved label for `permanentlyIneligibleReason`. */
+  permanentlyIneligibleReasonLabel?: string | null;
   phoneNormalized: string | null;
   legalHold: boolean;
   crmProfile: ICandidateCrmProfile | null;

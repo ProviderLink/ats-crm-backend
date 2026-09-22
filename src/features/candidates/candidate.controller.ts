@@ -19,6 +19,7 @@ export const getAllCandidates = catchAsync(
     const {
       status,
       inTalentPool: inTalentPoolStr,
+      eligibilityStatus: eligibilityStatusStr,
       search,
       tags: tagsStr,
       page,
@@ -34,6 +35,27 @@ export const getAllCandidates = catchAsync(
         ? includeIneligibleStr === 'true'
         : undefined;
 
+    // Only the two enum values are meaningful; anything else is ignored rather
+    // than passed through as an unmatchable filter.
+    const eligibilityStatus =
+      eligibilityStatusStr === 'eligible' ||
+      eligibilityStatusStr === 'permanently_ineligible'
+        ? eligibilityStatusStr
+        : undefined;
+
+    // Mirror the admin gate on GET /:id — permanently-ineligible candidate
+    // records must not be readable through the list endpoint either.
+    if (
+      eligibilityStatus === 'permanently_ineligible' &&
+      !req.user!.roles.includes('admin')
+    ) {
+      throw new AppError(
+        403,
+        'CANDIDATE_PERMANENTLY_INELIGIBLE',
+        'This candidate is permanently ineligible'
+      );
+    }
+
     const tags =
       tagsStr !== undefined
         ? tagsStr
@@ -45,6 +67,7 @@ export const getAllCandidates = catchAsync(
     const result = await candidateService.getAllCandidates({
       status,
       inTalentPool,
+      eligibilityStatus,
       search,
       tags,
       page: page !== undefined ? Number(page) : undefined,

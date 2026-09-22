@@ -50,6 +50,7 @@ function extractCloudinaryPublicId(
 export const getAllCandidates = async (filters: {
   status?: string;
   inTalentPool?: boolean;
+  eligibilityStatus?: 'eligible' | 'permanently_ineligible';
   search?: string;
   tags?: string[];
   page?: number;
@@ -66,6 +67,7 @@ export const getAllCandidates = async (filters: {
   const {
     status,
     inTalentPool,
+    eligibilityStatus,
     search,
     tags,
     page = 1,
@@ -80,8 +82,14 @@ export const getAllCandidates = async (filters: {
   if (search !== undefined && search.trim() !== '')
     query['$text'] = { $search: search };
 
-  // Default: exclude permanently ineligible candidates unless explicitly requested
-  if (!includeIneligible) {
+  // An explicit eligibilityStatus filter is authoritative — it lets a caller
+  // request ONLY the permanently-ineligible set (the admin Ineligible page),
+  // rather than fetching a mixed page and filtering client-side, which silently
+  // truncated the list once a client had more candidates than the page size.
+  if (eligibilityStatus !== undefined) {
+    query['eligibilityStatus'] = eligibilityStatus;
+  } else if (!includeIneligible) {
+    // Default: exclude permanently ineligible candidates unless requested
     query['eligibilityStatus'] = { $ne: 'permanently_ineligible' };
   }
 
@@ -91,8 +99,42 @@ export const getAllCandidates = async (filters: {
     Candidate.countDocuments(query),
   ]);
 
+  // Resolve disposition-reason labels in one batch — the admin Ineligible list
+  // needs the human label, and the codebase never uses populate(). Inactive or
+  // since-deleted reasons are still resolved so old rows keep their wording.
+  const reasonIds = [
+    ...new Set(
+      candidates
+        .map(
+          c =>
+            (c as unknown as { permanentlyIneligibleReason?: unknown })
+              .permanentlyIneligibleReason
+        )
+        .filter(Boolean)
+        .map(String)
+    ),
+  ];
+  const reasonDocs =
+    reasonIds.length > 0
+      ? await DispositionReason.find({ _id: { $in: reasonIds } }).select(
+          'label'
+        )
+      : [];
+  const reasonLabelMap: Record<string, string> = Object.fromEntries(
+    reasonDocs.map(r => [String(r._id), String(r.label ?? '')])
+  );
+
   return {
-    candidates: candidates.map(c => c.toSafeObject()),
+    candidates: candidates.map(c => {
+      const safe = c.toSafeObject() as ICandidate & {
+        permanentlyIneligibleReasonLabel?: string | null;
+      };
+      const reasonId = safe.permanentlyIneligibleReason;
+      safe.permanentlyIneligibleReasonLabel = reasonId
+        ? (reasonLabelMap[String(reasonId)] ?? null)
+        : null;
+      return safe;
+    }),
     total,
     page,
     limit,

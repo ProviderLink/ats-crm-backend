@@ -18,6 +18,7 @@ import {
   publicParse,
   publicUploadAndParse,
   rejectCandidate,
+  restoreCandidate,
   updateCandidate,
   updateEligibility,
   updateLegalHold,
@@ -274,11 +275,22 @@ const eligibilitySchema = z.object({
   reason: z.string().optional(),
 });
 
+const restoreCandidateSchema = z.object({
+  jobId: z.string().min(1),
+});
+
 router.patch(
   '/:id/eligibility',
   requireRoles('admin'),
   validate(eligibilitySchema, 'body'),
   updateEligibility
+);
+
+router.patch(
+  '/:id/restore',
+  requireRoles('admin'),
+  validate(restoreCandidateSchema, 'body'),
+  restoreCandidate
 );
 
 const legalHoldSchema = z.object({

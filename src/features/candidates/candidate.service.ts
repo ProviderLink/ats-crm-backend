@@ -858,6 +858,66 @@ export const updateAiValidation = async (
   return candidate.toSafeObject();
 };
 
+/**
+ * Restore a permanently ineligible candidate.
+ *
+ * The candidate always needs a job and returns to **In Review** as a normal
+ * pending candidate — exactly like a fresh public applicant. No application is
+ * created here: applications are created at approval, so creating one now would
+ * collide with the unique (candidateId, jobId) index when the candidate is
+ * later approved.
+ */
+export const restoreCandidate = async (
+  id: string,
+  jobId: string,
+  performedBy: string
+): Promise<ICandidate> => {
+  const candidate = await Candidate.findById(id);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  if (candidate.eligibilityStatus !== 'permanently_ineligible') {
+    throw new AppError(
+      400,
+      'CANDIDATE_NOT_INELIGIBLE',
+      'Only a permanently ineligible candidate can be restored'
+    );
+  }
+
+  candidate.eligibilityStatus = 'eligible';
+  candidate.permanentlyIneligibleAt = null;
+  candidate.permanentlyIneligibleBy = null;
+  candidate.permanentlyIneligibleReason = null;
+
+  // Send them back through the normal review flow for the chosen job.
+  candidate.appliedJobId = new mongoose.Types.ObjectId(jobId);
+  candidate.status = 'pending';
+
+  // A restored candidate is not pooled — they are back in the active flow.
+  candidate.inTalentPool = false;
+  candidate.talentPoolAddedAt = null;
+  candidate.talentPoolNotes = null;
+
+  await candidate.save();
+
+  createLog({
+    action: 'eligibility_changed',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: {
+      from: 'permanently_ineligible',
+      to: 'eligible',
+      jobId,
+      restored: true,
+    },
+    performedBy,
+  });
+
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
+};
+
 export const updateCandidateEligibility = async (
   id: string,
   eligibilityStatus: 'eligible' | 'permanently_ineligible',

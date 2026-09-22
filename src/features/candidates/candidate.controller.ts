@@ -259,6 +259,13 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
   // Trigger AI candidate scoring against this job (background)
   runCandidateScoring(id, jobId);
 
+  // Assigning a pooled candidate to a job moves them out of the talent pool
+  // and into the pipeline, so they are not listed in two places at once.
+  const current = await candidateService.getCandidateById(id);
+  if (current?.inTalentPool) {
+    await candidateService.updateTalentPool(id, 'remove', undefined, updatedBy);
+  }
+
   sendSuccess(
     res,
     { candidateId: id, jobId, applicationId: application._id, assigned: true },
@@ -369,12 +376,31 @@ export const updateEligibility = catchAsync(
   }
 );
 
+export const restoreCandidate = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { jobId } = req.body;
+    const performedBy = req.user!._id;
+
+    const job = await getJobById(jobId);
+    if (!job) {
+      throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+    }
+
+    const candidate = await candidateService.restoreCandidate(
+      id,
+      jobId,
+      performedBy
+    );
+    sendSuccess(res, candidate, 'Candidate restored to review', 200);
+  }
+);
+
 export const updateLegalHold = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const { legalHold } = req.body;
     const performedBy = req.user!._id;
-
     const candidate = await candidateService.updateCandidateLegalHold(
       id,
       legalHold,

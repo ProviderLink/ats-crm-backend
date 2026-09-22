@@ -90,6 +90,9 @@ const moveStageSchema = z.object({
 
 const rejectSchema = z.object({
   reason: z.string().optional(),
+  rejectionReasonId: z.string().min(1).optional(),
+  destination: z.enum(['candidate_pool', 'permanently_ineligible']).optional(),
+  internalNotes: z.string().optional(),
 });
 
 const notesSchema = z.object({

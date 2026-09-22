@@ -62,11 +62,15 @@ export const approveApplication = catchAsync(
 export const rejectApplication = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { reason } = req.body ?? {};
+    const { reason, rejectionReasonId, destination, internalNotes } =
+      req.body ?? {};
     const rejectedBy = req.user!._id;
     const application = await applicationService.rejectApplication(id, {
       rejectedBy,
       reason,
+      rejectionReasonId,
+      destination,
+      internalNotes,
     });
     sendSuccess(res, application, 'Application rejected', 200);
   }

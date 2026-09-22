@@ -6,6 +6,7 @@ import logger from '../../shared/utils/logger';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Application from '../applications/application.model';
+import DispositionReason from '../disposition-reasons/dispositionReason.model';
 import Interview from '../interviews/interview.model';
 import Candidate, { normalizePhone } from './candidate.model';
 import type {
@@ -554,6 +555,171 @@ export const updateTalentPool = async (
     resourceType: 'candidate',
     resourceId: id,
     performedBy: performedBy ?? null,
+  });
+
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
+};
+
+/**
+ * Candidate-level reject — used from the "In Review" tab.
+ *
+ * A candidate sitting In Review normally has NO application: a public apply
+ * only creates the candidate, and the application is created later, at
+ * approval. So this closes the candidate out directly (via the talent-pool /
+ * eligibility flags) instead of through an application.
+ *
+ * Any leftover open application is closed too, so the job board stops
+ * showing the candidate in a live pipeline.
+ */
+export const rejectCandidate = async (
+  id: string,
+  input: {
+    rejectionReasonId: string;
+    destination?: 'candidate_pool' | 'permanently_ineligible';
+    internalNotes?: string;
+  },
+  performedBy: string
+): Promise<ICandidate> => {
+  const candidate = await Candidate.findById(id);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  if (candidate.status !== 'pending') {
+    throw new AppError(
+      400,
+      'CANDIDATE_NOT_PENDING',
+      'Only candidates still in review can be rejected here'
+    );
+  }
+
+  if (candidate.eligibilityStatus === 'permanently_ineligible') {
+    throw new AppError(
+      400,
+      'CANDIDATE_ALREADY_INELIGIBLE',
+      'This candidate is already permanently ineligible'
+    );
+  }
+
+  const reason = await DispositionReason.findById(input.rejectionReasonId);
+  if (!reason)
+    throw new AppError(
+      404,
+      'DISPOSITION_REASON_NOT_FOUND',
+      'Rejection reason not found'
+    );
+  if (!reason.isActive)
+    throw new AppError(
+      400,
+      'DISPOSITION_REASON_INACTIVE',
+      'This rejection reason is no longer active'
+    );
+
+  if (
+    reason.requireInternalNotes &&
+    (!input.internalNotes || input.internalNotes.trim() === '')
+  ) {
+    throw new AppError(
+      422,
+      'INTERNAL_NOTES_REQUIRED',
+      'Internal notes are required for this rejection reason'
+    );
+  }
+
+  // A reason in the permanently-ineligible category always wins.
+  const destination =
+    reason.defaultEligibility === 'permanently_ineligible'
+      ? 'permanently_ineligible'
+      : (input.destination ?? 'candidate_pool');
+
+  const now = new Date();
+  const performedById = new mongoose.Types.ObjectId(performedBy);
+  const reasonId = new mongoose.Types.ObjectId(input.rejectionReasonId);
+
+  // Defensive: In Review candidates normally have no application, but close
+  // any leftover open one so the job board stays clean.
+  const openApplications = await Application.find({
+    candidateId: id,
+    phase: { $in: ['pending', 'approved'] },
+  });
+
+  const closedApplicationIds: string[] = [];
+
+  for (const application of openApplications) {
+    if (application.currentStage) {
+      application.lastStage = application.currentStage;
+    } else {
+      application.lastStage = null;
+    }
+    application.currentStage = null;
+    application.phase = 'rejected';
+    application.rejectedAt = now;
+    application.rejectedBy = performedById;
+    application.rejectionReason = reason.label;
+    application.closedAt = now;
+    application.closedBy = performedById;
+    application.dispositionDate = now;
+    application.dispositionReasonId = reasonId;
+    application.dispositionDestination = destination;
+    application.internalNotes = input.internalNotes ?? null;
+    await application.save();
+
+    createLog({
+      action: 'rejected',
+      resourceType: 'application',
+      resourceId: application._id.toString(),
+      relatedType: 'candidate',
+      relatedId: id,
+      metadata: {
+        reason: reason.label,
+        reasonId: input.rejectionReasonId,
+        destination,
+        internalNotes: input.internalNotes ?? null,
+        scope: 'candidate',
+      },
+      performedBy,
+    });
+
+    const appResult = application.toSafeObject();
+    emitToAts('applications', 'application:updated', appResult);
+    emitToAts('applications', 'application:phaseChanged', {
+      _id: appResult._id,
+      phase: 'rejected',
+    });
+
+    closedApplicationIds.push(application._id.toString());
+  }
+
+  if (destination === 'permanently_ineligible') {
+    candidate.eligibilityStatus = 'permanently_ineligible';
+    candidate.permanentlyIneligibleAt = now;
+    candidate.permanentlyIneligibleBy = performedById;
+    candidate.permanentlyIneligibleReason = reasonId;
+    // A banned candidate is never also in the talent pool.
+    candidate.inTalentPool = false;
+    candidate.talentPoolAddedAt = null;
+    candidate.talentPoolNotes = null;
+  } else {
+    candidate.inTalentPool = true;
+    candidate.talentPoolAddedAt = now;
+    candidate.talentPoolNotes = input.internalNotes ?? null;
+  }
+
+  await candidate.save();
+
+  createLog({
+    action: 'rejected',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: {
+      reason: reason.label,
+      reasonId: input.rejectionReasonId,
+      destination,
+      internalNotes: input.internalNotes ?? null,
+      closedApplicationIds,
+    },
+    performedBy,
   });
 
   const result = candidate.toSafeObject();

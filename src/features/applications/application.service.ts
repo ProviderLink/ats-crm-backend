@@ -291,6 +291,61 @@ export const rejectApplication = async (
     );
   }
 
+  const performedById = new mongoose.Types.ObjectId(input.rejectedBy);
+  const now = new Date();
+
+  // ── A candidate still live on another job keeps that job untouched ──
+  // Banning or pooling them here would silently destroy the other pipeline,
+  // so a non-final reject is a plain "remove from this job" with no
+  // platform-wide side effects.
+  const otherLiveApplications = await Application.countDocuments({
+    candidateId: application.candidateId,
+    _id: { $ne: application._id },
+    phase: { $in: ['pending', 'approved'] },
+  });
+  const isFinalReject = otherLiveApplications === 0;
+
+  // ── Resolve the structured reason (optional) ──
+  let reasonLabel: string | null = input.reason?.trim() || null;
+  let reasonId: mongoose.Types.ObjectId | null = null;
+  let destination: 'candidate_pool' | 'permanently_ineligible' | null = null;
+
+  if (isFinalReject && input.rejectionReasonId) {
+    const reason = await DispositionReason.findById(input.rejectionReasonId);
+    if (!reason) {
+      throw new AppError(
+        404,
+        'DISPOSITION_REASON_NOT_FOUND',
+        'Disposition reason not found'
+      );
+    }
+    if (!reason.isActive) {
+      throw new AppError(
+        400,
+        'DISPOSITION_REASON_INACTIVE',
+        'This disposition reason is no longer active'
+      );
+    }
+    if (
+      reason.requireInternalNotes &&
+      (!input.internalNotes || input.internalNotes.trim() === '')
+    ) {
+      throw new AppError(
+        422,
+        'INTERNAL_NOTES_REQUIRED',
+        'Internal notes are required for this disposition reason'
+      );
+    }
+
+    reasonId = new mongoose.Types.ObjectId(input.rejectionReasonId);
+    reasonLabel = reason.label;
+    // A reason in the permanently-ineligible category always wins.
+    destination =
+      reason.defaultEligibility === 'permanently_ineligible'
+        ? 'permanently_ineligible'
+        : (input.destination ?? 'candidate_pool');
+  }
+
   // Preserve the last pipeline stage for historical reference.
   if (application.currentStage) {
     application.lastStage = application.currentStage;
@@ -300,9 +355,19 @@ export const rejectApplication = async (
   application.currentStage = null;
 
   application.phase = 'rejected';
-  application.rejectedAt = new Date();
-  application.rejectedBy = new mongoose.Types.ObjectId(input.rejectedBy);
-  application.rejectionReason = input.reason?.trim() || null;
+  application.rejectedAt = now;
+  application.rejectedBy = performedById;
+  application.rejectionReason = reasonLabel;
+
+  // Disposition payload — only when this was the candidate's last live job.
+  if (destination) {
+    application.closedAt = now;
+    application.closedBy = performedById;
+    application.dispositionDate = now;
+    application.dispositionReasonId = reasonId;
+    application.dispositionDestination = destination;
+    application.internalNotes = input.internalNotes ?? null;
+  }
 
   await application.save();
 
@@ -312,9 +377,55 @@ export const rejectApplication = async (
     resourceId: id,
     relatedType: 'candidate',
     relatedId: String(application.candidateId),
-    metadata: { reason: application.rejectionReason },
+    metadata: {
+      reason: application.rejectionReason,
+      reasonId: input.rejectionReasonId ?? null,
+      destination,
+      internalNotes: input.internalNotes ?? null,
+      isFinalReject,
+    },
     performedBy: input.rejectedBy,
   });
+
+  // ── Candidate side-effects — only on the final (decisive) reject ──
+  // A candidate is never moved to Talent Pool or Ineligible automatically on a
+  // non-final reject; that only happens when the destination is explicitly
+  // chosen, which the UI offers exclusively on the last live application.
+  if (destination) {
+    await candidateService.updateTalentPool(
+      String(application.candidateId),
+      destination === 'candidate_pool' ? 'add' : 'remove',
+      destination === 'candidate_pool'
+        ? (input.internalNotes ?? undefined)
+        : undefined,
+      input.rejectedBy
+    );
+
+    if (destination === 'permanently_ineligible') {
+      await candidateService.updateCandidateEligibility(
+        String(application.candidateId),
+        'permanently_ineligible',
+        input.rejectionReasonId,
+        input.rejectedBy
+      );
+    }
+
+    createLog({
+      action: 'disposition',
+      resourceType: 'candidate',
+      resourceId: String(application.candidateId),
+      relatedType: 'application',
+      relatedId: id,
+      metadata: {
+        destination,
+        reasonId: input.rejectionReasonId ?? null,
+        reasonLabel,
+        lastStage: application.lastStage?.stageName ?? null,
+        internalNotes: input.internalNotes ?? null,
+      },
+      performedBy: input.rejectedBy,
+    });
+  }
 
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);

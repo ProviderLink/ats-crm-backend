@@ -178,6 +178,20 @@ export const updateTalentPool = catchAsync(
   }
 );
 
+export const rejectCandidate = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { rejectionReasonId, destination, internalNotes } = req.body;
+    const performedBy = req.user!._id;
+    const candidate = await candidateService.rejectCandidate(
+      id,
+      { rejectionReasonId, destination, internalNotes },
+      performedBy
+    );
+    sendSuccess(res, candidate, 'Candidate rejected', 200);
+  }
+);
+
 export const assignJob = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { jobId, startStageId } = req.body;

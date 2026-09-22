@@ -17,6 +17,7 @@ import {
   getCandidateById,
   publicParse,
   publicUploadAndParse,
+  rejectCandidate,
   updateCandidate,
   updateEligibility,
   updateLegalHold,
@@ -144,6 +145,16 @@ const talentPoolSchema = z.object({
   notes: z.string().optional(),
 });
 
+const rejectCandidateSchema = z
+  .object({
+    rejectionReasonId: z.string().min(1),
+    destination: z
+      .enum(['candidate_pool', 'permanently_ineligible'])
+      .optional(),
+    internalNotes: z.string().optional(),
+  })
+  .strict();
+
 const assignJobSchema = z.object({
   jobId: z.string().optional(),
   startStageId: z.string().optional(),
@@ -249,6 +260,13 @@ router.patch(
   requirePermission('candidates', 'write'),
   validate(talentPoolSchema),
   updateTalentPool
+);
+
+router.patch(
+  '/:id/reject',
+  requirePermission('candidates', 'write'),
+  validate(rejectCandidateSchema, 'body'),
+  rejectCandidate
 );
 
 const eligibilitySchema = z.object({

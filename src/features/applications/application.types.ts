@@ -69,7 +69,13 @@ export interface ApproveApplicationInput {
 
 export interface RejectApplicationInput {
   rejectedBy: string;
+  /** Legacy free-text reason — still accepted and stored as rejectionReason. */
   reason?: string;
+  /** Structured reason. When supplied, the application is closed with the full
+   * disposition payload and the candidate is routed to the chosen destination. */
+  rejectionReasonId?: string;
+  destination?: 'candidate_pool' | 'permanently_ineligible';
+  internalNotes?: string;
 }
 
 export interface DisposeApplicationInput {

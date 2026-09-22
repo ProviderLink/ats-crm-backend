@@ -76,6 +76,14 @@ export interface RejectApplicationInput {
   rejectionReasonId?: string;
   destination?: 'candidate_pool' | 'permanently_ineligible';
   internalNotes?: string;
+  /**
+   * Set by the composite change-job flow. The application is closed the same
+   * way, but the activity entry records `job_changed` instead of `rejected`,
+   * so a move is never shown as a rejection and no destination is applied.
+   */
+  isJobMove?: boolean;
+  /** Title of the job the candidate moved to. Only used when isJobMove. */
+  movedToJobTitle?: string;
 }
 
 export interface MoveStageInput {

@@ -27,13 +27,17 @@ export const getAllLogs = catchAsync(async (req: Request, res: Response) => {
 export const getResourceLogs = catchAsync(
   async (req: Request, res: Response) => {
     const { resourceType, resourceId } = req.params;
-    const { page, limit } = req.query as Record<string, string | undefined>;
+    const { page, limit, includeRelated } = req.query as Record<
+      string,
+      string | undefined
+    >;
 
     const result = await activityLogService.getResourceLogs(
       resourceType,
       resourceId,
       page !== undefined ? Number(page) : undefined,
-      limit !== undefined ? Number(limit) : undefined
+      limit !== undefined ? Number(limit) : undefined,
+      includeRelated === 'true'
     );
 
     sendSuccess(res, result.logs, 'Resource activity logs retrieved', 200, {

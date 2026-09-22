@@ -37,6 +37,9 @@ export type ActivityAction =
   | 'stage_changed'
   | 'notes_updated'
   | 'disposition'
+  // A candidate moved from one job to another. Distinct from 'rejected' so a
+  // move never renders as a rejection on the application card or job board.
+  | 'job_changed'
   // ── Interview (logged under application resource) ──────
   | 'interview_scheduled'
   | 'interview_updated'

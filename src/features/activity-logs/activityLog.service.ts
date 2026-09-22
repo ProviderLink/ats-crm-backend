@@ -74,7 +74,15 @@ export const getResourceLogs = async (
   resourceType: string,
   resourceId: string,
   page = 1,
-  limit = 50
+  limit = 50,
+  /**
+   * Also return entries that POINT AT this entity rather than belonging to it.
+   *
+   * A rejection is stored against the application with `relatedType: candidate`
+   * / `relatedId: <candidateId>`, so a candidate-scoped query alone would miss
+   * it and the candidate history panel would never show rejections or hires.
+   */
+  includeRelated = false
 ): Promise<{
   logs: IActivityLog[];
   total: number;
@@ -82,7 +90,14 @@ export const getResourceLogs = async (
   limit: number;
   totalPages: number;
 }> => {
-  const query = { resourceType, resourceId };
+  const query = includeRelated
+    ? {
+        $or: [
+          { resourceType, resourceId },
+          { relatedType: resourceType, relatedId: resourceId },
+        ],
+      }
+    : { resourceType, resourceId };
   const skip = (page - 1) * limit;
   const [logs, total] = await Promise.all([
     ActivityLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),

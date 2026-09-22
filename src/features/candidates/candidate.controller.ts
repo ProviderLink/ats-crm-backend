@@ -393,6 +393,8 @@ export const changeJob = catchAsync(async (req: Request, res: Response) => {
   try {
     await applicationService.rejectApplication(currentApplication._id, {
       rejectedBy: updatedBy,
+      isJobMove: true,
+      movedToJobTitle: targetJob.title,
       reason: `Moved to ${targetJob.title}`,
     });
   } catch (err) {

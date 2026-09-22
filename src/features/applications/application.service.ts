@@ -336,12 +336,18 @@ export const rejectApplication = async (
   });
   const isFinalReject = otherLiveApplications === 0;
 
-  // ── Resolve the structured reason (optional) ──
+  // ── Resolve the structured reason ──
+  //
+  // The reason is recorded on EVERY reject, final or not: a recruiter who
+  // picks "Not enough experience" expects to see it on the application, and
+  // discarding it loses the only durable record of why someone was removed
+  // from a job. Only the DESTINATION (ban / talent pool) is restricted to a
+  // final reject, because applying it would affect the candidate platform-wide.
   let reasonLabel: string | null = input.reason?.trim() || null;
   let reasonId: mongoose.Types.ObjectId | null = null;
   let destination: 'candidate_pool' | 'permanently_ineligible' | null = null;
 
-  if (isFinalReject && input.rejectionReasonId) {
+  if (input.rejectionReasonId) {
     const reason = await DispositionReason.findById(input.rejectionReasonId);
     if (!reason) {
       throw new AppError(
@@ -370,11 +376,15 @@ export const rejectApplication = async (
 
     reasonId = new mongoose.Types.ObjectId(input.rejectionReasonId);
     reasonLabel = reason.label;
-    // A reason in the permanently-ineligible category always wins.
-    destination =
-      reason.defaultEligibility === 'permanently_ineligible'
-        ? 'permanently_ineligible'
-        : (input.destination ?? 'candidate_pool');
+
+    // Only a final reject routes the candidate anywhere.
+    if (isFinalReject) {
+      // A reason in the permanently-ineligible category always wins.
+      destination =
+        reason.defaultEligibility === 'permanently_ineligible'
+          ? 'permanently_ineligible'
+          : (input.destination ?? 'candidate_pool');
+    }
   }
 
   // Preserve the last pipeline stage for historical reference.
@@ -403,7 +413,7 @@ export const rejectApplication = async (
   await application.save();
 
   createLog({
-    action: 'rejected',
+    action: input.isJobMove ? 'job_changed' : 'rejected',
     resourceType: 'application',
     resourceId: id,
     relatedType: 'candidate',
@@ -414,6 +424,9 @@ export const rejectApplication = async (
       destination,
       internalNotes: input.internalNotes ?? null,
       isFinalReject,
+      ...(input.isJobMove
+        ? { movedToJobTitle: input.movedToJobTitle ?? null }
+        : {}),
     },
     performedBy: input.rejectedBy,
   });

@@ -131,6 +131,16 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
   }
 
+  // Optional work samples — a link, a file, or neither. Never required, since
+  // only some roles (e.g. design) have a portfolio to show.
+  let portfolioFileUrl: string | null = null;
+  let portfolioFileName: string | null = null;
+  if (req.portfolioFile) {
+    const uploaded = await uploadToCloudinary(req.portfolioFile, 'portfolios');
+    portfolioFileUrl = uploaded.url;
+    portfolioFileName = req.portfolioFile.originalname;
+  }
+
   let candidateId = body.candidateId;
 
   // If candidateId is provided, update the existing candidate with reviewed data
@@ -179,6 +189,9 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
           resumeOriginalName,
           resumeRawText,
           videoIntroUrl: body.videoIntroUrl ?? null,
+          portfolioUrl: body.portfolioUrl ?? null,
+          portfolioFileUrl,
+          portfolioFileName,
           yearsOfExperience: body.yearsOfExperience ?? 0,
           englishProficiency: body.englishProficiency ?? null,
           currentSalaryPHP: body.currentSalaryPHP ?? null,

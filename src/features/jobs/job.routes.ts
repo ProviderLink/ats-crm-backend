@@ -5,7 +5,7 @@ import {
   requireAppAccess,
   requirePermission,
 } from '../../shared/middleware/authorize';
-import { uploadResume } from '../../shared/middleware/upload';
+import { uploadResumeWithPortfolio } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import { PIPELINE_STAGE_ICONS } from '../pipeline-templates/pipelineTemplate.types';
 import {
@@ -121,6 +121,7 @@ const applyToJobSchema = z.object({
   resumeOriginalName: z.string().optional(),
   resumeRawText: z.string().optional(),
   videoIntroUrl: z.string().url().optional().nullable(),
+  portfolioUrl: z.string().url().optional().nullable(),
   yearsOfExperience: z.coerce.number().min(0).optional(),
   englishProficiency: z
     .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
@@ -186,7 +187,12 @@ const router = Router();
 // Public routes — must be registered before authenticate middleware
 router.get('/', getAllJobs);
 router.get('/:id', getJobById);
-router.post('/:id/apply', uploadResume, validate(applyToJobSchema), applyToJob);
+router.post(
+  '/:id/apply',
+  uploadResumeWithPortfolio,
+  validate(applyToJobSchema),
+  applyToJob
+);
 
 router.use(authenticate);
 router.use(requireAppAccess('ats'));

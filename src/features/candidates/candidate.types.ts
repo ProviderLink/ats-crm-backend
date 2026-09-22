@@ -58,6 +58,9 @@ export interface ICandidate {
   resumeRawText: string;
   videoIntroUrl: string | null;
   videoIntroSource: string | null;
+  portfolioUrl: string | null;
+  portfolioFileUrl: string | null;
+  portfolioFileName: string | null;
   parsedData: ICandidateParsedData | null;
   aiValidation: ICandidateAiValidation | null;
   aiScore: ICandidateAiScore | null;
@@ -105,6 +108,9 @@ export interface CreateCandidateInput {
   resumeRawText?: string;
   videoIntroUrl?: string | null;
   videoIntroSource?: string | null;
+  portfolioUrl?: string | null;
+  portfolioFileUrl?: string | null;
+  portfolioFileName?: string | null;
   yearsOfExperience?: number;
   englishProficiency?:
     | 'basic'

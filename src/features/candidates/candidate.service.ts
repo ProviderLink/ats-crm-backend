@@ -16,7 +16,10 @@ import InterviewScorecard from '../interview-scorecards/interview-scorecard.mode
 import Interview from '../interviews/interview.model';
 import PerformanceReview from '../performance-reviews/performanceReview.model';
 import WorkEntry from '../work-entries/workEntry.model';
-import Candidate, { normalizePhone } from './candidate.model';
+import Candidate, {
+  normalizePhone,
+  type ICandidateDocument,
+} from './candidate.model';
 import type {
   CreateCandidateInput,
   ICandidate,
@@ -170,6 +173,37 @@ export const getCandidateByEmail = async (
  * Returns {candidate, isExisting} so callers can react to pre-existing profiles.
  * This is the single entry point for both internal and public candidate creation.
  */
+/**
+ * Merge portfolio input onto an existing candidate on re-apply.
+ *
+ * Only overwrites what the applicant actually supplied, and deletes the
+ * superseded Cloudinary file so re-applicants don't accumulate orphans.
+ */
+async function applyPortfolioToExisting(
+  existing: ICandidateDocument,
+  input: CreateCandidateInput
+): Promise<void> {
+  if (input.portfolioUrl !== undefined && input.portfolioUrl !== null) {
+    existing.portfolioUrl = input.portfolioUrl;
+  }
+
+  if (
+    input.portfolioFileUrl !== undefined &&
+    input.portfolioFileUrl !== null &&
+    input.portfolioFileUrl !== existing.portfolioFileUrl
+  ) {
+    if (existing.portfolioFileUrl) {
+      const oldPublicId = extractCloudinaryPublicId(
+        existing.portfolioFileUrl,
+        'raw'
+      );
+      if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
+    }
+    existing.portfolioFileUrl = input.portfolioFileUrl;
+    existing.portfolioFileName = input.portfolioFileName ?? null;
+  }
+}
+
 export const findOrCreateCandidate = async (
   input: CreateCandidateInput,
   createdBy: string | null
@@ -193,6 +227,7 @@ export const findOrCreateCandidate = async (
       byEmail.resumeOriginalName = input.resumeOriginalName;
       byEmail.resumeRawText = input.resumeRawText;
     }
+    await applyPortfolioToExisting(byEmail, input);
     // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
     if (input.parsedData) {
       byEmail.parsedData = input.parsedData;
@@ -226,6 +261,7 @@ export const findOrCreateCandidate = async (
         byPhone.resumeOriginalName = input.resumeOriginalName;
         byPhone.resumeRawText = input.resumeRawText;
       }
+      await applyPortfolioToExisting(byPhone, input);
       // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
       if (input.parsedData) {
         byPhone.parsedData = input.parsedData;
@@ -254,6 +290,9 @@ export const findOrCreateCandidate = async (
     resumeRawText: input.resumeRawText ?? '',
     videoIntroUrl: input.videoIntroUrl ?? null,
     videoIntroSource: input.videoIntroSource ?? null,
+    portfolioUrl: input.portfolioUrl ?? null,
+    portfolioFileUrl: input.portfolioFileUrl ?? null,
+    portfolioFileName: input.portfolioFileName ?? null,
     yearsOfExperience: input.yearsOfExperience ?? 0,
     englishProficiency: input.englishProficiency ?? null,
     currentSalaryPHP: input.currentSalaryPHP ?? null,
@@ -324,6 +363,9 @@ export const createCandidate = async (
     resumeRawText: input.resumeRawText ?? '',
     videoIntroUrl: input.videoIntroUrl ?? null,
     videoIntroSource: input.videoIntroSource ?? null,
+    portfolioUrl: input.portfolioUrl ?? null,
+    portfolioFileUrl: input.portfolioFileUrl ?? null,
+    portfolioFileName: input.portfolioFileName ?? null,
     yearsOfExperience: input.yearsOfExperience ?? 0,
     englishProficiency: input.englishProficiency ?? null,
     currentSalaryPHP: input.currentSalaryPHP ?? null,
@@ -553,6 +595,14 @@ export const deleteCandidate = async (
 
   if (candidate.resumeUrl) {
     const publicId = extractCloudinaryPublicId(candidate.resumeUrl, 'raw');
+    if (publicId) await deleteFromCloudinary(publicId, 'raw');
+  }
+
+  if (candidate.portfolioFileUrl) {
+    const publicId = extractCloudinaryPublicId(
+      candidate.portfolioFileUrl,
+      'raw'
+    );
     if (publicId) await deleteFromCloudinary(publicId, 'raw');
   }
 

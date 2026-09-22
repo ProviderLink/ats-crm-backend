@@ -120,6 +120,11 @@ const candidateSchema = new Schema(
       default: null,
     },
 
+    // Optional work samples — a link, an uploaded file, or both. Never required.
+    portfolioUrl: { type: String, default: null },
+    portfolioFileUrl: { type: String, default: null },
+    portfolioFileName: { type: String, default: null },
+
     parsedData: { type: parsedDataSchema, default: null },
     aiValidation: { type: aiValidationSchema, default: null },
     aiScore: { type: aiScoreSchema, default: null },

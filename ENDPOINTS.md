@@ -136,3 +136,37 @@ Upload an avatar image (multipart form).
 ### `PATCH /:id/talent-pool`
 
 Add or remove a candidate from the talent pool. Body: `{ action: 'add' | 'remove', notes?: string }`.
+
+## Portfolio (work samples)
+
+A candidate may submit work samples — a **link**, an **uploaded file**, or
+**both**. It is always **optional**: only some roles (e.g. graphic design) have
+a portfolio worth showing, so it must never block an application. It is
+collected on the **public apply form only**; the internal quick-import flow
+does not ask for it.
+
+Stored on the candidate document:
+
+| Field               | Type           | Notes                                                      |
+| ------------------- | -------------- | ---------------------------------------------------------- |
+| `portfolioUrl`      | string \| null | External link (Behance, Dribbble, Drive, personal site, …) |
+| `portfolioFileUrl`  | string \| null | Cloudinary URL in `ats/portfolios` (`resource_type: raw`)  |
+| `portfolioFileName` | string \| null | Original upload name, used for the download filename       |
+
+### Sending it
+
+`POST /api/v1/ats/jobs/:id/apply` (multipart form) accepts:
+
+- `portfolioUrl` — plain form field, must be a valid URL.
+- `portfolioFile` — file part. Accepted types: PDF, ZIP, or image
+  (JPEG/PNG/WebP/GIF); max 10 MB.
+
+On re-apply by a known candidate (email or phone match), a newly supplied
+`portfolioUrl` / `portfolioFile` overwrites the stored value, and the
+superseded Cloudinary asset is deleted so re-applicants don't accumulate
+orphans. Omitted fields leave the existing values untouched.
+
+The portfolio file is uploaded to Cloudinary at **final submit**, not during
+the stateless parse step — the same rule the resume follows, so abandoned
+applications leave no orphan files. Deleting a candidate removes its portfolio
+file from Cloudinary alongside the resume and avatar.

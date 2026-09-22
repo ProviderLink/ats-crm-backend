@@ -10,9 +10,10 @@ cloudinary.config({
 
 export const uploadToCloudinary = async (
   file: Express.Multer.File,
-  folder: 'resumes' | 'avatars' | 'logos'
+  folder: 'resumes' | 'avatars' | 'logos' | 'portfolios'
 ): Promise<{ url: string; publicId: string }> => {
-  const resourceType = folder === 'resumes' ? 'raw' : 'image';
+  const resourceType =
+    folder === 'resumes' || folder === 'portfolios' ? 'raw' : 'image';
   try {
     const result = await new Promise<{ secure_url: string; public_id: string }>(
       (resolve, reject) => {

@@ -3,6 +3,8 @@ export {};
 declare global {
   namespace Express {
     interface Request {
+      /** Optional portfolio attachment on the public apply flow. */
+      portfolioFile?: Express.Multer.File;
       user?: {
         _id: string;
         firstName: string;

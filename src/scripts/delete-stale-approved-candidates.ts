@@ -164,6 +164,14 @@ async function main() {
     const id = c._id;
     const oid = new mongoose.Types.ObjectId(id);
 
+    // Legal hold must survive every code path that deletes a candidate, scripts
+    // included. This script bypassed the service guard and would have erased a
+    // candidate subject to a hold.
+    if (c.legalHold) {
+      console.log(`  SKIP ${id} — legal hold is set`);
+      continue;
+    }
+
     // Cloudinary assets
     const assets: Array<{ pid: string; type: 'raw' | 'image' | 'video' }> = [];
     const resumePid = c.resumeUrl ? extractPublicId(c.resumeUrl, 'raw') : null;

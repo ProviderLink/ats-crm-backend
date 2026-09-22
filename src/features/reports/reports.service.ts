@@ -328,16 +328,16 @@ export const getDispositionsReport = async (filters: {
   const apps = await Application.find(query).sort({ closedAt: -1 });
 
   const headers = [
-    'Disposition Date',
+    'Rejection Date',
     'Candidate Name',
     'Candidate Email',
     'Job Title',
     'Last Stage',
-    'Disposition Category',
-    'Disposition Reason',
+    'Rejection Category',
+    'Rejection Reason',
     'Destination',
     'Internal Notes',
-    'Disposed By',
+    'Rejected By',
     'Eligibility Status',
   ];
 

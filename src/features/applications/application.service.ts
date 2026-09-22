@@ -62,6 +62,19 @@ export const getApplicationById = async (id: string): Promise<IApplication> => {
   return application.toSafeObject();
 };
 
+/**
+ * Look up a candidate's application for a specific job.
+ * Returns null when none exists. Used to pre-empt the unique
+ * (candidateId, jobId) index before attempting a job change.
+ */
+export const findApplication = async (
+  candidateId: string,
+  jobId: string
+): Promise<IApplication | null> => {
+  const application = await Application.findOne({ candidateId, jobId });
+  return application ? application.toSafeObject() : null;
+};
+
 export const createApplication = async (
   input: CreateApplicationInput
 ): Promise<IApplication> => {
@@ -434,7 +447,6 @@ export const rejectApplication = async (
   });
   return result;
 };
-
 
 export const moveStage = async (
   id: string,

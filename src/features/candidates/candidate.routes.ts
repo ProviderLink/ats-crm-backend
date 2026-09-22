@@ -11,6 +11,7 @@ import { validate } from '../../shared/validators/common.validator';
 import {
   approveCandidate,
   assignJob,
+  changeJob,
   createCandidate,
   deleteCandidate,
   getAllCandidates,
@@ -309,6 +310,19 @@ router.post(
   requirePermission('candidates', 'write'),
   validate(assignJobSchema),
   assignJob
+);
+
+const changeJobSchema = z.object({
+  applicationId: z.string().min(1),
+  targetJobId: z.string().min(1),
+  startStageId: z.string().optional(),
+});
+
+router.post(
+  '/:id/change-job',
+  requirePermission('candidates', 'write'),
+  validate(changeJobSchema, 'body'),
+  changeJob
 );
 
 export default router;

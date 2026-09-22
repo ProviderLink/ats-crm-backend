@@ -871,6 +871,41 @@ export const updateAiValidation = async (
 };
 
 /**
+ * Point the candidate's job reference at a different job.
+ *
+ * Used by the composite change-job flow: the old application is closed and a
+ * new one created, so the candidate's own job pointer must follow. Applied
+ * without touching status — the new application's phase already expresses it.
+ */
+export const updateAppliedJob = async (
+  id: string,
+  jobId: string,
+  performedBy?: string | null
+): Promise<ICandidate> => {
+  const candidate = await Candidate.findById(id);
+  if (!candidate)
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+
+  const previousJobId = candidate.appliedJobId
+    ? String(candidate.appliedJobId)
+    : null;
+  candidate.appliedJobId = new mongoose.Types.ObjectId(jobId);
+  await candidate.save();
+
+  createLog({
+    action: 'updated',
+    resourceType: 'candidate',
+    resourceId: id,
+    metadata: { from: previousJobId, to: jobId, movedJob: true },
+    performedBy: performedBy ?? null,
+  });
+
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
+};
+
+/**
  * Restore a permanently ineligible candidate.
  *
  * The candidate always needs a job and returns to **In Review** as a normal

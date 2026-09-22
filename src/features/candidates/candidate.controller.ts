@@ -274,6 +274,146 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
   );
 });
 
+/**
+ * Change the job on an existing application.
+ *
+ * `jobId` is part of the unique `(candidateId, jobId)` index and is re-read by
+ * every stage operation, so it is never mutated in place. A job change is a
+ * composite action: close the current application, then create one for the
+ * target job. Both halves are done here so the UI cannot apply only one.
+ */
+export const changeJob = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { applicationId, targetJobId, startStageId } = req.body;
+  const updatedBy = req.user!._id;
+
+  const candidate = await candidateService.getCandidateById(id);
+  if (!candidate) {
+    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+  }
+  if (candidate.eligibilityStatus === 'permanently_ineligible') {
+    throw new AppError(
+      403,
+      'CANDIDATE_PERMANENTLY_INELIGIBLE',
+      'This candidate is permanently ineligible and cannot be assigned to a job'
+    );
+  }
+
+  const currentApplication =
+    await applicationService.getApplicationById(applicationId);
+  if (String(currentApplication.candidateId) !== id) {
+    throw new AppError(
+      400,
+      'APPLICATION_CANDIDATE_MISMATCH',
+      'This application does not belong to the given candidate'
+    );
+  }
+  if (
+    currentApplication.phase !== 'pending' &&
+    currentApplication.phase !== 'approved'
+  ) {
+    throw new AppError(
+      400,
+      'APPLICATION_INVALID_PHASE',
+      'Only a pending or approved application can be moved to another job'
+    );
+  }
+
+  if (String(currentApplication.jobId) === targetJobId) {
+    throw new AppError(
+      400,
+      'APPLICATION_SAME_JOB',
+      'The candidate is already on this job'
+    );
+  }
+
+  const targetJob = await getJobById(targetJobId);
+  if (!targetJob) {
+    throw new AppError(404, 'JOB_NOT_FOUND', 'Target job not found');
+  }
+  if (targetJob.status !== 'open') {
+    throw new AppError(
+      400,
+      'JOB_CLOSED',
+      'The target job is not open for assignments'
+    );
+  }
+
+  // Refuse when they already hold an application for the target job, rather
+  // than letting the unique index throw a raw duplicate-key error.
+  const existing = await applicationService.findApplication(
+    id,
+    targetJobId
+  );
+  if (existing) {
+    throw new AppError(
+      409,
+      'CANDIDATE_ALREADY_APPLIED',
+      'Candidate already has an application for this job'
+    );
+  }
+
+  if (startStageId && targetJob.pipeline?.stages) {
+    const stage = targetJob.pipeline.stages.find(
+      (s: { _id: { toString(): string } }) =>
+        s._id.toString() === startStageId
+    );
+    if (!stage) {
+      throw new AppError(
+        400,
+        'INVALID_STAGE',
+        'The specified starting stage does not belong to this job pipeline'
+      );
+    }
+  }
+
+  // 1. Close the current application — a move, not a rejection, so no
+  //    destination is applied to the candidate.
+  await applicationService.rejectApplication(currentApplication._id, {
+    rejectedBy: updatedBy,
+    reason: `Moved to ${targetJob.title}`,
+  });
+
+  // 2. Create the new application on the target job.
+  const application = await applicationService.createApplication({
+    candidateId: id,
+    jobId: targetJobId,
+    clientId: targetJob.clientId,
+    source: 'assigned',
+    createdBy: updatedBy,
+  });
+
+  if (startStageId && targetJob.pipeline?.stages) {
+    await applicationService.moveStage(application._id.toString(), {
+      stageId: startStageId,
+      movedBy: updatedBy.toString(),
+    });
+  }
+
+  runCandidateScoring(id, targetJobId);
+
+  // The candidate now belongs to the new job.
+  await candidateService.updateAppliedJob(id, targetJobId, updatedBy);
+
+  const current = await candidateService.getCandidateById(id);
+  if (current?.inTalentPool) {
+    await candidateService.updateTalentPool(id, 'remove', undefined, updatedBy);
+  }
+
+  sendSuccess(
+    res,
+    {
+      candidateId: id,
+      applicationId: application._id,
+      closedApplicationId: currentApplication._id,
+      jobId: targetJobId,
+      changed: true,
+    },
+    'Candidate moved to the new job',
+    201
+  );
+});
+
 export const approveCandidate = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;

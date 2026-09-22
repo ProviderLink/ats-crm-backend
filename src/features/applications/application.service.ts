@@ -75,6 +75,18 @@ export const findApplication = async (
   return application ? application.toSafeObject() : null;
 };
 
+/**
+ * Compensating delete for a partially-applied composite operation.
+ *
+ * Used only to roll back an application that was just created when a
+ * subsequent step in the same request failed — never exposed as a route, so
+ * the "no deleting applications" rule still holds for users.
+ */
+export const removeApplicationById = async (id: string): Promise<void> => {
+  await Application.deleteOne({ _id: id });
+  emitToAts('applications', 'application:deleted', { _id: id });
+};
+
 export const createApplication = async (
   input: CreateApplicationInput
 ): Promise<IApplication> => {

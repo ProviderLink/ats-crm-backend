@@ -350,7 +350,19 @@ export const changeJob = catchAsync(async (req: Request, res: Response) => {
     );
   }
 
-  if (startStageId && targetJob.pipeline?.stages) {
+  // Validate the target pipeline up front, before anything is mutated.
+  // createApplication rejects an 'assigned' application when the job has no
+  // pipeline, and doing that after closing the current application would leave
+  // the candidate in no pipeline at all — invisible in every tab.
+  if (!targetJob.pipeline || targetJob.pipeline.stages.length === 0) {
+    throw new AppError(
+      422,
+      'APPLICATION_NO_PIPELINE',
+      'The target job must have a pipeline before a candidate can be moved to it'
+    );
+  }
+
+  if (startStageId) {
     const stage = targetJob.pipeline.stages.find(
       (s: { _id: { toString(): string } }) => s._id.toString() === startStageId
     );
@@ -363,14 +375,9 @@ export const changeJob = catchAsync(async (req: Request, res: Response) => {
     }
   }
 
-  // 1. Close the current application — a move, not a rejection, so no
-  //    destination is applied to the candidate.
-  await applicationService.rejectApplication(currentApplication._id, {
-    rejectedBy: updatedBy,
-    reason: `Moved to ${targetJob.title}`,
-  });
-
-  // 2. Create the new application on the target job.
+  // Create the new application FIRST. Every remaining failure mode is a
+  // validation error that has already been ruled out above, so if this throws
+  // nothing has changed yet and the candidate keeps their current job.
   const application = await applicationService.createApplication({
     candidateId: id,
     jobId: targetJobId,
@@ -379,7 +386,21 @@ export const changeJob = catchAsync(async (req: Request, res: Response) => {
     createdBy: updatedBy,
   });
 
-  if (startStageId && targetJob.pipeline?.stages) {
+  // Then close the current application — a move, not a rejection, so no
+  // destination is applied to the candidate. If this fails (a DB write error,
+  // since the phase is already validated) roll the new application back,
+  // otherwise the candidate would sit on two live pipelines.
+  try {
+    await applicationService.rejectApplication(currentApplication._id, {
+      rejectedBy: updatedBy,
+      reason: `Moved to ${targetJob.title}`,
+    });
+  } catch (err) {
+    await applicationService.removeApplicationById(application._id.toString());
+    throw err;
+  }
+
+  if (startStageId) {
     await applicationService.moveStage(application._id.toString(), {
       stageId: startStageId,
       movedBy: updatedBy.toString(),

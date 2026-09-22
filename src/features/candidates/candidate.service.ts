@@ -898,6 +898,24 @@ export const restoreCandidate = async (
     );
   }
 
+  // The (candidateId, jobId) index on Application is unique regardless of
+  // phase, so a closed application for the chosen job would block the approval
+  // that follows restore — the recruiter would hit an "already applied" 409
+  // with no way forward. Refuse up front and point at a usable job instead of
+  // allowing the candidate into a dead end.
+  const existingApplication = await Application.findOne({
+    candidateId: id,
+    jobId,
+  });
+
+  if (existingApplication) {
+    throw new AppError(
+      409,
+      'JOB_ALREADY_HAS_APPLICATION',
+      'This candidate already has a closed application for the selected job, which would block approval. Choose a different job.'
+    );
+  }
+
   candidate.eligibilityStatus = 'eligible';
   candidate.permanentlyIneligibleAt = null;
   candidate.permanentlyIneligibleBy = null;

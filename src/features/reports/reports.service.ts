@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import ActivityLog from '../activity-logs/activityLog.model';
 import Application from '../applications/application.model';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
@@ -359,6 +360,58 @@ export const getDispositionsReport = async (filters: {
       app.dispositionDestination ?? '',
       app.internalNotes ?? '',
       String(app.closedBy ?? ''),
+      candidate?.eligibilityStatus ?? '',
+    ]);
+  }
+
+  // ── Candidate-level rejections ──
+  // A candidate rejected from In Review has no application, so nothing above
+  // matches and the whole event was previously missing from this report. Those
+  // rejections are recorded as an activity log on the candidate, so read them
+  // here.
+  //
+  // No de-duplication is needed: `rejectCandidate` refuses when the candidate
+  // holds a live application, so a candidate-level reject can never also
+  // produce an application row for the same event. Any application row for that
+  // candidate is a separate rejection of a job, and both are worth reporting.
+
+  // Date bounds mirror the application query above, including the end-of-day
+  // extension so an endDate includes that whole day.
+  const rejectLogDateFilter: Record<string, Date> = {};
+  if (filters.startDate) rejectLogDateFilter.$gte = new Date(filters.startDate);
+  if (filters.endDate) {
+    const end = new Date(filters.endDate);
+    end.setHours(23, 59, 59, 999);
+    rejectLogDateFilter.$lte = end;
+  }
+
+  const candidateRejectLogs = await ActivityLog.find({
+    action: 'rejected',
+    resourceType: 'candidate',
+    ...(Object.keys(rejectLogDateFilter).length > 0
+      ? { createdAt: rejectLogDateFilter }
+      : {}),
+  }).sort({ createdAt: -1 });
+
+  for (const log of candidateRejectLogs) {
+    const candidateId = String(log.resourceId);
+    const candidate = await Candidate.findById(candidateId);
+    const m = (log.metadata ?? {}) as Record<string, unknown>;
+    const reasonId = typeof m['reasonId'] === 'string' ? m['reasonId'] : null;
+    const reason = reasonId ? await DispositionReason.findById(reasonId) : null;
+
+    rows.push([
+      log.createdAt.toISOString().split('T')[0],
+      candidate ? `${candidate.firstName} ${candidate.lastName}` : '',
+      candidate?.email ?? '',
+      // No job — this rejection happened before any application existed.
+      '',
+      '',
+      reason?.category ?? '',
+      reason?.label ?? String(m['reason'] ?? ''),
+      typeof m['destination'] === 'string' ? m['destination'] : '',
+      typeof m['internalNotes'] === 'string' ? m['internalNotes'] : '',
+      String(log.performedBy ?? ''),
       candidate?.eligibilityStatus ?? '',
     ]);
   }

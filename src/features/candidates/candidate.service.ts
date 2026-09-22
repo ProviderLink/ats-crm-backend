@@ -5,9 +5,17 @@ import { AppError } from '../../shared/utils/AppError';
 import logger from '../../shared/utils/logger';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
+import ActivityLog from '../activity-logs/activityLog.model';
 import Application from '../applications/application.model';
+import Assignment from '../assignments/assignment.model';
 import DispositionReason from '../disposition-reasons/dispositionReason.model';
+import Email from '../emails/email.model';
+import EodReminder from '../eod-reminders/eodReminder.model';
+import EodSubmission from '../eod-submissions/eodSubmission.model';
+import InterviewScorecard from '../interview-scorecards/interview-scorecard.model';
 import Interview from '../interviews/interview.model';
+import PerformanceReview from '../performance-reviews/performanceReview.model';
+import WorkEntry from '../work-entries/workEntry.model';
 import Candidate, { normalizePhone } from './candidate.model';
 import type {
   CreateCandidateInput,
@@ -511,24 +519,90 @@ export const deleteCandidate = async (
     if (publicId) await deleteFromCloudinary(publicId, 'image');
   }
 
-  // Delete all interviews associated with this candidate
-  const interviewResult = await Interview.deleteMany({ candidateId: id });
-  if (interviewResult.deletedCount > 0) {
-    logger.info(
-      `Deleted ${interviewResult.deletedCount} interview(s) for candidate ${id}`
-    );
-  }
+  // ── Delete every record that references this candidate ──
+  // The confirmation dialog tells the user this erases "applications,
+  // interviews, emails, and history", so each of these must actually go —
+  // leaving them behind orphans rows that point at a candidate that no longer
+  // exists, and breaks any report that resolves a candidate by id.
+  //
+  // Activity logs are included on purpose: they are the "history" the dialog
+  // names, and they are keyed by resourceId/relatedId, so they would otherwise
+  // survive as unreachable records.
+  const relatedDeletions: { label: string; run: () => Promise<number> }[] = [
+    {
+      label: 'application',
+      run: async () =>
+        (await Application.deleteMany({ candidateId: id })).deletedCount ?? 0,
+    },
+    {
+      label: 'interview',
+      run: async () =>
+        (await Interview.deleteMany({ candidateId: id })).deletedCount ?? 0,
+    },
+    {
+      label: 'interview scorecard',
+      run: async () =>
+        (await InterviewScorecard.deleteMany({ candidateId: id }))
+          .deletedCount ?? 0,
+    },
+    {
+      label: 'assignment',
+      run: async () =>
+        (await Assignment.deleteMany({ candidateId: id })).deletedCount ?? 0,
+    },
+    {
+      label: 'work entry',
+      run: async () =>
+        (await WorkEntry.deleteMany({ candidateId: id })).deletedCount ?? 0,
+    },
+    {
+      label: 'EOD submission',
+      run: async () =>
+        (await EodSubmission.deleteMany({ candidateId: id })).deletedCount ?? 0,
+    },
+    {
+      label: 'EOD reminder',
+      run: async () =>
+        (await EodReminder.deleteMany({ candidateId: id })).deletedCount ?? 0,
+    },
+    {
+      label: 'performance review',
+      run: async () =>
+        (await PerformanceReview.deleteMany({ candidateId: id }))
+          .deletedCount ?? 0,
+    },
+    {
+      label: 'email',
+      run: async () =>
+        (await Email.deleteMany({ 'context.candidateId': id })).deletedCount ??
+        0,
+    },
+    {
+      label: 'activity log',
+      run: async () =>
+        (
+          await ActivityLog.deleteMany({
+            $or: [
+              { resourceType: 'candidate', resourceId: id },
+              { relatedType: 'candidate', relatedId: id },
+            ],
+          })
+        ).deletedCount ?? 0,
+    },
+  ];
 
-  // Delete all applications associated with this candidate
-  const applicationResult = await Application.deleteMany({ candidateId: id });
-  if (applicationResult.deletedCount > 0) {
-    logger.info(
-      `Deleted ${applicationResult.deletedCount} application(s) for candidate ${id}`
-    );
+  for (const { label, run } of relatedDeletions) {
+    const count = await run();
+    if (count > 0) {
+      logger.info(`Deleted ${count} ${label}(s) for candidate ${id}`);
+    }
   }
 
   await candidate.deleteOne();
 
+  // Logged after the purge above would have removed it, so this entry is
+  // written last and deliberately left in place as the tombstone for the
+  // deletion itself.
   createLog({
     action: 'deleted',
     resourceType: 'candidate',

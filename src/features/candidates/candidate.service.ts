@@ -1000,7 +1000,12 @@ export const updateAiValidation = async (
     },
   });
 
-  return candidate.toSafeObject();
+  // The AI result lands asynchronously (a background job), so without this emit
+  // no open client learns about it. Same shape as every other candidate write
+  // here, so the UI's `candidate:updated` handler can patch it in place.
+  const result = candidate.toSafeObject();
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };
 
 /**

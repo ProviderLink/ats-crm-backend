@@ -694,5 +694,12 @@ export const updateAiValidation = async (
     },
   });
 
-  return application.toSafeObject();
+  // AI validation runs in a background job, so without an emit an already-open
+  // client never sees the result land. Every other write in this file emits;
+  // this one was the exception, which is why the candidates list used to work
+  // around it by re-fetching rows that lacked validation data.
+  const result = application.toSafeObject();
+  emitToAts('applications', 'application:updated', result);
+  emitToAts('candidates', 'candidate:updated', result);
+  return result;
 };

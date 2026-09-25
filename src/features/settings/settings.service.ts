@@ -1,5 +1,6 @@
 import { clearAiProviderCache } from '../../shared/utils/ai/index';
 import { clearCompanyTimezoneCache } from '../../shared/utils/companyTimezone';
+import { clearEmailSenderCache } from '../../shared/utils/emailSender';
 import { createLog } from '../activity-logs/activityLog.service';
 import Settings from './settings.model';
 import type { ISettings, UpdateSettingsInput } from './settings.types';
@@ -23,6 +24,9 @@ export const updateSettings = async (
       settings.email.fromName = input.email.fromName;
     }
     settings.markModified('email');
+    // The sender identity caches for 60s — drop it so a new display name
+    // applies to the very next outbound email.
+    clearEmailSenderCache();
   }
 
   if (input.ai) {

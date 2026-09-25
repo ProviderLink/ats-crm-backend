@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { env } from '../../config/env';
 import authenticate from '../../shared/middleware/authenticate';
 import { requirePermission } from '../../shared/middleware/authorize';
 import { isValidTimeZone } from '../../shared/utils/timezone';
@@ -11,7 +12,17 @@ const router = Router();
 const updateSettingsSchema = z.object({
   email: z
     .object({
-      fromEmail: z.string().email().optional(),
+      // The from ADDRESS is intentionally not user-editable. Resend only sends
+      // from addresses on a verified domain, and the inbound webhook can only
+      // receive replies for COMPANY_EMAIL — allowing an arbitrary address here
+      // silently broke candidate reply threading. Reject it loudly if sent.
+      fromEmail: z
+        .string()
+        .email()
+        .refine(v => v.toLowerCase() === env.COMPANY_EMAIL.toLowerCase(), {
+          message: `The sender address is fixed to ${env.COMPANY_EMAIL}`,
+        })
+        .optional(),
       fromName: z.string().min(1).max(100).optional(),
     })
     .optional(),

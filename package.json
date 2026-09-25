@@ -16,6 +16,7 @@
     "seed:demo": "ts-node src/scripts/seed-demo.ts",
     "migrate:user-permissions": "ts-node src/scripts/migrate-user-permissions.ts",
     "migrate:company-timezone": "ts-node src/scripts/migrate-company-timezone.ts",
+    "migrate:email-sender": "ts-node --transpile-only src/scripts/align-email-sender.ts",
     "migrate:eod-time": "ts-node src/scripts/migrate-eod-time.ts",
     "migrate:activity-action": "ts-node --transpile-only src/scripts/migrate-activity-action.ts",
     "migrate:activity-timestamps": "ts-node --transpile-only src/scripts/migrate-activity-timestamps.ts",

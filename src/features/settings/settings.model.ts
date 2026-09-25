@@ -1,4 +1,8 @@
 import { Document, Model, Schema, model } from 'mongoose';
+import {
+  DEFAULT_FROM_EMAIL,
+  DEFAULT_FROM_NAME,
+} from '../../shared/utils/emailSenderDefaults';
 import { DEFAULT_TIMEZONE, isValidTimeZone } from '../../shared/utils/timezone';
 import type { ISettings } from './settings.types';
 
@@ -12,8 +16,8 @@ interface ISettingsModel extends Model<ISettingsDocument> {
 
 const emailSchema = new Schema(
   {
-    fromEmail: { type: String, default: 'hello@aristagroups.com' },
-    fromName: { type: String, default: 'Arista' },
+    fromEmail: { type: String, default: DEFAULT_FROM_EMAIL },
+    fromName: { type: String, default: DEFAULT_FROM_NAME },
   },
   { _id: false }
 );

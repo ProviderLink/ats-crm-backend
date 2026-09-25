@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { env } from '../../config/env';
 import AppError from './AppError';
+import { getEmailSenderIdentity } from './emailSender';
 import logger from './logger';
 
 const resend = new Resend(env.RESEND_API_KEY);
@@ -23,15 +24,21 @@ export const sendEmail = async (params: {
   text?: string;
   replyTo?: string;
 }): Promise<{ id: string }> => {
+  const { fromEmail, fromName, replyTo } = await getEmailSenderIdentity();
+  const from = `${fromName} <${fromEmail}>`;
+
   const { data, error } = await resend.emails.send({
-    from: `${env.COMPANY_NAME} <${env.COMPANY_EMAIL}>`,
+    from,
     to: params.to,
     cc: params.cc,
     bcc: params.bcc,
     subject: params.subject,
     html: params.html,
     text: params.text,
-    replyTo: params.replyTo,
+    // Always reply to the workspace mailbox so the inbound webhook keeps
+    // matching candidate replies against their thread. An explicit caller
+    // value still wins.
+    replyTo: params.replyTo ?? replyTo,
   });
 
   if (error || !data) {
@@ -39,7 +46,7 @@ export const sendEmail = async (params: {
       error,
       to: params.to,
       subject: params.subject,
-      from: `${env.COMPANY_NAME} <${env.COMPANY_EMAIL}>`,
+      from,
     });
     throw new AppError(
       500,

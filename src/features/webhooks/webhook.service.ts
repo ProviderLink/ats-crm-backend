@@ -5,7 +5,6 @@ import { env } from '../../config/env';
 import logger from '../../shared/utils/logger';
 import Candidate from '../candidates/candidate.model';
 import Email from '../emails/email.model';
-import { getSettings } from '../settings/settings.service';
 import type { ProcessedAttachment, ResendWebhookEvent } from './webhook.types';
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET || '';
@@ -164,9 +163,11 @@ export async function handleEmailReceived(data: { email_id: string }) {
   const toEmail = emailData.to;
   const subject = emailData.subject || 'No Subject';
 
-  // Get configured system email to check if this email is associated with our system.
-  const settings = await getSettings();
-  const systemEmail = settings.email.fromEmail.toLowerCase();
+  // The mailbox that actually receives replies is pinned to COMPANY_EMAIL:
+  // `sendEmail` always sets Reply-To to it, because Resend only delivers inbound
+  // mail for the verified domain's configured address. Reading this from
+  // settings would silently stop ingest the moment an admin edited it.
+  const systemEmail = env.COMPANY_EMAIL.toLowerCase();
 
   // Check if the email is addressed to or from our system email.
   const toEmails = Array.isArray(toEmail) ? toEmail : [toEmail];

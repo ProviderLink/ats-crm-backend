@@ -1,4 +1,7 @@
+import mongoose from 'mongoose';
+import { connectDB } from '../config/db';
 import DispositionReason from '../features/disposition-reasons/dispositionReason.model';
+import logger from '../shared/utils/logger';
 
 interface SeedReason {
   label: string;
@@ -343,4 +346,32 @@ export async function seedDispositionReasons(): Promise<void> {
       await DispositionReason.create(reason);
     }
   }
+}
+
+/**
+ * CLI entry point: `pnpm seed:disposition-reasons`
+ *
+ * Guarded by `require.main` so the module can also be imported (e.g. from the
+ * startup chain in `app.ts`) without opening a second connection.
+ *
+ * Idempotent — each reason is matched on (label, category), so a re-run only
+ * inserts what is missing. It never duplicates a reason and never overwrites
+ * one that has been edited in Settings.
+ */
+if (require.main === module) {
+  (async () => {
+    await connectDB();
+    const before = await DispositionReason.countDocuments();
+    await seedDispositionReasons();
+    const after = await DispositionReason.countDocuments();
+    logger.info('Disposition reasons seeded', {
+      before,
+      after,
+      inserted: after - before,
+    });
+    await mongoose.disconnect();
+  })().catch(err => {
+    logger.error('Disposition reasons seed failed', err);
+    process.exit(1);
+  });
 }

@@ -14,6 +14,7 @@
     "start": "node dist/app.js",
     "seed:admin": "ts-node src/scripts/seed-admin.ts",
     "seed:demo": "ts-node src/scripts/seed-demo.ts",
+    "seed:disposition-reasons": "ts-node src/scripts/seed-disposition-reasons.ts",
     "migrate:user-permissions": "ts-node src/scripts/migrate-user-permissions.ts",
     "migrate:company-timezone": "ts-node src/scripts/migrate-company-timezone.ts",
     "migrate:email-sender": "ts-node --transpile-only src/scripts/align-email-sender.ts",

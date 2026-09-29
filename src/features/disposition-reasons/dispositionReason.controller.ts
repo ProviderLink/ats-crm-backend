@@ -69,3 +69,9 @@ export const reorderReason = catchAsync(async (req: Request, res: Response) => {
   );
   sendSuccess(res, reason, 'Disposition reason reordered');
 });
+
+export const deleteReason = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await dispositionReasonService.deleteReason(id, req.user!._id);
+  sendSuccess(res, result, 'Disposition reason deleted');
+});

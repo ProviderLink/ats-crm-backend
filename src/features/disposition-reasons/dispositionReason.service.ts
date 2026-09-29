@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { createLog } from '../activity-logs/activityLog.service';
+import Application from '../applications/application.model';
+import Candidate from '../candidates/candidate.model';
 import DispositionReason from './dispositionReason.model';
 import type {
   CreateDispositionReasonInput,
@@ -177,4 +179,57 @@ export const reorderReason = async (
   await reason.save();
 
   return reason.toSafeObject();
+};
+
+/**
+ * Permanently delete a reason.
+ *
+ * REFUSED while the reason is referenced, because two ObjectId refs point at
+ * it — `Application.dispositionReasonId` and
+ * `Candidate.permanentlyIneligibleReason` — and both the disposition report and
+ * the Ineligible list resolve the human label by looking the document back up.
+ * A hard delete would leave those rows rendering an empty reason, which is
+ * worse than hiding the option. Deactivating removes the reason from the reject
+ * dialog while keeping every historical record readable.
+ *
+ * Unused reasons (the common case for a mis-typed entry) delete cleanly.
+ */
+export const deleteReason = async (
+  id: string,
+  performedBy?: string | null
+): Promise<{ deleted: boolean }> => {
+  const reason = await DispositionReason.findById(id);
+  if (!reason)
+    throw new AppError(
+      404,
+      'DISPOSITION_REASON_NOT_FOUND',
+      'Disposition reason not found'
+    );
+
+  const [applicationCount, candidateCount] = await Promise.all([
+    Application.countDocuments({ dispositionReasonId: id }),
+    Candidate.countDocuments({ permanentlyIneligibleReason: id }),
+  ]);
+  const usageCount = applicationCount + candidateCount;
+
+  if (usageCount > 0) {
+    throw new AppError(
+      409,
+      'DISPOSITION_REASON_IN_USE',
+      `“${reason.label}” has already been used on ${usageCount} record${usageCount === 1 ? '' : 's'} and cannot be deleted. Deactivate it instead — that hides it from the reject dialog and keeps past rejections readable.`
+    );
+  }
+
+  const { label, category } = reason;
+  await reason.deleteOne();
+
+  createLog({
+    action: 'deleted',
+    resourceType: 'settings',
+    resourceId: id,
+    metadata: { label, category },
+    performedBy: performedBy ?? null,
+  });
+
+  return { deleted: true };
 };

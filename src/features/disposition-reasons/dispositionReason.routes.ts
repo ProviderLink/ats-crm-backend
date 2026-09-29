@@ -9,6 +9,7 @@ import { validate } from '../../shared/validators/common.validator';
 import {
   createReason,
   deactivateReason,
+  deleteReason,
   getActiveReasons,
   getReasonById,
   listReasons,
@@ -105,5 +106,9 @@ router.patch(
   validate(reorderSchema, 'body'),
   reorderReason
 );
+
+// Refuses with 409 while the reason is referenced by an application or an
+// ineligible candidate — see `deleteReason`. Deactivate in that case instead.
+router.delete('/:id', requirePermission('settings', 'write'), deleteReason);
 
 export default router;

@@ -155,6 +155,8 @@ export function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
 
 export const getAllUsers = async (filters: {
   role?: string;
+  roles?: string[];
+  appAccess?: string;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -165,10 +167,17 @@ export const getAllUsers = async (filters: {
   limit: number;
   totalPages: number;
 }> => {
-  const { role, isActive, page = 1, limit = 20 } = filters;
+  const { role, roles, appAccess, isActive, page = 1, limit = 20 } = filters;
   const query: Record<string, unknown> = {};
 
   if (role !== undefined) query['roles'] = role;
+  // Several roles at once — `roles` is an array field, so `$in` means "has any
+  // of these". Used by the interviewer picker to ask for the ATS staff roles
+  // without a separate request per role.
+  else if (roles && roles.length > 0) query['roles'] = { $in: roles };
+  // `appAccess` is an array field, so a plain equality check matches any
+  // document containing that value.
+  if (appAccess !== undefined) query['appAccess'] = appAccess;
   if (isActive !== undefined) query['isActive'] = isActive;
 
   const skip = (page - 1) * limit;

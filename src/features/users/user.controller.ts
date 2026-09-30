@@ -18,6 +18,8 @@ import * as userService from './user.service';
 export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const {
     role,
+    roles,
+    appAccess,
     isActive: isActiveRaw,
     page,
     limit,
@@ -26,11 +28,29 @@ export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const isActive =
     isActiveRaw === 'true' ? true : isActiveRaw === 'false' ? false : undefined;
 
+  // A valueless `?page=` yields `''`, and `Number('')` is 0 — which is not
+  // `undefined`, so the service default never fires and Mongo rejects a negative
+  // `skip`. Normalise instead of trusting the raw query string.
+  const toPositiveInt = (raw?: string): number | undefined => {
+    const n = Number(raw);
+    return raw !== undefined && Number.isFinite(n) && n > 0
+      ? Math.floor(n)
+      : undefined;
+  };
+
   const result = await userService.getAllUsers({
     role,
+    // Comma-separated so the picker can request several roles in one call.
+    roles: roles
+      ? roles
+          .split(',')
+          .map(r => r.trim())
+          .filter(Boolean)
+      : undefined,
+    appAccess,
     isActive,
-    page: page !== undefined ? Number(page) : undefined,
-    limit: limit !== undefined ? Number(limit) : undefined,
+    page: toPositiveInt(page),
+    limit: toPositiveInt(limit),
   });
 
   sendSuccess(res, result.users, 'Users retrieved', 200, {

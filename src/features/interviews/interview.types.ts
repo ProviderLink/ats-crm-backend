@@ -10,20 +10,6 @@ export const INTERVIEW_MEETING_TYPES = [
 ] as const;
 export type InterviewMeetingType = (typeof INTERVIEW_MEETING_TYPES)[number];
 
-export const INTERVIEW_MEETING_TYPE_LABELS: Record<
-  InterviewMeetingType,
-  string
-> = {
-  initial_screening: 'Initial Screening',
-  group_interview: 'Group Interview',
-  technical_interview: 'Technical Interview',
-  panel_interview: 'Panel Interview',
-  final_interview: 'Final Interview',
-  hr_interview: 'HR Interview',
-  culture_fit: 'Culture Fit',
-  other: 'Other',
-};
-
 export interface IInterviewFeedback {
   _id: string;
   interviewerId: string;
@@ -49,14 +35,33 @@ export interface IInterview {
   clientId: string;
   title: string;
   type: string;
-  interviewType: InterviewMeetingType;
-  round: number;
+  /**
+   * Always the company timezone from Settings.
+   *
+   * Retained on the document (rather than resolved on read) because the value
+   * an interview was booked under is part of its record — and emails render the
+   * stored value.
+   */
+  timezone: string;
+  /**
+   * Kept for existing records and the calendar/email rendering, but no longer
+   * settable: a fixed 60-minute default is applied server-side.
+   */
+  duration: number;
   status: string;
   scheduledAt: Date;
-  duration: number;
-  timezone: string;
   meetingDetails: IInterviewMeetingDetails | null;
   interviewerIds: string[];
+  /**
+   * Display names for `interviewerIds`, resolved server-side.
+   *
+   * The client used to look these up in the boot-loaded user list, which is
+   * incomplete for non-admin roles (`team:read` is not granted everywhere) and
+   * printed raw ObjectIds for anyone missing. Optional because older/partial
+   * payloads may not carry it — and a user deleted after the interview was
+   * scheduled legitimately has no name to show.
+   */
+  interviewerNames?: string[];
   feedbacks: IInterviewFeedback[];
   organizerId: string;
   reminderSent: boolean;
@@ -70,13 +75,10 @@ export interface CreateInterviewInput {
   jobId: string;
   clientId: string;
   title: string;
-  interviewType?: InterviewMeetingType;
   type: 'zoom' | 'google_meet' | 'phone_call' | 'in_person';
-  round: number;
   scheduledAt: Date | string;
-  duration: number;
-  timezone: string;
-  interviewerIds: string[];
+  /** Optional — defaults to the organiser when empty. */
+  interviewerIds?: string[];
   organizerId: string;
   meetingDetails?: Partial<IInterviewMeetingDetails>;
 }
@@ -90,9 +92,8 @@ export interface SubmitFeedbackInput {
 
 export interface UpdateInterviewInput {
   title?: string;
+  type?: 'zoom' | 'google_meet' | 'phone_call' | 'in_person';
   scheduledAt?: Date | string;
-  duration?: number;
-  timezone?: string;
   interviewerIds?: string[];
   status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
   meetingDetails?: Partial<IInterviewMeetingDetails>;

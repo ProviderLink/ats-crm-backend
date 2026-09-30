@@ -15,6 +15,11 @@ import {
   updateInterview,
 } from '../interviews/interview.controller';
 import {
+  createNestedInterviewSchema,
+  feedbackSchema,
+  updateInterviewSchema,
+} from '../interviews/interview.schemas';
+import {
   approveApplication,
   getAllApplications,
   getApplicationById,
@@ -23,58 +28,6 @@ import {
   rejectApplication,
   updateNotes,
 } from './application.controller';
-
-const createInterviewSchema = z.object({
-  title: z.string().min(1).max(200),
-  type: z.enum(['zoom', 'google_meet', 'phone_call', 'in_person']),
-  interviewType: z
-    .enum([
-      'initial_screening',
-      'group_interview',
-      'technical_interview',
-      'panel_interview',
-      'final_interview',
-      'hr_interview',
-      'culture_fit',
-      'other',
-    ])
-    .optional(),
-  jobId: z.string().optional(),
-  round: z.number().int().min(1),
-  scheduledAt: z.string().datetime(),
-  duration: z.number().int().min(15).max(480),
-  timezone: z.string().min(1),
-  interviewerIds: z.array(z.string()).min(1),
-  meetingDetails: z
-    .object({
-      link: z.string().url().optional().nullable(),
-      phoneNumber: z.string().optional().nullable(),
-      address: z.string().optional().nullable(),
-    })
-    .optional(),
-});
-
-const updateInterviewSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  scheduledAt: z.string().datetime().optional(),
-  duration: z.number().int().min(15).max(480).optional(),
-  timezone: z.string().min(1).optional(),
-  interviewerIds: z.array(z.string()).min(1).optional(),
-  status: z.enum(['scheduled', 'completed', 'cancelled', 'no_show']).optional(),
-  meetingDetails: z
-    .object({
-      link: z.string().url().optional().nullable(),
-      phoneNumber: z.string().optional().nullable(),
-      address: z.string().optional().nullable(),
-    })
-    .optional(),
-});
-
-const feedbackSchema = z.object({
-  rating: z.number().int().min(1).max(5),
-  notes: z.string(),
-  recommendation: z.enum(['strong_yes', 'yes', 'neutral', 'no', 'strong_no']),
-});
 
 const moveStageSchema = z.object({
   stageId: z.string().min(1),
@@ -144,7 +97,7 @@ router.get(
 router.post(
   '/:applicationId/interviews',
   requirePermission('interviews', 'write'),
-  validate(createInterviewSchema),
+  validate(createNestedInterviewSchema),
   createInterviewForApplication
 );
 

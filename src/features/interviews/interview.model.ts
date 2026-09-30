@@ -76,19 +76,38 @@ const interviewSchema = new Schema(
       enum: ['zoom', 'google_meet', 'phone_call', 'in_person'],
       required: true,
     },
+    /**
+     * Legacy field — interviews are no longer staged, so nothing writes or
+     * reads this. The path is kept (with a default) so historic documents still
+     * validate; removing it would require migrating existing rows first.
+     */
     interviewType: {
       type: String,
       enum: INTERVIEW_MEETING_TYPES,
       default: 'initial_screening',
     },
-    round: { type: Number, required: true, min: 1 },
+    /**
+     * Legacy field. Interviews are no longer numbered, but historic documents
+     * still carry a value, so the path is kept (optional, not `required`) to
+     * avoid a schema churn that would need a data migration. Nothing reads it.
+     */
+    round: { type: Number, min: 1, default: 1 },
     status: {
       type: String,
       enum: ['scheduled', 'completed', 'cancelled', 'no_show'],
       default: 'scheduled',
     },
     scheduledAt: { type: Date, required: true },
+    /**
+     * Server-owned. A fixed default is applied on create and the value is part
+     * of the record (emails render it), but the client can no longer set it.
+     */
     duration: { type: Number, required: true },
+    /**
+     * Always the company timezone from Settings — written server-side on
+     * create. Stored rather than derived so the wall clock an interview was
+     * booked under stays readable even if the setting later changes.
+     */
     timezone: { type: String, required: true },
     meetingDetails: { type: meetingDetailsSchema, default: null },
     interviewerIds: {

@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import authenticate from '../../shared/middleware/authenticate';
+import optionalAuthenticate from '../../shared/middleware/optionalAuthenticate';
 import {
   requireAppAccess,
   requirePermission,
 } from '../../shared/middleware/authorize';
 import { uploadResumeWithPortfolio } from '../../shared/middleware/upload';
-import { validate } from '../../shared/validators/common.validator';
+import {
+  httpUrlSchema,
+  validate,
+} from '../../shared/validators/common.validator';
 import { PIPELINE_STAGE_ICONS } from '../pipeline-templates/pipelineTemplate.types';
 import {
   applyToJob,
@@ -117,11 +121,13 @@ const applyToJobSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   phone: z.string().min(1),
-  resumeUrl: z.string().url().optional(),
+  resumeUrl: z.undefined({
+    message: 'resumeUrl is not accepted; upload a resume file',
+  }),
   resumeOriginalName: z.string().optional(),
   resumeRawText: z.string().optional(),
-  videoIntroUrl: z.string().url().optional().nullable(),
-  portfolioUrl: z.string().url().optional().nullable(),
+  videoIntroUrl: httpUrlSchema.optional().nullable(),
+  portfolioUrl: httpUrlSchema.optional().nullable(),
   yearsOfExperience: z.coerce.number().min(0).optional(),
   englishProficiency: z
     .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])
@@ -185,8 +191,8 @@ const applyToJobSchema = z.object({
 const router = Router();
 
 // Public routes — must be registered before authenticate middleware
-router.get('/', getAllJobs);
-router.get('/:id', getJobById);
+router.get('/', optionalAuthenticate, getAllJobs);
+router.get('/:id', optionalAuthenticate, getJobById);
 router.post(
   '/:id/apply',
   uploadResumeWithPortfolio,

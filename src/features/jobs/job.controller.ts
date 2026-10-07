@@ -15,79 +15,30 @@ import * as jobService from './job.service';
 import { generateJobDraft } from './jobDraft.service';
 import { standardizeJobContent } from './jobStandardize.service';
 
-const PUBLIC_JOB_FIELDS = [
-  '_id',
-  'title',
-  'description',
-  'status',
-  'jobType',
-  'locationType',
-  'location',
-  'experienceLevel',
-  'openings',
-  'requirements',
-  'responsibilities',
-  'skills',
-  'benefits',
-  'salaryRange',
-  'applicationDeadline',
-  'createdAt',
-] as const;
-
-const PUBLIC_JOBS_MAX_LIMIT = 200;
-
-const isStaff = (req: Request): boolean =>
-  !!req.user &&
-  (req.user.roles.includes('admin') || req.user.appAccess.includes('ats'));
-
-const toPublicJob = (job: unknown) =>
-  Object.fromEntries(
-    PUBLIC_JOB_FIELDS.map(key => [key, (job as Record<string, unknown>)[key]])
-  );
-
 export const getAllJobs = catchAsync(async (req: Request, res: Response) => {
   const { clientId, status, search, page, limit } = req.query as Record<
     string,
     string | undefined
   >;
-  const staff = isStaff(req);
-  const requestedLimit = limit !== undefined ? Number(limit) : undefined;
-  const publicLimit = Math.min(
-    requestedLimit !== undefined && requestedLimit > 0 ? requestedLimit : 20,
-    PUBLIC_JOBS_MAX_LIMIT
-  );
   const result = await jobService.getAllJobs({
     clientId,
-    status: staff ? status : 'open',
+    status,
     search,
     page: page !== undefined ? Number(page) : undefined,
-    limit: staff ? requestedLimit : publicLimit,
+    limit: limit !== undefined ? Number(limit) : undefined,
   });
-  sendSuccess(
-    res,
-    staff ? result.jobs : result.jobs.map(toPublicJob),
-    'Jobs retrieved',
-    200,
-    {
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
-      totalPages: result.totalPages,
-    }
-  );
+  sendSuccess(res, result.jobs, 'Jobs retrieved', 200, {
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  });
 });
 
 export const getJobById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const job = await jobService.getJobById(id);
-  if (isStaff(req)) {
-    sendSuccess(res, job, 'Job retrieved', 200);
-    return;
-  }
-  if (job.status !== 'open') {
-    throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
-  }
-  sendSuccess(res, toPublicJob(job), 'Job retrieved', 200);
+  sendSuccess(res, job, 'Job retrieved', 200);
 });
 
 export const createJob = catchAsync(async (req: Request, res: Response) => {
@@ -162,7 +113,7 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
   // Resolve the resume at final submit: upload the file to Cloudinary here
   // (instead of during the stateless parse step) so abandoned applications
   // don't leave orphan files consuming storage.
-  let resumeUrl: string | undefined;
+  let resumeUrl: string | undefined = body.resumeUrl;
   let resumeRawText: string | undefined = body.resumeRawText;
   let resumeOriginalName: string = body.resumeOriginalName || 'resume.pdf';
 

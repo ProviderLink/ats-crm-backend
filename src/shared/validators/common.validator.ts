@@ -6,18 +6,6 @@ export const objectIdSchema = z
   .string()
   .regex(/^[a-f\d]{24}$/i, 'Invalid ID format');
 
-export const httpUrlSchema = z
-  .string()
-  .url()
-  .refine(value => {
-    try {
-      const { protocol } = new URL(value);
-      return protocol === 'http:' || protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }, 'URL must use http or https');
-
 export const paginationSchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),

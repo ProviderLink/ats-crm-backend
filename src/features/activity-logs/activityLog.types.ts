@@ -59,7 +59,6 @@ export type ActivityAction =
   | 'note_deleted'
   // ── User ───────────────────────────────────────────────
   | 'deactivated'
-  | 'reactivated'
   | 'permissions_updated'
   | 'provisioned_va'
   | 'provisioned_client'

@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { env } from '../../config/env';
 import {
   runCandidateScoring,
   runResumeParsing,
@@ -577,7 +576,6 @@ export const hireApplication = async (
         firstName: candidate.firstName,
         inviteToken,
         invitedByName: 'ATS System',
-        inviteUrl: `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
       })
       .catch(err => {
         console.error('Failed to send VA invite email:', err);

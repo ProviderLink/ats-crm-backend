@@ -1,9 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import { env } from '../config/env';
-import { hasPermission } from '../shared/middleware/authorize';
-
-const OBJECT_ID_RE = /^[a-f\d]{24}$/i;
 
 export const initializeAtsSocket = (io: Server): void => {
   const ats = io.of('/ats');
@@ -35,35 +32,20 @@ export const initializeAtsSocket = (io: Server): void => {
       return;
     }
 
-    const subject = {
-      roles,
-      permissions: decoded.permissions as unknown,
-    };
-
-    // Rooms mirror the REST permission model. `applications` also carries the
-    // interview:* events.
-    const ROOM_PERMISSIONS: [room: string, resource: string][] = [
-      ['applications', 'candidates'],
-      ['candidates', 'candidates'],
-      ['jobs', 'jobs'],
-      ['clients', 'clients'],
-      ['tags', 'tags'],
-      ['pipeline-templates', 'pipelineTemplates'],
-      ['email-templates', 'emailTemplates'],
-    ];
-    for (const [room, resource] of ROOM_PERMISSIONS) {
-      if (hasPermission(subject, resource, 'read')) socket.join(room);
-    }
+    socket.join('applications');
+    socket.join('candidates');
+    socket.join('jobs');
+    socket.join('clients');
+    socket.join('tags');
+    socket.join('pipeline-templates');
+    socket.join('email-templates');
     socket.join(`user:${decoded._id}`);
 
-    socket.on('join:job', (jobId: unknown) => {
-      if (typeof jobId !== 'string' || !OBJECT_ID_RE.test(jobId)) return;
-      if (!hasPermission(subject, 'jobs', 'read')) return;
+    socket.on('join:job', (jobId: string) => {
       socket.join(`job:${jobId}`);
     });
 
-    socket.on('leave:job', (jobId: unknown) => {
-      if (typeof jobId !== 'string' || !OBJECT_ID_RE.test(jobId)) return;
+    socket.on('leave:job', (jobId: string) => {
       socket.leave(`job:${jobId}`);
     });
 

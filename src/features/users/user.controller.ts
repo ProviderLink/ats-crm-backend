@@ -96,7 +96,6 @@ export const getCrmAccountsList = catchAsync(
         const q: Record<string, unknown> = {
           roles: 'client',
           clientRef: { $ne: null },
-          deactivatedAt: null,
         };
         if (scopedClientIds) q['clientRef'] = { $in: [...scopedClientIds] };
         return User.find(q);
@@ -106,7 +105,6 @@ export const getCrmAccountsList = catchAsync(
         const q: Record<string, unknown> = {
           roles: 'va',
           candidateRef: { $ne: null },
-          deactivatedAt: null,
         };
         if (scopedCandidateIds)
           q['candidateRef'] = { $in: [...scopedCandidateIds] };

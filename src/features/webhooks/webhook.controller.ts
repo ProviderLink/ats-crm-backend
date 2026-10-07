@@ -8,15 +8,6 @@ import * as webhookService from './webhook.service';
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET || '';
 
-const UNSIGNED_WEBHOOKS_ALLOWED =
-  env.NODE_ENV === 'development' || env.NODE_ENV === 'test';
-
-if (!RESEND_WEBHOOK_SECRET && !UNSIGNED_WEBHOOKS_ALLOWED) {
-  logger.error(
-    'RESEND_WEBHOOK_SECRET is not set: all /api/webhooks/resend requests will be rejected'
-  );
-}
-
 /**
  * POST /api/webhooks/resend
  * Handle incoming Resend webhook events.
@@ -24,13 +15,6 @@ if (!RESEND_WEBHOOK_SECRET && !UNSIGNED_WEBHOOKS_ALLOWED) {
  */
 export const handleResendWebhook = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    // Fail closed unless running in development/test.
-    if (!RESEND_WEBHOOK_SECRET && !UNSIGNED_WEBHOOKS_ALLOWED) {
-      logger.error('Webhook rejected: RESEND_WEBHOOK_SECRET is not configured');
-      sendSuccess(res, { verified: false }, 'Webhook secret not configured', 401);
-      return;
-    }
-
     // Verify webhook signature when secret is configured.
     if (RESEND_WEBHOOK_SECRET) {
       if (!webhookService.verifyWebhookSignature(req)) {

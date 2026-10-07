@@ -7,22 +7,10 @@ import { sendEmail } from '../../shared/utils/email';
 import User from '../users/user.model';
 import type { AuthTokenPayload, LoginInput } from './auth.types';
 
-// Fixed bcrypt hash (cost 12) compared against when the email is unknown.
-const DUMMY_PASSWORD_HASH =
-  '$2a$12$iD0LMx6trShWLh5EQXgqv.Ns6OltmLuoQh.5ehy7gaIME2bZoS2mi';
-
 export const login = async (input: LoginInput) => {
   const app = input.app ?? 'ats';
-  const found = await User.findOne({ email: input.email.toLowerCase() });
-  const user = found?.deactivatedAt ? null : found;
-
-  // Always run one bcrypt compare so unknown emails cost the same as wrong
-  // passwords, and only reveal the account state after a correct password.
-  const match = await bcrypt.compare(
-    input.password,
-    user?.passwordHash ?? DUMMY_PASSWORD_HASH
-  );
-  if (!user || !match) {
+  const user = await User.findOne({ email: input.email.toLowerCase() });
+  if (!user) {
     throw new AppError(
       401,
       'AUTH_INVALID_CREDENTIALS',
@@ -34,14 +22,12 @@ export const login = async (input: LoginInput) => {
     throw new AppError(401, 'USER_INACTIVE', 'Account is deactivated');
   }
 
-  if (
-    !user.roles.includes('admin') &&
-    !(user.appAccess as string[]).includes(app)
-  ) {
+  const match = await bcrypt.compare(input.password, user.passwordHash);
+  if (!match) {
     throw new AppError(
-      403,
-      'AUTH_APP_ACCESS_DENIED',
-      `You don't have access to the ${app === 'crm' ? 'CRM' : 'ATS'}`
+      401,
+      'AUTH_INVALID_CREDENTIALS',
+      'Invalid email or password'
     );
   }
 
@@ -113,7 +99,7 @@ export const refreshToken = async (
   }
 
   const user = await User.findById(decoded._id);
-  if (!user || !user.isActive) {
+  if (!user) {
     throw new AppError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
   }
 
@@ -148,7 +134,7 @@ export const refreshToken = async (
 
 export const forgotPassword = async (email: string) => {
   const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user || !user.isActive) return;
+  if (!user) return;
 
   const resetToken = crypto.randomBytes(32).toString('hex');
   user.passwordResetToken = resetToken;
@@ -245,13 +231,6 @@ export const resetPassword = async (token: string, password: string) => {
       'Reset link is invalid or has expired'
     );
   }
-  if (!user.isActive) {
-    throw new AppError(
-      400,
-      'AUTH_TOKEN_INVALID',
-      'Reset link is invalid or has expired'
-    );
-  }
 
   user.passwordHash = await bcrypt.hash(password, 12);
   user.passwordResetToken = null;
@@ -317,13 +296,6 @@ export const setPassword = async (token: string, password: string) => {
     inviteTokenExpires: { $gt: new Date() },
   });
   if (!user) {
-    throw new AppError(
-      400,
-      'AUTH_TOKEN_INVALID',
-      'Invite link is invalid or has expired'
-    );
-  }
-  if (!user.isActive) {
     throw new AppError(
       400,
       'AUTH_TOKEN_INVALID',

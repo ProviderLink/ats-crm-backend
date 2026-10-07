@@ -153,6 +153,80 @@ export function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
   return perms;
 }
 
+const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Bring a soft-deactivated user back under the same _id so history stays
+ * linked. Roles, access and permissions are rebuilt from the new input and all
+ * credentials are reset. The `deactivatedAt: { $ne: null }` guard makes it
+ * atomic: of two concurrent reactivations only one wins, the other gets 409.
+ */
+const reactivateDeactivatedUser = async (
+  id: mongoose.Types.ObjectId,
+  input: {
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    roles: UserRole[];
+  },
+  refs: {
+    clientRef?: mongoose.Types.ObjectId;
+    candidateRef?: mongoose.Types.ObjectId;
+  },
+  performedBy?: string | null
+): Promise<{ user: SafeUser; inviteToken: string }> => {
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const passwordHash = await bcrypt.hash(
+    crypto.randomBytes(32).toString('hex'),
+    12
+  );
+
+  const updated = await User.findOneAndUpdate(
+    { _id: id, deactivatedAt: { $ne: null } },
+    {
+      $set: {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        ...(input.phone !== undefined ? { phone: input.phone } : {}),
+        roles: input.roles,
+        appAccess: deriveAppAccess(input.roles),
+        permissions: buildPermissionsForRoles(input.roles),
+        passwordHash,
+        refreshTokenAts: null,
+        refreshTokenCrm: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        inviteToken,
+        inviteTokenExpires: new Date(Date.now() + INVITE_TTL_MS),
+        isActive: true,
+        isInviteAccepted: false,
+        emailVerified: false,
+        deactivatedAt: null,
+        clientRef: refs.clientRef ?? null,
+        candidateRef: refs.candidateRef ?? null,
+      },
+    },
+    { new: true }
+  );
+  if (!updated) {
+    throw new AppError(
+      409,
+      'USER_ALREADY_EXISTS',
+      'A user with this email already exists'
+    );
+  }
+
+  createLog({
+    action: 'reactivated',
+    resourceType: 'user',
+    resourceId: String(updated._id),
+    metadata: { roles: input.roles },
+    performedBy: performedBy ?? null,
+  });
+
+  return { user: updated.toSafeObject(), inviteToken };
+};
+
 export const getAllUsers = async (filters: {
   role?: string;
   roles?: string[];
@@ -179,6 +253,7 @@ export const getAllUsers = async (filters: {
   // document containing that value.
   if (appAccess !== undefined) query['appAccess'] = appAccess;
   if (isActive !== undefined) query['isActive'] = isActive;
+  query['deactivatedAt'] = null;
 
   const skip = (page - 1) * limit;
   const [users, total] = await Promise.all([
@@ -197,7 +272,9 @@ export const getAllUsers = async (filters: {
 
 export const getUserById = async (id: string): Promise<SafeUser> => {
   const user = await User.findById(id);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user || user.deactivatedAt) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
   return user.toSafeObject();
 };
 
@@ -206,6 +283,9 @@ export const createUser = async (
   createdBy?: string
 ): Promise<{ user: SafeUser; inviteToken: string }> => {
   const existing = await User.findOne({ email: input.email.toLowerCase() });
+  if (existing?.deactivatedAt) {
+    return reactivateDeactivatedUser(existing._id, input, {}, createdBy);
+  }
   if (existing) {
     throw new AppError(
       409,
@@ -363,7 +443,9 @@ export const updateUser = async (
   updatedBy?: string | null
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user || user.deactivatedAt) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
 
   if (input.roles !== undefined) {
     user.roles = input.roles as UserRole[];
@@ -399,7 +481,9 @@ export const updatePermissions = async (
   updatedBy?: string | null
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user || user.deactivatedAt) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
 
   const current = JSON.parse(JSON.stringify(user.permissions ?? {})) as Record<
     string,
@@ -432,10 +516,19 @@ export const deactivateUser = async (
   deactivatedBy?: string | null
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user || user.deactivatedAt) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
 
-  const safeUser = user.toSafeObject();
-  await User.findByIdAndDelete(id);
+  user.isActive = false;
+  user.deactivatedAt = new Date();
+  user.refreshTokenAts = null;
+  user.refreshTokenCrm = null;
+  user.passwordResetToken = null;
+  user.passwordResetExpires = null;
+  user.inviteToken = null;
+  user.inviteTokenExpires = null;
+  await user.save();
 
   createLog({
     action: 'deactivated',
@@ -444,7 +537,7 @@ export const deactivateUser = async (
     performedBy: deactivatedBy ?? null,
   });
 
-  return safeUser;
+  return user.toSafeObject();
 };
 
 export const updateMe = async (
@@ -452,7 +545,9 @@ export const updateMe = async (
   input: { firstName?: string; lastName?: string; phone?: string }
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user || user.deactivatedAt) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
 
   if (input.firstName !== undefined) user.firstName = input.firstName;
   if (input.lastName !== undefined) user.lastName = input.lastName;
@@ -470,6 +565,24 @@ export const provisionVA = async (
   createdBy?: string | null
 ): Promise<{ user: SafeUser; inviteToken: string | null }> => {
   const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing?.deactivatedAt) {
+    const { user, inviteToken } = await reactivateDeactivatedUser(
+      existing._id,
+      { firstName, lastName, roles: ['va'] },
+      { candidateRef: new mongoose.Types.ObjectId(candidateId) },
+      createdBy
+    );
+    upsertVaProfile(candidateId, {}).catch(() => {});
+    createLog({
+      action: 'provisioned_va',
+      resourceType: 'user',
+      resourceId: user._id,
+      relatedType: 'candidate',
+      relatedId: candidateId,
+      performedBy: createdBy ?? null,
+    });
+    return { user, inviteToken };
+  }
   if (existing) {
     // If the user was previously deactivated / CRM revoked, re-activate and re-invite
     if (
@@ -547,6 +660,23 @@ export const provisionClient = async (
   createdBy?: string | null
 ): Promise<{ user: SafeUser; inviteToken: string | null }> => {
   const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing?.deactivatedAt) {
+    const { user, inviteToken } = await reactivateDeactivatedUser(
+      existing._id,
+      { firstName, lastName, roles: ['client'] },
+      { clientRef: new mongoose.Types.ObjectId(clientId) },
+      createdBy
+    );
+    createLog({
+      action: 'provisioned_client',
+      resourceType: 'user',
+      resourceId: user._id,
+      relatedType: 'client',
+      relatedId: clientId,
+      performedBy: createdBy ?? null,
+    });
+    return { user, inviteToken };
+  }
   if (existing) {
     // If the user was previously deactivated / CRM revoked, re-activate and re-invite
     if (
@@ -623,7 +753,9 @@ export const revokeCrmAccess = async (
   revokedBy?: string | null
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
-  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user || user.deactivatedAt) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
 
   user.appAccess = (user.appAccess as AppAccess[]).filter(a => a !== 'crm');
   user.isActive = false;

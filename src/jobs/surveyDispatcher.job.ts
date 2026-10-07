@@ -32,7 +32,10 @@ async function runSurveyDispatcher(): Promise<void> {
     });
 
     for (const reminder of reminders) {
-      const accountManager = await User.findById(reminder.assignedTo);
+      const accountManager = await User.findOne({
+        _id: reminder.assignedTo,
+        deactivatedAt: null,
+      });
       if (!accountManager) continue;
 
       try {

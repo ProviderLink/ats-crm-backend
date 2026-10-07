@@ -92,6 +92,7 @@ const userSchema = new Schema(
     inviteToken: { type: String, default: null },
     inviteTokenExpires: { type: Date, default: null },
     isInviteAccepted: { type: Boolean, default: false },
+    deactivatedAt: { type: Date, default: null },
     lastLoginAts: { type: Date, default: null },
     lastLoginCrm: { type: Date, default: null },
     clientRef: { type: Schema.Types.ObjectId, ref: 'Client', default: null },

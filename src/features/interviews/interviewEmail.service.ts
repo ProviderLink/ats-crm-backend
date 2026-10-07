@@ -522,9 +522,10 @@ const gatherEmailContext = async (
       'firstName lastName email'
     ),
     Job.findById(interview.jobId).select('title'),
-    User.find({ _id: { $in: interview.interviewerIds } }).select(
-      'firstName lastName email'
-    ),
+    User.find({
+      _id: { $in: interview.interviewerIds },
+      deactivatedAt: null,
+    }).select('firstName lastName email'),
   ]);
 
   const candidateName = candidate

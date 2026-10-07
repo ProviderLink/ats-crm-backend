@@ -50,6 +50,7 @@ export interface IUser {
   inviteToken: string | null;
   inviteTokenExpires: Date | null;
   isInviteAccepted: boolean;
+  deactivatedAt: Date | null;
   lastLoginAts: Date | null;
   lastLoginCrm: Date | null;
   clientRef: string | null;

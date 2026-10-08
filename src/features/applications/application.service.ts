@@ -19,6 +19,7 @@ import type {
   HireApplicationInput,
   IApplication,
   MoveStageInput,
+  MoveToTalentPoolInput,
   RejectApplicationInput,
 } from './application.types';
 
@@ -427,6 +428,7 @@ export const rejectApplication = async (
       ...(input.isJobMove
         ? { movedToJobTitle: input.movedToJobTitle ?? null }
         : {}),
+      ...(input.movedToTalentPool ? { movedToTalentPool: true } : {}),
     },
     performedBy: input.rejectedBy,
   });
@@ -478,6 +480,44 @@ export const rejectApplication = async (
     phase: 'rejected',
   });
   return result;
+};
+
+/**
+ * Remove a candidate from one job and park them in the Talent Pool.
+ *
+ * Not a rejection: no reason is required, no disposition is recorded and the
+ * activity entry is `job_changed`, so reports and the timeline never count it
+ * as one. The pool flag is candidate-level and harmless, so it is applied even
+ * when the candidate is still live on another job — that job is untouched.
+ */
+export const moveToTalentPool = async (
+  id: string,
+  input: MoveToTalentPoolInput
+): Promise<IApplication> => {
+  const application = await rejectApplication(id, {
+    rejectedBy: input.movedBy,
+    isJobMove: true,
+    movedToTalentPool: true,
+    reason: 'Moved to Talent Pool',
+  });
+
+  const candidate = await Candidate.findById(application.candidateId);
+  // Skip when already pooled (keeps the original date and notes) or banned
+  // (a permanently ineligible candidate is never also in the pool).
+  if (
+    candidate &&
+    !candidate.inTalentPool &&
+    candidate.eligibilityStatus !== 'permanently_ineligible'
+  ) {
+    await candidateService.updateTalentPool(
+      String(candidate._id),
+      'add',
+      input.notes,
+      input.movedBy
+    );
+  }
+
+  return application;
 };
 
 export const moveStage = async (

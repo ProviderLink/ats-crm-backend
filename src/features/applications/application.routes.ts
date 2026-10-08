@@ -25,6 +25,7 @@ import {
   getApplicationById,
   hireApplication,
   moveStage,
+  moveToTalentPool,
   rejectApplication,
   updateNotes,
 } from './application.controller';
@@ -38,6 +39,10 @@ const rejectSchema = z.object({
   rejectionReasonId: z.string().min(1).optional(),
   destination: z.enum(['candidate_pool', 'permanently_ineligible']).optional(),
   internalNotes: z.string().optional(),
+});
+
+const moveToTalentPoolSchema = z.object({
+  notes: z.string().max(2000).optional(),
 });
 
 const notesSchema = z.object({
@@ -64,6 +69,13 @@ router.patch(
   requirePermission('candidates', 'write'),
   validate(rejectSchema),
   rejectApplication
+);
+
+router.patch(
+  '/:id/move-to-talent-pool',
+  requirePermission('candidates', 'write'),
+  validate(moveToTalentPoolSchema),
+  moveToTalentPool
 );
 
 router.patch(

@@ -84,6 +84,18 @@ export interface RejectApplicationInput {
   isJobMove?: boolean;
   /** Title of the job the candidate moved to. Only used when isJobMove. */
   movedToJobTitle?: string;
+  /**
+   * Set by the move-to-talent-pool flow (together with isJobMove). Tags the
+   * activity entry so the timeline can say the candidate went to the talent
+   * pool rather than to another job.
+   */
+  movedToTalentPool?: boolean;
+}
+
+export interface MoveToTalentPoolInput {
+  movedBy: string;
+  /** Optional note stored on the candidate's talent pool entry. */
+  notes?: string;
 }
 
 export interface MoveStageInput {

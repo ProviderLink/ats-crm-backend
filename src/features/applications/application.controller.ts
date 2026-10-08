@@ -76,6 +76,19 @@ export const rejectApplication = catchAsync(
   }
 );
 
+export const moveToTalentPool = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { notes } = req.body ?? {};
+    const movedBy = req.user!._id;
+    const application = await applicationService.moveToTalentPool(id, {
+      movedBy,
+      notes,
+    });
+    sendSuccess(res, application, 'Candidate moved to Talent Pool', 200);
+  }
+);
+
 export const moveStage = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { stageId } = req.body;

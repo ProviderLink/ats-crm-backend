@@ -6,6 +6,18 @@ export const objectIdSchema = z
   .string()
   .regex(/^[a-f\d]{24}$/i, 'Invalid ID format');
 
+/**
+ * A web link. `z.string().url()` alone accepts any scheme, including
+ * `javascript:` and `data:`; links entered by applicants end up as clickable
+ * anchors in the staff app, so only http(s) is allowed.
+ */
+export const httpUrlSchema = z
+  .string()
+  .url()
+  .refine(value => /^https?:\/\//i.test(value), {
+    message: 'Only http(s) links are allowed',
+  });
+
 export const paginationSchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),

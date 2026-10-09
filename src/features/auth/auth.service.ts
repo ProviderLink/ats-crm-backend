@@ -102,6 +102,11 @@ export const refreshToken = async (
   if (!user) {
     throw new AppError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
   }
+  // A deactivated user must not keep minting access tokens on a refresh
+  // cookie issued before they were deactivated.
+  if (!user.isActive) {
+    throw new AppError(401, 'USER_INACTIVE', 'Account is deactivated');
+  }
 
   // Check the correct app-specific refresh token
   const storedToken =
@@ -134,7 +139,7 @@ export const refreshToken = async (
 
 export const forgotPassword = async (email: string) => {
   const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) return;
+  if (!user || !user.isActive) return;
 
   const resetToken = crypto.randomBytes(32).toString('hex');
   user.passwordResetToken = resetToken;
@@ -232,6 +237,10 @@ export const resetPassword = async (token: string, password: string) => {
     );
   }
 
+  // Only an invitation (issued by an admin) may activate an account. A plain
+  // password-reset token must never bring a deactivated user back.
+  const viaInvite = user.inviteToken === token;
+
   user.passwordHash = await bcrypt.hash(password, 12);
   user.passwordResetToken = null;
   user.passwordResetExpires = null;
@@ -239,7 +248,7 @@ export const resetPassword = async (token: string, password: string) => {
   user.inviteTokenExpires = null;
   user.emailVerified = true;
   user.isInviteAccepted = true;
-  user.isActive = true;
+  if (viaInvite) user.isActive = true;
   user.refreshTokenAts = null;
   user.refreshTokenCrm = null;
   await user.save();

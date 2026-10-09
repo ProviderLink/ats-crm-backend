@@ -15,6 +15,36 @@ import Client from '../clients/client.model';
 import User from './user.model';
 import * as userService from './user.service';
 
+const isAdminRequest = (req: Request): boolean =>
+  req.user!.roles.includes('admin');
+
+/** Only an admin may hand out the admin role. */
+const assertCanAssignRoles = (req: Request, roles?: string[]): void => {
+  if (roles?.includes('admin') && !isAdminRequest(req)) {
+    throw new AppError(
+      403,
+      'AUTH_INSUFFICIENT_PERMISSIONS',
+      'Only an administrator can assign the admin role'
+    );
+  }
+};
+
+/** Team permissions never extend to editing, deactivating or removing an admin. */
+const assertCanManageTarget = async (
+  req: Request,
+  targetId: string
+): Promise<void> => {
+  if (isAdminRequest(req)) return;
+  const target = await User.findById(targetId).select('roles');
+  if (target?.roles.includes('admin')) {
+    throw new AppError(
+      403,
+      'AUTH_INSUFFICIENT_PERMISSIONS',
+      'Only an administrator can change an administrator account'
+    );
+  }
+};
+
 export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const {
     role,
@@ -132,6 +162,7 @@ export const getUserById = catchAsync(async (req: Request, res: Response) => {
 
 export const createUser = catchAsync(async (req: Request, res: Response) => {
   const body = req.body;
+  assertCanAssignRoles(req, body.roles);
   const createdBy = req.user!._id;
   const { user, inviteToken } = await userService.createUser(body, createdBy);
 
@@ -166,6 +197,8 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
 export const updateUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
+  assertCanAssignRoles(req, body.roles);
+  await assertCanManageTarget(req, id);
   const user = await userService.updateUser(id, body, req.user!._id);
   sendSuccess(res, user, 'User updated', 200);
 });
@@ -189,6 +222,7 @@ export const deactivateUser = catchAsync(
       );
     }
 
+    await assertCanManageTarget(req, id);
     const user = await userService.deactivateUser(id, req.user!._id);
     sendSuccess(res, user, 'User deactivated', 200);
   }
@@ -198,6 +232,7 @@ export const updatePermissions = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const body = req.body;
+    await assertCanManageTarget(req, id);
     const user = await userService.updatePermissions(
       id,
       body.permissions,
@@ -367,6 +402,7 @@ export const revokeCrmAccess = catchAsync(
       );
     }
 
+    await assertCanManageTarget(req, id);
     const user = await userService.revokeCrmAccess(id, req.user!._id);
     sendSuccess(res, user, 'CRM access revoked', 200);
   }

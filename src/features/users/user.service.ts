@@ -380,6 +380,12 @@ export const updateUser = async (
     user.markModified('permissions');
   }
   if (input.isActive !== undefined) user.isActive = input.isActive;
+  if (input.isActive === false) {
+    // Deactivation ends existing sessions: without this the refresh cookie
+    // stays valid for its full lifetime.
+    user.refreshTokenAts = null;
+    user.refreshTokenCrm = null;
+  }
 
   await user.save();
 
@@ -627,6 +633,8 @@ export const revokeCrmAccess = async (
 
   user.appAccess = (user.appAccess as AppAccess[]).filter(a => a !== 'crm');
   user.isActive = false;
+  user.refreshTokenAts = null;
+  user.refreshTokenCrm = null;
   user.markModified('appAccess');
   await user.save();
 

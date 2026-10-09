@@ -7,7 +7,10 @@ import {
 } from '../../shared/middleware/authorize';
 import optionalAuthenticate from '../../shared/middleware/optionalAuthenticate';
 import { uploadResumeWithPortfolio } from '../../shared/middleware/upload';
-import { validate } from '../../shared/validators/common.validator';
+import {
+  httpUrlSchema,
+  validate,
+} from '../../shared/validators/common.validator';
 import { PIPELINE_STAGE_ICONS } from '../pipeline-templates/pipelineTemplate.types';
 import {
   applyToJob,
@@ -120,8 +123,8 @@ const applyToJobSchema = z.object({
   phone: z.string().min(1),
   resumeOriginalName: z.string().optional(),
   resumeRawText: z.string().optional(),
-  videoIntroUrl: z.string().url().optional().nullable(),
-  portfolioUrl: z.string().url().optional().nullable(),
+  videoIntroUrl: httpUrlSchema.optional().nullable(),
+  portfolioUrl: httpUrlSchema.optional().nullable(),
   yearsOfExperience: z.coerce.number().min(0).optional(),
   englishProficiency: z
     .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])

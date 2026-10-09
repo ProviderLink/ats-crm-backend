@@ -7,7 +7,10 @@ import {
   requireRoles,
 } from '../../shared/middleware/authorize';
 import { uploadAvatar, uploadResume } from '../../shared/middleware/upload';
-import { validate } from '../../shared/validators/common.validator';
+import {
+  httpUrlSchema,
+  validate,
+} from '../../shared/validators/common.validator';
 import {
   approveCandidate,
   assignJob,
@@ -32,7 +35,7 @@ const createCandidateSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   phone: z.string().min(1),
-  videoIntroUrl: z.string().url().optional().nullable(),
+  videoIntroUrl: httpUrlSchema.optional().nullable(),
   videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
   yearsOfExperience: z.coerce.number().min(0).optional(),
   englishProficiency: z
@@ -98,7 +101,7 @@ const updateCandidateSchema = z.object({
   firstName: z.string().min(1).max(50).optional(),
   lastName: z.string().min(1).max(50).optional(),
   phone: z.string().min(1).optional(),
-  videoIntroUrl: z.string().url().optional().nullable(),
+  videoIntroUrl: httpUrlSchema.optional().nullable(),
   videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
   yearsOfExperience: z.number().min(0).optional(),
   tags: z.array(z.string()).optional(),
@@ -187,7 +190,7 @@ const publicApplySchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   phone: z.string().min(1),
-  videoIntroUrl: z.string().url().optional().nullable(),
+  videoIntroUrl: httpUrlSchema.optional().nullable(),
   videoIntroSource: z.enum(['cloudinary', 'external']).optional().nullable(),
   englishProficiency: z
     .enum(['basic', 'conversational', 'professional', 'fluent', 'native'])

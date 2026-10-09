@@ -16,6 +16,8 @@ export const getAllReviews = async (filters: {
   candidateId?: string;
   vaId?: string;
   clientId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   reviewType?: string;
   status?: string;
   page?: number;
@@ -31,12 +33,14 @@ export const getAllReviews = async (filters: {
     candidateId,
     vaId,
     clientId,
+    scope,
     reviewType,
     status,
     page = 1,
     limit = 20,
   } = filters;
   const query: Record<string, unknown> = {};
+  if (scope) query['$and'] = [scope];
 
   const effectiveCandidateId = candidateId ?? vaId;
   if (effectiveCandidateId !== undefined)

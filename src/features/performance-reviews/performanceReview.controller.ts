@@ -10,7 +10,14 @@ import { sendSuccess } from '../../shared/utils/response';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
 import Job from '../jobs/job.model';
+import { assertOwnsPair, pairScope } from '../assignments/assignmentScope';
 import * as reviewService from './performanceReview.service';
+
+// An account manager may only touch reviews of VAs on assignments they manage.
+const assertManagesReview = async (req: Request, id: string) => {
+  const review = await reviewService.getReviewById(id);
+  await assertOwnsPair(req.user!, review.candidateId, review.clientId);
+};
 
 export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
   const { candidateId, vaId, clientId, reviewType, status, page, limit } =
@@ -25,6 +32,7 @@ export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
   const result = await reviewService.getAllReviews({
     candidateId: scoped.candidateId,
     clientId: scoped.clientId,
+    scope: await pairScope(req.user!),
     reviewType,
     status,
     page: page !== undefined ? Number(page) : undefined,
@@ -43,6 +51,7 @@ export const getReviewById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const review = await reviewService.getReviewById(id);
   assertOwnsCandidate(req.user!, review.candidateId);
+  await assertOwnsPair(req.user!, review.candidateId, review.clientId);
 
   const [candidate, client, job] = await Promise.all([
     Candidate.findById(review.candidateId).lean(),
@@ -66,6 +75,7 @@ export const generateReview = catchAsync(
   async (req: Request, res: Response) => {
     const body = req.body;
     const generatedByUserId = req.user!._id;
+    await assertOwnsPair(req.user!, body.candidateId, body.clientId);
     const review = await reviewService.generateReview({
       ...body,
       generatedByUserId,
@@ -83,6 +93,7 @@ export const updateReview = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
   const updatedBy = req.user!._id;
+  await assertManagesReview(req, id);
   const review = await reviewService.updateReview(id, body, updatedBy);
   sendSuccess(res, review, 'Performance review updated', 200);
 });
@@ -91,6 +102,7 @@ export const completeReview = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const completedBy = req.user!._id;
+    await assertManagesReview(req, id);
     const review = await reviewService.completeReview(id, completedBy);
     sendSuccess(res, review, 'Performance review completed', 200);
   }
@@ -98,6 +110,7 @@ export const completeReview = catchAsync(
 
 export const deleteReview = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
+  await assertManagesReview(req, id);
   await reviewService.deleteReview(id, req.user!._id);
   sendSuccess(res, null, 'Performance review deleted', 200);
 });
@@ -106,6 +119,7 @@ export const regenerateSection = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const { section } = req.body;
+    await assertManagesReview(req, id);
     const review = await reviewService.regenerateSection(id, section);
     sendSuccess(res, review, `${section} regenerated successfully`, 200);
   }
@@ -116,6 +130,7 @@ export const exportReviewPdf = catchAsync(
     const { id } = req.params;
     const review = await reviewService.getReviewById(id);
     assertOwnsCandidate(req.user!, review.candidateId);
+    await assertOwnsPair(req.user!, review.candidateId, review.clientId);
 
     // Populate names for the PDF
     const [candidate, client, job, timezone] = await Promise.all([

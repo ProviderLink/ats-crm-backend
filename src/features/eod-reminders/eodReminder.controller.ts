@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertOwnsAssignment, assignmentScope } from '../assignments/assignmentScope';
 import * as eodReminderService from './eodReminder.service';
 
 export const getAllEodReminders = catchAsync(
@@ -11,6 +12,7 @@ export const getAllEodReminders = catchAsync(
       assignmentId,
       candidateId,
       status,
+      scope: await assignmentScope(req.user!),
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
@@ -27,6 +29,7 @@ export const getEodReminderById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const eodReminder = await eodReminderService.getEodReminderById(id);
+    await assertOwnsAssignment(req.user!, eodReminder.assignmentId);
     sendSuccess(res, eodReminder, 'EOD reminder retrieved', 200);
   }
 );

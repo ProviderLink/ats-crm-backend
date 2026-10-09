@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { scopeListFilters } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertOwnsAssignment, assignmentScope } from '../assignments/assignmentScope';
 import * as eodService from './eodSubmission.service';
 
 export const getAllEodSubmissions = catchAsync(
@@ -25,6 +26,7 @@ export const getAllEodSubmissions = catchAsync(
       assignmentId,
       candidateId: scoped.candidateId,
       clientId: scoped.clientId,
+      scope: await assignmentScope(user),
       date,
       dateFrom,
       dateTo,
@@ -49,6 +51,7 @@ export const getEodSubmissionById = catchAsync(
       candidateRef: user.candidateRef,
       clientRef: user.clientRef,
     });
+    await assertOwnsAssignment(user, eodSubmission.assignmentId);
     sendSuccess(res, eodSubmission, 'EOD submission retrieved', 200);
   }
 );

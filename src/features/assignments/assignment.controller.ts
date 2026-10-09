@@ -5,6 +5,7 @@ import {
   scopeListFilters,
 } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertManagesAssignment, isAccountManagerOnly } from './assignmentScope';
 import * as assignmentService from './assignment.service';
 
 export const getAllAssignments = catchAsync(
@@ -19,7 +20,8 @@ export const getAllAssignments = catchAsync(
     const result = await assignmentService.getAllAssignments({
       candidateId: scoped.candidateId,
       clientId: scoped.clientId,
-      accountManagerId,
+      // An account manager only ever lists their own assignments
+      accountManagerId: isAccountManagerOnly(user) ? user._id : accountManagerId,
       status,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
@@ -38,6 +40,7 @@ export const getAssignmentById = catchAsync(
     const { id } = req.params;
     const assignment = await assignmentService.getAssignmentById(id);
     assertOwnsRecord(req.user!, assignment);
+    assertManagesAssignment(req.user!, assignment);
     sendSuccess(res, assignment, 'Assignment retrieved', 200);
   }
 );
@@ -46,6 +49,8 @@ export const createAssignment = catchAsync(
   async (req: Request, res: Response) => {
     const body = req.body;
     const createdBy = req.user!._id;
+    // An account manager can only create assignments they will manage
+    assertManagesAssignment(req.user!, { accountManagerId: body.accountManagerId });
     const assignment = await assignmentService.createAssignment(
       body,
       createdBy
@@ -60,6 +65,12 @@ export const updateAssignment = catchAsync(
     const body = req.body;
     const updatedBy = req.user!._id;
     const userRoles = req.user!.roles;
+    // ...and cannot hand an assignment over to another account manager
+    if (body.accountManagerId !== undefined) {
+      assertManagesAssignment(req.user!, {
+        accountManagerId: body.accountManagerId,
+      });
+    }
     const assignment = await assignmentService.updateAssignment(
       id,
       body,

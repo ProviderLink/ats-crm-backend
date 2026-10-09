@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertOwnsAssignment, assignmentScope } from '../assignments/assignmentScope';
 import * as scorecardService from './scorecard.service';
 
 export const getAllScorecards = catchAsync(
@@ -12,6 +13,7 @@ export const getAllScorecards = catchAsync(
     >;
     const result = await scorecardService.getAllScorecards({
       vaId,
+      scope: await assignmentScope(req.user!),
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
@@ -29,8 +31,10 @@ export const getScorecardById = catchAsync(
     const { id } = req.params;
     try {
       const scorecard = await scorecardService.getScorecardById(id);
+      await assertOwnsAssignment(req.user!, scorecard.assignmentId);
       sendSuccess(res, scorecard, 'Scorecard retrieved', 200);
-    } catch {
+    } catch (err) {
+      if (err instanceof AppError) throw err;
       throw new AppError(404, 'SCORECARD_NOT_FOUND', 'Scorecard not found');
     }
   }

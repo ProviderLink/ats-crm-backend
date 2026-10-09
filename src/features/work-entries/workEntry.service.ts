@@ -21,6 +21,8 @@ export const getAllWorkEntries = async (filters: {
   assignmentId?: string;
   candidateId?: string;
   clientId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   entryDate?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -37,6 +39,7 @@ export const getAllWorkEntries = async (filters: {
     assignmentId,
     candidateId,
     clientId,
+    scope,
     entryDate,
     dateFrom,
     dateTo,
@@ -46,6 +49,7 @@ export const getAllWorkEntries = async (filters: {
   const query: Record<string, unknown> = {};
   // Always exclude soft-deleted entries
   query['isDeleted'] = { $ne: true };
+  if (scope) query['$and'] = [scope];
 
   if (assignmentId !== undefined)
     query['assignmentId'] = new mongoose.Types.ObjectId(assignmentId);

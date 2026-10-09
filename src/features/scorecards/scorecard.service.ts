@@ -44,6 +44,8 @@ function computeProductivityScore(params: {
 
 export const getAllScorecards = async (filters: {
   vaId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -53,9 +55,10 @@ export const getAllScorecards = async (filters: {
   limit: number;
   totalPages: number;
 }> => {
-  const { vaId, page = 1, limit = 20 } = filters;
+  const { vaId, scope, page = 1, limit = 20 } = filters;
   const query: Record<string, unknown> = {};
   if (vaId) query['vaId'] = new mongoose.Types.ObjectId(vaId);
+  if (scope) query['$and'] = [scope];
 
   const skip = (page - 1) * limit;
   const [scorecards, total] = await Promise.all([

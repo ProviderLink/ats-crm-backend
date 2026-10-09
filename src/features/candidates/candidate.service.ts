@@ -169,10 +169,35 @@ export const getCandidateByEmail = async (
 };
 
 /**
- * Find an existing candidate by email or normalized phone, or create a new one.
- * Returns {candidate, isExisting} so callers can react to pre-existing profiles.
- * This is the single entry point for both internal and public candidate creation.
+ * Re-applying through the public form refreshes the stored resume and profile
+ * only while the candidate is still In Review. Once they are approved, hired
+ * or in a pipeline (or banned) their record is left exactly as it is.
  */
+export const canApplicantUpdateProfile = async (
+  candidate: ICandidateDocument
+): Promise<boolean> => {
+  if (candidate.status !== 'pending') return false;
+  if (candidate.eligibilityStatus === 'permanently_ineligible') return false;
+  const inPipeline = await Application.exists({
+    candidateId: candidate._id,
+    phase: { $in: ['approved', 'hired'] },
+  });
+  return !inPipeline;
+};
+
+/** The candidate a public application belongs to, matched by email then phone. */
+export const findExistingApplicant = async (
+  email: string,
+  phone?: string
+): Promise<ICandidateDocument | null> => {
+  const byEmail = await Candidate.findOne({ email: email.toLowerCase() });
+  if (byEmail) return byEmail;
+  const normalizedPhone = normalizePhone(phone);
+  return normalizedPhone
+    ? Candidate.findOne({ phoneNormalized: normalizedPhone })
+    : null;
+};
+
 /**
  * Merge portfolio input onto an existing candidate on re-apply.
  *
@@ -204,76 +229,58 @@ async function applyPortfolioToExisting(
   }
 }
 
+/** Apply a re-application's resume, portfolio and parsed data to a candidate. */
+async function refreshFromApplication(
+  existing: ICandidateDocument,
+  input: CreateCandidateInput
+): Promise<void> {
+  if (input.resumeUrl && input.resumeRawText) {
+    // Delete the previous resume file before replacing it so re-applicants
+    // don't leave orphaned files in Cloudinary.
+    if (existing.resumeUrl && existing.resumeUrl !== input.resumeUrl) {
+      const oldPublicId = extractCloudinaryPublicId(existing.resumeUrl, 'raw');
+      if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
+    }
+    existing.resumeUrl = input.resumeUrl;
+    existing.resumeOriginalName = input.resumeOriginalName;
+    existing.resumeRawText = input.resumeRawText;
+  }
+  await applyPortfolioToExisting(existing, input);
+  // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
+  if (input.parsedData) {
+    existing.parsedData = input.parsedData;
+    existing.markModified('parsedData');
+  }
+  // Always record the job they applied to (idempotent)
+  if (input.appliedJobId && !existing.appliedJobId) {
+    existing.appliedJobId = new mongoose.Types.ObjectId(input.appliedJobId);
+  }
+}
+
+/**
+ * Find an existing candidate by email or normalized phone, or create a new one.
+ * Returns {candidate, isExisting} so callers can react to pre-existing profiles.
+ * An existing candidate is only updated while they are still In Review (see
+ * canApplicantUpdateProfile).
+ */
 export const findOrCreateCandidate = async (
   input: CreateCandidateInput,
   createdBy: string | null
 ): Promise<{ candidate: ICandidate; isExisting: boolean }> => {
   const normalizedPhone = normalizePhone(input.phone);
 
-  // 1. Email match (case-insensitive)
-  const byEmail = await Candidate.findOne({
-    email: input.email.toLowerCase(),
-  });
-  if (byEmail) {
-    // Existing candidate — update resume if new one provided
-    if (input.resumeUrl && input.resumeRawText) {
-      // Delete the previous resume file before replacing it so re-applicants
-      // don't leave orphaned files in Cloudinary.
-      if (byEmail.resumeUrl && byEmail.resumeUrl !== input.resumeUrl) {
-        const oldPublicId = extractCloudinaryPublicId(byEmail.resumeUrl, 'raw');
-        if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
-      }
-      byEmail.resumeUrl = input.resumeUrl;
-      byEmail.resumeOriginalName = input.resumeOriginalName;
-      byEmail.resumeRawText = input.resumeRawText;
+  // 1. Email match (case-insensitive), 2. phone match (normalized)
+  const existing =
+    (await Candidate.findOne({ email: input.email.toLowerCase() })) ??
+    (normalizedPhone
+      ? await Candidate.findOne({ phoneNormalized: normalizedPhone })
+      : null);
+  if (existing) {
+    if (await canApplicantUpdateProfile(existing)) {
+      await refreshFromApplication(existing, input);
+      await existing.save();
     }
-    await applyPortfolioToExisting(byEmail, input);
-    // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
-    if (input.parsedData) {
-      byEmail.parsedData = input.parsedData;
-      byEmail.markModified('parsedData');
-    }
-    // Always record the job they applied to (idempotent)
-    if (input.appliedJobId && !byEmail.appliedJobId) {
-      byEmail.appliedJobId = new mongoose.Types.ObjectId(input.appliedJobId);
-    }
-    await byEmail.save();
-    return { candidate: byEmail.toSafeObject(), isExisting: true };
-  }
-
-  // 2. Phone match (normalized)
-  if (normalizedPhone) {
-    const byPhone = await Candidate.findOne({
-      phoneNormalized: normalizedPhone,
-    });
-    if (byPhone) {
-      if (input.resumeUrl && input.resumeRawText) {
-        // Delete the previous resume file before replacing it so re-applicants
-        // don't leave orphaned files in Cloudinary.
-        if (byPhone.resumeUrl && byPhone.resumeUrl !== input.resumeUrl) {
-          const oldPublicId = extractCloudinaryPublicId(
-            byPhone.resumeUrl,
-            'raw'
-          );
-          if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
-        }
-        byPhone.resumeUrl = input.resumeUrl;
-        byPhone.resumeOriginalName = input.resumeOriginalName;
-        byPhone.resumeRawText = input.resumeRawText;
-      }
-      await applyPortfolioToExisting(byPhone, input);
-      // Save AI-parsed data when provided (re-apply with a freshly parsed resume)
-      if (input.parsedData) {
-        byPhone.parsedData = input.parsedData;
-        byPhone.markModified('parsedData');
-      }
-      // Always record the job they applied to (idempotent)
-      if (input.appliedJobId && !byPhone.appliedJobId) {
-        byPhone.appliedJobId = new mongoose.Types.ObjectId(input.appliedJobId);
-      }
-      await byPhone.save();
-      return { candidate: byPhone.toSafeObject(), isExisting: true };
-    }
+    return { candidate: existing.toSafeObject(), isExisting: true };
   }
 
   // 3. Create new candidate

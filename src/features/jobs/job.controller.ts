@@ -128,14 +128,28 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     );
   }
 
+  if (!req.file) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
+  }
+
+  // A returning applicant who is already approved, hired or in a pipeline keeps
+  // their record exactly as it is: nothing is uploaded or overwritten.
+  const existingApplicant = await candidateService.findExistingApplicant(
+    body.email,
+    body.phone
+  );
+  const refreshProfile =
+    !existingApplicant ||
+    (await candidateService.canApplicantUpdateProfile(existingApplicant));
+
   // Resolve the resume at final submit: upload the file to Cloudinary here
   // (instead of during the stateless parse step) so abandoned applications
   // don't leave orphan files consuming storage.
-  let resumeUrl: string | undefined;
+  let resumeUrl = '';
   let resumeRawText: string | undefined = body.resumeRawText;
   let resumeOriginalName: string = body.resumeOriginalName || 'resume.pdf';
 
-  if (req.file) {
+  if (refreshProfile) {
     resumeOriginalName = req.file.originalname || resumeOriginalName;
     resumeRawText =
       body.resumeRawText && body.resumeRawText.trim() !== ''
@@ -145,15 +159,11 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     resumeUrl = url;
   }
 
-  if (!resumeUrl) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
-  }
-
   // Optional work samples — a link, a file, or neither. Never required, since
   // only some roles (e.g. design) have a portfolio to show.
   let portfolioFileUrl: string | null = null;
   let portfolioFileName: string | null = null;
-  if (req.portfolioFile) {
+  if (refreshProfile && req.portfolioFile) {
     const uploaded = await uploadToCloudinary(req.portfolioFile, 'portfolios');
     portfolioFileUrl = uploaded.url;
     portfolioFileName = req.portfolioFile.originalname;
@@ -219,6 +229,7 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
   // Trigger AI resume parsing for the newly created candidate (background)
   // only when parsedData wasn't already supplied from the stateless parse.
   if (
+    refreshProfile &&
     !body.parsedData &&
     candidate.resumeRawText &&
     candidate.resumeRawText.trim() !== ''
@@ -231,15 +242,17 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  // Ensure appliedJobId is set for re-applies too.
-  await candidateService.updateCandidate(
-    candidateId,
-    { appliedJobId: jobId } as any,
-    null
-  );
+  if (refreshProfile) {
+    // Ensure appliedJobId is set for re-applies too.
+    await candidateService.updateCandidate(
+      candidateId,
+      { appliedJobId: jobId } as any,
+      null
+    );
 
-  // Trigger TYPE-1 candidacy validation (real / fake / garbage check)
-  runCandidacyValidation(candidateId);
+    // Trigger TYPE-1 candidacy validation (real / fake / garbage check)
+    runCandidacyValidation(candidateId);
+  }
 
   // Send application confirmation email if enabled in settings (fire-and-forget)
   settingsService

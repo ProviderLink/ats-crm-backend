@@ -87,9 +87,12 @@ export const getWorkEntriesReport = async (filters: {
   endDate?: string;
   candidateId?: string;
   clientId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   format?: ExportFormat;
 }) => {
   const query: Record<string, any> = {};
+  if (filters.scope) query.$and = [filters.scope];
 
   if (filters.startDate || filters.endDate) {
     query.entryDate = {};
@@ -140,9 +143,12 @@ export const getEodSubmissionsReport = async (filters: {
   endDate?: string;
   candidateId?: string;
   clientId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   format?: ExportFormat;
 }) => {
   const query: Record<string, any> = {};
+  if (filters.scope) query.$and = [filters.scope];
 
   if (filters.startDate || filters.endDate) {
     // `dateKey` is the company business day, so a plain inclusive string range
@@ -245,9 +251,12 @@ export const getPerformanceReport = async (filters: {
   endDate?: string;
   candidateId?: string;
   clientId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   format?: ExportFormat;
 }) => {
   const query: Record<string, any> = {};
+  if (filters.scope) query.$and = [filters.scope];
 
   if (filters.startDate || filters.endDate) {
     query.createdAt = {};

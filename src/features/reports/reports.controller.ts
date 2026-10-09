@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import type { ExportFormat } from './reports.service';
+import { assignmentScope, pairScope } from '../assignments/assignmentScope';
 import * as reportsService from './reports.service';
 
 function sendReport(
@@ -52,6 +53,7 @@ export const exportWorkEntries = catchAsync(
       endDate,
       candidateId,
       clientId,
+      scope: await assignmentScope(req.user!),
       format: fmt,
     });
     sendReport(res, result, fmt);
@@ -68,6 +70,7 @@ export const exportEodSubmissions = catchAsync(
       endDate,
       candidateId,
       clientId,
+      scope: await assignmentScope(req.user!),
       format: fmt,
     });
     sendReport(res, result, fmt);
@@ -84,6 +87,7 @@ export const exportPerformance = catchAsync(
       endDate,
       candidateId,
       clientId,
+      scope: await pairScope(req.user!),
       format: fmt,
     });
     sendReport(res, result, fmt);

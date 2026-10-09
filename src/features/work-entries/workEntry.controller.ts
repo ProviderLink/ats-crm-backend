@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { scopeListFilters } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertOwnsAssignment, assignmentScope } from '../assignments/assignmentScope';
 import * as workEntryService from './workEntry.service';
 
 export const getAllWorkEntries = catchAsync(
@@ -25,6 +26,7 @@ export const getAllWorkEntries = catchAsync(
       assignmentId,
       candidateId: scoped.candidateId,
       clientId: scoped.clientId,
+      scope: await assignmentScope(user),
       entryDate,
       dateFrom,
       dateTo,
@@ -44,6 +46,7 @@ export const getWorkEntryById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const workEntry = await workEntryService.getWorkEntryById(id, req.user!);
+    await assertOwnsAssignment(req.user!, workEntry.assignmentId);
     sendSuccess(res, workEntry, 'Work entry retrieved', 200);
   }
 );

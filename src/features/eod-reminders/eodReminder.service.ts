@@ -7,6 +7,8 @@ export const getAllEodReminders = async (filters: {
   assignmentId?: string;
   candidateId?: string;
   status?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -16,8 +18,16 @@ export const getAllEodReminders = async (filters: {
   limit: number;
   totalPages: number;
 }> => {
-  const { assignmentId, candidateId, status, page = 1, limit = 20 } = filters;
+  const {
+    assignmentId,
+    candidateId,
+    status,
+    scope,
+    page = 1,
+    limit = 20,
+  } = filters;
   const query: Record<string, unknown> = {};
+  if (scope) query['$and'] = [scope];
 
   if (assignmentId !== undefined)
     query['assignmentId'] = new mongoose.Types.ObjectId(assignmentId);

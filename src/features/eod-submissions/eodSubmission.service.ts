@@ -44,6 +44,8 @@ export const getAllEodSubmissions = async (filters: {
   assignmentId?: string;
   candidateId?: string;
   clientId?: string;
+  /** Extra Mongo condition, e.g. an account manager's own assignments. */
+  scope?: Record<string, unknown>;
   date?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -60,6 +62,7 @@ export const getAllEodSubmissions = async (filters: {
     assignmentId,
     candidateId,
     clientId,
+    scope,
     date,
     dateFrom,
     dateTo,
@@ -67,6 +70,7 @@ export const getAllEodSubmissions = async (filters: {
     limit = 20,
   } = filters;
   const query: Record<string, unknown> = {};
+  if (scope) query['$and'] = [scope];
 
   if (assignmentId !== undefined)
     query['assignmentId'] = new mongoose.Types.ObjectId(assignmentId);

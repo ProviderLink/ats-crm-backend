@@ -12,6 +12,7 @@ import EmailTemplate from '../email-templates/emailTemplate.model';
 import * as emailService from '../emails/email.service';
 import * as settingsService from '../settings/settings.service';
 import * as jobService from './job.service';
+import { toPublicJob } from './job.public';
 import { generateJobDraft } from './jobDraft.service';
 import { standardizeJobContent } from './jobStandardize.service';
 
@@ -20,24 +21,41 @@ export const getAllJobs = catchAsync(async (req: Request, res: Response) => {
     string,
     string | undefined
   >;
+  // Anonymous visitors (the careers portal) only ever see open jobs, trimmed
+  // to the public fields. Signed-in callers get the full list as before.
+  const isAnonymous = !req.user;
   const result = await jobService.getAllJobs({
-    clientId,
-    status,
+    clientId: isAnonymous ? undefined : clientId,
+    status: isAnonymous ? 'open' : status,
     search,
     page: page !== undefined ? Number(page) : undefined,
     limit: limit !== undefined ? Number(limit) : undefined,
   });
-  sendSuccess(res, result.jobs, 'Jobs retrieved', 200, {
-    total: result.total,
-    page: result.page,
-    limit: result.limit,
-    totalPages: result.totalPages,
-  });
+  sendSuccess(
+    res,
+    isAnonymous ? result.jobs.map(toPublicJob) : result.jobs,
+    'Jobs retrieved',
+    200,
+    {
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+    }
+  );
 });
 
 export const getJobById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const job = await jobService.getJobById(id);
+  if (!req.user) {
+    // Drafts are never public; closed jobs stay viewable so shared links work.
+    if (job.status === 'draft') {
+      throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+    }
+    sendSuccess(res, toPublicJob(job), 'Job retrieved', 200);
+    return;
+  }
   sendSuccess(res, job, 'Job retrieved', 200);
 });
 
@@ -113,7 +131,7 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
   // Resolve the resume at final submit: upload the file to Cloudinary here
   // (instead of during the stateless parse step) so abandoned applications
   // don't leave orphan files consuming storage.
-  let resumeUrl: string | undefined = body.resumeUrl;
+  let resumeUrl: string | undefined;
   let resumeRawText: string | undefined = body.resumeRawText;
   let resumeOriginalName: string = body.resumeOriginalName || 'resume.pdf';
 
@@ -141,111 +159,79 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     portfolioFileName = req.portfolioFile.originalname;
   }
 
-  let candidateId = body.candidateId;
+  // Always find-or-create by email/phone. A client-supplied `candidateId` is
+  // deliberately NOT honoured: this route is public, so accepting it would let
+  // anyone modify an arbitrary existing candidate.
+  let candidateId: string;
 
-  // If candidateId is provided, update the existing candidate with reviewed data
-  if (candidateId) {
-    // Check permanently-ineligible status before processing
-    const existingCandidate =
-      await candidateService.getCandidateById(candidateId);
-    if (existingCandidate.eligibilityStatus === 'permanently_ineligible') {
-      logger.warn(
-        `Permanently ineligible candidate ${candidateId} reapplied for job ${jobId}`
-      );
-      createLog({
-        action: 'ineligible_reapply_blocked',
-        resourceType: 'candidate',
-        resourceId: candidateId,
-        metadata: { jobId },
-        performedBy: null,
-      });
-      sendSuccess(
-        res,
-        { candidateId, jobId, received: true, blocked: true },
-        'Application received',
-        201
-      );
-      return;
-    }
+  // Find-or-create candidate via email+phone dedup (handles reapplicants).
+  // appliedJobId is set atomically during creation so it's never missing.
+  const { candidate, isExisting } =
+    await candidateService.findOrCreateCandidate(
+      {
+        firstName: body.firstName,
+        lastName: body.lastName,
+        email: body.email,
+        phone: body.phone,
+        resumeUrl,
+        resumeOriginalName,
+        resumeRawText,
+        videoIntroUrl: body.videoIntroUrl ?? null,
+        portfolioUrl: body.portfolioUrl ?? null,
+        portfolioFileUrl,
+        portfolioFileName,
+        yearsOfExperience: body.yearsOfExperience ?? 0,
+        englishProficiency: body.englishProficiency ?? null,
+        currentSalaryPHP: body.currentSalaryPHP ?? null,
+        currentSalaryUSD: body.currentSalaryUSD ?? null,
+        reasonForLeaving: body.reasonForLeaving ?? null,
+        cityOfResidence: body.cityOfResidence ?? null,
+        parsedData: body.parsedData ?? null,
+        source: 'applied',
+        appliedJobId: jobId,
+      },
+      null
+    );
+  candidateId = candidate._id;
 
-    if (body.parsedData) {
-      await candidateService.updateCandidate(
-        candidateId,
-        { parsedData: body.parsedData },
-        null // public apply, no auth user
-      );
-    }
-  } else {
-    // Find-or-create candidate via email+phone dedup (handles reapplicants).
-    // appliedJobId is set atomically during creation so it's never missing.
-    const { candidate, isExisting } =
-      await candidateService.findOrCreateCandidate(
-        {
-          firstName: body.firstName,
-          lastName: body.lastName,
-          email: body.email,
-          phone: body.phone,
-          resumeUrl,
-          resumeOriginalName,
-          resumeRawText,
-          videoIntroUrl: body.videoIntroUrl ?? null,
-          portfolioUrl: body.portfolioUrl ?? null,
-          portfolioFileUrl,
-          portfolioFileName,
-          yearsOfExperience: body.yearsOfExperience ?? 0,
-          englishProficiency: body.englishProficiency ?? null,
-          currentSalaryPHP: body.currentSalaryPHP ?? null,
-          currentSalaryUSD: body.currentSalaryUSD ?? null,
-          reasonForLeaving: body.reasonForLeaving ?? null,
-          cityOfResidence: body.cityOfResidence ?? null,
-          parsedData: body.parsedData ?? null,
-          source: 'applied',
-          appliedJobId: jobId,
-        },
-        null
-      );
-    candidateId = candidate._id;
+  // If this is a permanently ineligible candidate reapplying, log + flag
+  if (candidate.eligibilityStatus === 'permanently_ineligible') {
+    logger.warn(
+      `Permanently ineligible candidate ${candidateId} reapplied for job ${jobId}`
+    );
+    createLog({
+      action: 'ineligible_reapply_blocked',
+      resourceType: 'candidate',
+      resourceId: candidateId,
+      metadata: { jobId },
+      performedBy: null,
+    });
 
-    // If this is a permanently ineligible candidate reapplying, log + flag
-    if (candidate.eligibilityStatus === 'permanently_ineligible') {
-      logger.warn(
-        `Permanently ineligible candidate ${candidateId} reapplied for job ${jobId}`
-      );
-      createLog({
-        action: 'ineligible_reapply_blocked',
-        resourceType: 'candidate',
-        resourceId: candidateId,
-        metadata: { jobId },
-        performedBy: null,
-      });
-
-      sendSuccess(
-        res,
-        { candidateId, jobId, received: true, blocked: true },
-        'Application received',
-        201
-      );
-      return;
-    }
-
-    // Trigger AI resume parsing for the newly created candidate (background)
-    // only when parsedData wasn't already supplied from the stateless parse.
-    if (
-      !body.parsedData &&
-      candidate.resumeRawText &&
-      candidate.resumeRawText.trim() !== ''
-    ) {
-      runResumeParsing(candidateId).catch(err => {
-        logger.error('AI resume parsing failed during job apply', {
-          candidateId,
-          error: (err as Error).message,
-        });
-      });
-    }
+    sendSuccess(
+      res,
+      { candidateId, jobId, received: true, blocked: true },
+      'Application received',
+      201
+    );
+    return;
   }
 
-  // Ensure appliedJobId is set even for the candidateId branch (re-applies).
-  // The findOrCreateCandidate branch already sets it atomically.
+  // Trigger AI resume parsing for the newly created candidate (background)
+  // only when parsedData wasn't already supplied from the stateless parse.
+  if (
+    !body.parsedData &&
+    candidate.resumeRawText &&
+    candidate.resumeRawText.trim() !== ''
+  ) {
+    runResumeParsing(candidateId).catch(err => {
+      logger.error('AI resume parsing failed during job apply', {
+        candidateId,
+        error: (err as Error).message,
+      });
+    });
+  }
+
+  // Ensure appliedJobId is set for re-applies too.
   await candidateService.updateCandidate(
     candidateId,
     { appliedJobId: jobId } as any,

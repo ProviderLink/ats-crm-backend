@@ -5,6 +5,7 @@ import {
   requireAppAccess,
   requirePermission,
 } from '../../shared/middleware/authorize';
+import optionalAuthenticate from '../../shared/middleware/optionalAuthenticate';
 import { uploadResumeWithPortfolio } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import { PIPELINE_STAGE_ICONS } from '../pipeline-templates/pipelineTemplate.types';
@@ -117,7 +118,6 @@ const applyToJobSchema = z.object({
   lastName: z.string().min(1).max(50),
   email: z.string().email(),
   phone: z.string().min(1),
-  resumeUrl: z.string().url().optional(),
   resumeOriginalName: z.string().optional(),
   resumeRawText: z.string().optional(),
   videoIntroUrl: z.string().url().optional().nullable(),
@@ -138,7 +138,6 @@ const applyToJobSchema = z.object({
   reasonForLeaving: z.string().max(500).optional().nullable(),
   cityOfResidence: z.string().max(100).optional().nullable(),
   coverLetter: z.string().optional(),
-  candidateId: z.string().optional(),
   parsedData: z.preprocess(
     v => {
       if (typeof v === 'string' && v.trim() !== '') {
@@ -182,11 +181,27 @@ const applyToJobSchema = z.object({
   ),
 });
 
+// Query strings are untrusted: with Express's extended parser `?status[$ne]=x`
+// arrives as an object, which would reach Mongo as an operator.
+const listJobsQuerySchema = z.object({
+  clientId: z.string().optional(),
+  status: z.string().optional(),
+  search: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(10000).optional(),
+});
+
 const router = Router();
 
-// Public routes — must be registered before authenticate middleware
-router.get('/', getAllJobs);
-router.get('/:id', getJobById);
+// Public routes — must be registered before authenticate middleware.
+// Anonymous callers get a trimmed view; a valid token gets the full one.
+router.get(
+  '/',
+  optionalAuthenticate,
+  validate(listJobsQuerySchema, 'query'),
+  getAllJobs
+);
+router.get('/:id', optionalAuthenticate, getJobById);
 router.post(
   '/:id/apply',
   uploadResumeWithPortfolio,

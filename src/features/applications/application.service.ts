@@ -116,7 +116,18 @@ export const createApplication = async (
     candidateId: input.candidateId,
     jobId: input.jobId,
   });
-  if (existing) {
+  // (candidateId, jobId) is unique, so a candidate can never get a second
+  // application for the same job. The one exception is an application that was
+  // closed as a plain move (job change / removal to the Talent Pool): it has
+  // no disposition (`closedAt` is null), so assigning the candidate back to
+  // that job reopens it instead of failing. Real rejections stay closed.
+  const isReopen =
+    !!existing &&
+    existing.phase === 'rejected' &&
+    !existing.closedAt &&
+    input.source === 'assigned' &&
+    !isBlocked;
+  if (existing && !isReopen) {
     throw new AppError(
       409,
       'CANDIDATE_ALREADY_APPLIED',
@@ -161,18 +172,34 @@ export const createApplication = async (
     };
   }
 
-  const application = await Application.create({
-    candidateId: input.candidateId,
-    jobId: input.jobId,
-    clientId: input.clientId,
-    source: input.source,
-    phase,
-    currentStage,
-    isBlocked,
-    createdBy: input.createdBy
-      ? new mongoose.Types.ObjectId(input.createdBy)
-      : null,
-  });
+  let application;
+  if (existing && isReopen) {
+    existing.phase = phase;
+    existing.currentStage = currentStage as typeof existing.currentStage;
+    existing.source = input.source;
+    existing.isBlocked = false;
+    existing.approvedAt = null;
+    existing.approvedBy = null;
+    existing.rejectedAt = null;
+    existing.rejectedBy = null;
+    existing.rejectionReason = null;
+    existing.lastStage = null;
+    await existing.save();
+    application = existing;
+  } else {
+    application = await Application.create({
+      candidateId: input.candidateId,
+      jobId: input.jobId,
+      clientId: input.clientId,
+      source: input.source,
+      phase,
+      currentStage,
+      isBlocked,
+      createdBy: input.createdBy
+        ? new mongoose.Types.ObjectId(input.createdBy)
+        : null,
+    });
+  }
 
   if (
     (input.source === 'internal_upload' || input.source === 'assigned') &&
@@ -219,12 +246,21 @@ export const createApplication = async (
     resourceId: application._id.toString(),
     relatedType: 'candidate',
     relatedId: input.candidateId,
-    metadata: { source: input.source, phase, isBlocked },
+    metadata: {
+      source: input.source,
+      phase,
+      isBlocked,
+      ...(isReopen ? { reopened: true } : {}),
+    },
     performedBy: input.createdBy ?? null,
   });
 
   const result = application.toSafeObject();
-  emitToAts('applications', 'application:created', result);
+  emitToAts(
+    'applications',
+    isReopen ? 'application:updated' : 'application:created',
+    result
+  );
   return result;
 };
 

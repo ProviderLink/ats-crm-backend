@@ -503,10 +503,10 @@ export const approveCandidate = catchAsync(
       throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
     }
 
-    // Change candidate status to approved
-    await candidateService.updateCandidateStatus(id, 'approved', updatedBy);
-
-    // Create Application — the link between candidate and job.
+    // Create Application — the link between candidate and job. This runs
+    // BEFORE the status change: it can be refused (e.g. the job is closed),
+    // and a candidate already flipped to 'approved' would then be left with no
+    // application and vanish from every tab.
     const application = await applicationService.createApplication({
       candidateId: id,
       jobId,
@@ -514,6 +514,9 @@ export const approveCandidate = catchAsync(
       source: 'direct_apply',
       createdBy: updatedBy,
     });
+
+    // Change candidate status to approved
+    await candidateService.updateCandidateStatus(id, 'approved', updatedBy);
 
     // Immediately approve the application so the candidate lands in the
     // pipeline at the job's first stage (In Pipeline tab) rather than

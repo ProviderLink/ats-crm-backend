@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
+import { assertOwnsCandidate } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
 import * as service from './vaProfile.service';
 
@@ -23,6 +24,7 @@ export const getAllVaProfiles = catchAsync(
 export const getVaProfileById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    assertOwnsCandidate(req.user!, id);
     try {
       const profile = await service.getVaProfileById(id);
       sendSuccess(res, profile, 'VA profile retrieved', 200);

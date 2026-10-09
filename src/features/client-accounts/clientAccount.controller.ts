@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
+import { assertOwnsRecord } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
 import * as service from './clientAccount.service';
 
@@ -42,6 +43,7 @@ export const getClientAccountById = catchAsync(
 export const getHiredVasForClient = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    assertOwnsRecord(req.user!, { clientId: id });
     const vas = await service.getHiredVasForClient(id);
     sendSuccess(res, vas, 'Hired VAs retrieved', 200);
   }

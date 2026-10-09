@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
+import {
+  assertOwnsCandidate,
+  scopeListFilters,
+} from '../../shared/utils/crmScope';
 import { buildReviewPdf } from '../../shared/utils/pdf';
 import { sendSuccess } from '../../shared/utils/response';
 import Candidate from '../candidates/candidate.model';
@@ -12,10 +16,15 @@ export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
   const { candidateId, vaId, clientId, reviewType, status, page, limit } =
     req.query as Record<string, string | undefined>;
 
-  const result = await reviewService.getAllReviews({
-    candidateId,
-    vaId,
+  // A VA only ever sees their own reviews (vaId is an alias of candidateId)
+  const scoped = scopeListFilters(req.user!, {
+    candidateId: candidateId ?? vaId,
     clientId,
+  });
+
+  const result = await reviewService.getAllReviews({
+    candidateId: scoped.candidateId,
+    clientId: scoped.clientId,
     reviewType,
     status,
     page: page !== undefined ? Number(page) : undefined,
@@ -33,6 +42,7 @@ export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
 export const getReviewById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const review = await reviewService.getReviewById(id);
+  assertOwnsCandidate(req.user!, review.candidateId);
 
   const [candidate, client, job] = await Promise.all([
     Candidate.findById(review.candidateId).lean(),
@@ -105,6 +115,7 @@ export const exportReviewPdf = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const review = await reviewService.getReviewById(id);
+    assertOwnsCandidate(req.user!, review.candidateId);
 
     // Populate names for the PDF
     const [candidate, client, job, timezone] = await Promise.all([

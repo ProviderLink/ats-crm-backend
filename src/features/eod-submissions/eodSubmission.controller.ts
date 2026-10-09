@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
+import { scopeListFilters } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
 import * as eodService from './eodSubmission.service';
 
@@ -17,28 +18,13 @@ export const getAllEodSubmissions = catchAsync(
     } = req.query as Record<string, string | undefined>;
     const user = req.user!;
 
-    // Auto-scope: VA sees only their own EODs, client sees only their VAs
-    const isAdmin = user.roles.includes('admin');
-    const isAM = user.roles.includes('account_manager');
-
-    const resolvedCandidateId =
-      isAdmin || isAM
-        ? candidateId
-        : user.roles.includes('va') && user.candidateRef
-          ? user.candidateRef
-          : candidateId;
-
-    const resolvedClientId =
-      isAdmin || isAM
-        ? clientId
-        : user.roles.includes('client') && user.clientRef
-          ? user.clientRef
-          : clientId;
+    // A VA sees only their own EODs, a client only their VAs'
+    const scoped = scopeListFilters(user, { candidateId, clientId });
 
     const result = await eodService.getAllEodSubmissions({
       assignmentId,
-      candidateId: resolvedCandidateId,
-      clientId: resolvedClientId,
+      candidateId: scoped.candidateId,
+      clientId: scoped.clientId,
       date,
       dateFrom,
       dateTo,
@@ -79,7 +65,8 @@ export const createEodSubmission = catchAsync(
     const body = req.body;
     const eodSubmission = await eodService.createEodSubmission(
       body,
-      req.user!._id
+      req.user!._id,
+      req.user!
     );
     sendSuccess(res, eodSubmission, 'EOD submitted successfully', 201);
   }
@@ -89,7 +76,11 @@ export const updateEodSubmission = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const body = req.body;
-    const eodSubmission = await eodService.updateEodSubmission(id, body);
+    const eodSubmission = await eodService.updateEodSubmission(
+      id,
+      body,
+      req.user!
+    );
     sendSuccess(res, eodSubmission, 'EOD submission updated', 200);
   }
 );
@@ -97,7 +88,7 @@ export const updateEodSubmission = catchAsync(
 export const deleteEodSubmission = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    await eodService.deleteEodSubmission(id, req.user!._id);
+    await eodService.deleteEodSubmission(id, req.user!._id, req.user!);
     sendSuccess(res, null, 'EOD submission deleted', 200);
   }
 );

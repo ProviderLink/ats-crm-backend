@@ -1,5 +1,10 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import {
+  assertOwnsCandidate,
+  assertOwnsRecord,
+  type CrmActor,
+} from '../../shared/utils/crmScope';
 import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Assignment from '../assignments/assignment.model';
@@ -117,20 +122,26 @@ export const getAllWorkEntries = async (filters: {
   };
 };
 
-export const getWorkEntryById = async (id: string): Promise<IWorkEntry> => {
+export const getWorkEntryById = async (
+  id: string,
+  actor?: CrmActor
+): Promise<IWorkEntry> => {
   const workEntry = await WorkEntry.findById(id);
   if (!workEntry)
     throw new AppError(404, 'WORK_ENTRY_NOT_FOUND', 'Work entry not found');
+  if (actor) assertOwnsRecord(actor, workEntry);
   return workEntry.toSafeObject();
 };
 
 export const createWorkEntry = async (
   input: CreateWorkEntryInput,
-  createdBy: string
+  createdBy: string,
+  actor?: CrmActor
 ): Promise<IWorkEntry> => {
   const assignment = await Assignment.findById(input.assignmentId);
   if (!assignment)
     throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
+  if (actor) assertOwnsCandidate(actor, assignment.candidateId);
   if (assignment.status === 'ended') {
     throw new AppError(
       400,
@@ -167,12 +178,14 @@ export const createWorkEntry = async (
 export const updateWorkEntry = async (
   id: string,
   input: UpdateWorkEntryInput,
-  updatedBy: string
+  updatedBy: string,
+  actor?: CrmActor
 ): Promise<IWorkEntry> => {
   void updatedBy;
   const workEntry = await WorkEntry.findById(id);
   if (!workEntry)
     throw new AppError(404, 'WORK_ENTRY_NOT_FOUND', 'Work entry not found');
+  if (actor) assertOwnsCandidate(actor, workEntry.candidateId);
 
   if (input.entryDate !== undefined)
     workEntry.entryDate = new Date(input.entryDate);
@@ -200,11 +213,13 @@ export const updateWorkEntry = async (
 };
 
 export const deleteWorkEntry = async (
-  id: string
+  id: string,
+  actor?: CrmActor
 ): Promise<{ deleted: boolean }> => {
   const workEntry = await WorkEntry.findById(id);
   if (!workEntry)
     throw new AppError(404, 'WORK_ENTRY_NOT_FOUND', 'Work entry not found');
+  if (actor) assertOwnsCandidate(actor, workEntry.candidateId);
 
   // Soft-delete: mark as deleted instead of removing from DB
   workEntry.isDeleted = true;

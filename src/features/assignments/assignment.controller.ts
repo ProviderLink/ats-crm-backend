@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
+import {
+  assertOwnsRecord,
+  scopeListFilters,
+} from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
 import * as assignmentService from './assignment.service';
 
@@ -9,29 +13,12 @@ export const getAllAssignments = catchAsync(
       req.query as Record<string, string | undefined>;
     const user = req.user!;
 
-    // Auto-scope for non-admin users
-    const isAdmin = user.roles.includes('admin');
-    const isAM = user.roles.includes('account_manager');
-
-    // VA sees only their own assignments
-    const resolvedCandidateId =
-      isAdmin || isAM
-        ? candidateId
-        : user.roles.includes('va') && user.candidateRef
-          ? user.candidateRef
-          : candidateId;
-
-    // Client sees only their own assignments
-    const resolvedClientId =
-      isAdmin || isAM
-        ? clientId
-        : user.roles.includes('client') && user.clientRef
-          ? user.clientRef
-          : clientId;
+    // A VA sees only their own assignments, a client only their own
+    const scoped = scopeListFilters(user, { candidateId, clientId });
 
     const result = await assignmentService.getAllAssignments({
-      candidateId: resolvedCandidateId,
-      clientId: resolvedClientId,
+      candidateId: scoped.candidateId,
+      clientId: scoped.clientId,
       accountManagerId,
       status,
       page: page !== undefined ? Number(page) : undefined,
@@ -50,6 +37,7 @@ export const getAssignmentById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const assignment = await assignmentService.getAssignmentById(id);
+    assertOwnsRecord(req.user!, assignment);
     sendSuccess(res, assignment, 'Assignment retrieved', 200);
   }
 );

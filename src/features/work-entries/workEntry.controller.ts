@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
+import { scopeListFilters } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
 import * as workEntryService from './workEntry.service';
 
@@ -17,28 +18,13 @@ export const getAllWorkEntries = catchAsync(
     } = req.query as Record<string, string | undefined>;
     const user = req.user!;
 
-    // Auto-scope: VA sees only their own entries, client sees only their VAs
-    const isAdmin = user.roles.includes('admin');
-    const isAM = user.roles.includes('account_manager');
-
-    const resolvedCandidateId =
-      isAdmin || isAM
-        ? candidateId
-        : user.roles.includes('va') && user.candidateRef
-          ? user.candidateRef
-          : candidateId;
-
-    const resolvedClientId =
-      isAdmin || isAM
-        ? clientId
-        : user.roles.includes('client') && user.clientRef
-          ? user.clientRef
-          : clientId;
+    // A VA sees only their own entries, a client only their VAs'
+    const scoped = scopeListFilters(user, { candidateId, clientId });
 
     const result = await workEntryService.getAllWorkEntries({
       assignmentId,
-      candidateId: resolvedCandidateId,
-      clientId: resolvedClientId,
+      candidateId: scoped.candidateId,
+      clientId: scoped.clientId,
       entryDate,
       dateFrom,
       dateTo,
@@ -57,7 +43,7 @@ export const getAllWorkEntries = catchAsync(
 export const getWorkEntryById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const workEntry = await workEntryService.getWorkEntryById(id);
+    const workEntry = await workEntryService.getWorkEntryById(id, req.user!);
     sendSuccess(res, workEntry, 'Work entry retrieved', 200);
   }
 );
@@ -66,7 +52,11 @@ export const createWorkEntry = catchAsync(
   async (req: Request, res: Response) => {
     const body = req.body;
     const createdBy = req.user!._id;
-    const workEntry = await workEntryService.createWorkEntry(body, createdBy);
+    const workEntry = await workEntryService.createWorkEntry(
+      body,
+      createdBy,
+      req.user!
+    );
     sendSuccess(res, workEntry, 'Work entry created', 201);
   }
 );
@@ -79,7 +69,8 @@ export const updateWorkEntry = catchAsync(
     const workEntry = await workEntryService.updateWorkEntry(
       id,
       body,
-      updatedBy
+      updatedBy,
+      req.user!
     );
     sendSuccess(res, workEntry, 'Work entry updated', 200);
   }
@@ -88,7 +79,7 @@ export const updateWorkEntry = catchAsync(
 export const deleteWorkEntry = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    await workEntryService.deleteWorkEntry(id);
+    await workEntryService.deleteWorkEntry(id, req.user!);
     sendSuccess(res, { deleted: true }, 'Work entry deleted', 200);
   }
 );

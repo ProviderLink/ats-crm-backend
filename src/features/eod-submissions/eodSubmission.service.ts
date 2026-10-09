@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import { assertOwnsCandidate, type CrmActor } from '../../shared/utils/crmScope';
 import {
   computeShiftHours,
   resolveCompanyDay,
@@ -206,11 +207,13 @@ export const getEodContext = async (): Promise<{
 
 export const createEodSubmission = async (
   input: CreateEodSubmissionInput,
-  submittedBy?: string | null
+  submittedBy?: string | null,
+  actor?: CrmActor
 ): Promise<IEodSubmission> => {
   const assignment = await Assignment.findById(input.assignmentId);
   if (!assignment)
     throw new AppError(404, 'ASSIGNMENT_NOT_FOUND', 'Assignment not found');
+  if (actor) assertOwnsCandidate(actor, assignment.candidateId);
   if (assignment.status === 'ended') {
     throw new AppError(
       400,
@@ -282,11 +285,13 @@ export const createEodSubmission = async (
 
 export const updateEodSubmission = async (
   id: string,
-  input: UpdateEodSubmissionInput
+  input: UpdateEodSubmissionInput,
+  actor?: CrmActor
 ): Promise<IEodSubmission> => {
   const eodSubmission = await EodSubmission.findById(id);
   if (!eodSubmission)
     throw new AppError(404, 'EOD_NOT_FOUND', 'EOD submission not found');
+  if (actor) assertOwnsCandidate(actor, eodSubmission.candidateId);
 
   if (input.shiftStart !== undefined)
     eodSubmission.shiftStart = input.shiftStart;
@@ -323,11 +328,13 @@ export const updateEodSubmission = async (
 
 export const deleteEodSubmission = async (
   id: string,
-  deletedBy?: string | null
+  deletedBy?: string | null,
+  actor?: CrmActor
 ): Promise<void> => {
   const eodSubmission = await EodSubmission.findById(id);
   if (!eodSubmission)
     throw new AppError(404, 'EOD_NOT_FOUND', 'EOD submission not found');
+  if (actor) assertOwnsCandidate(actor, eodSubmission.candidateId);
 
   await EodSubmission.findByIdAndDelete(id);
 

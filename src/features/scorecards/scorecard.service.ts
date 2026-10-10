@@ -146,6 +146,7 @@ export const generateScorecards = async (
     // Work entries for this assignment this week
     const workEntries = await WorkEntry.find({
       assignmentId: assignment._id,
+      isDeleted: { $ne: true },
       entryDate: { $gte: weekStart, $lte: weekEnd },
     });
 

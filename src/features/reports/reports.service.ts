@@ -91,7 +91,7 @@ export const getWorkEntriesReport = async (filters: {
   scope?: Record<string, unknown>;
   format?: ExportFormat;
 }) => {
-  const query: Record<string, any> = {};
+  const query: Record<string, any> = { isDeleted: { $ne: true } };
   if (filters.scope) query.$and = [filters.scope];
 
   if (filters.startDate || filters.endDate) {

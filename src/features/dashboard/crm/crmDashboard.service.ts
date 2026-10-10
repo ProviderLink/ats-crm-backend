@@ -68,6 +68,7 @@ export const getDashboardStats = async (accountManagerId?: string) => {
       ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
     WorkEntry.countDocuments({
+      isDeleted: { $ne: true },
       entryDate: { $gte: todayStart, $lte: todayEnd },
       ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
@@ -93,6 +94,7 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     .lean()) as unknown as IEodSubmission[];
 
   const workEntryMatch: Record<string, unknown> = {
+    isDeleted: { $ne: true },
     entryDate: { $gte: weekStart, $lte: todayEnd },
   };
   if (candidateIdFilter) {

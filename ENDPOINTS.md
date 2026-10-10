@@ -66,7 +66,7 @@ All need a token (no app check).
 
 ## Activity logs — `/shared/activity-logs`
 
-Guard: `activityLogs.read` (admin, account manager).
+Guard: app `ats` (so account managers, who only have CRM access, are refused). The global list needs `activityLogs.read`. A single record's activity (`/:resourceType/:resourceId`) is also readable with that record's own read permission: `candidates.read` for `candidate` and `application`, `interviews.read` for `interview`, `jobs.read` for `job`, `clients.read` for `client`. Other record types need `activityLogs.read`.
 
 | Method | Path | Notes |
 | ------ | ---- | ----- |

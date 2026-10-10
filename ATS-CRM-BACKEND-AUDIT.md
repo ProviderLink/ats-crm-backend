@@ -141,7 +141,7 @@ Read each script's header before running it against production data.
 Security fixes made on 2026-10-08/10 (ownership checks, `isActive` enforcement, public job trimming, http(s)-only links, admin-role guard, tag regex, CSV formulas, socket rooms, webhook de-duplication) are in place. What remains, most important first:
 
 **Access control**
-1. **Account managers are not scoped everywhere.** They can read all survey reminders, all activity logs, all client accounts and VA profiles, and generate scorecards for any VA. Assignments, work entries, EODs, reminders, reviews, scorecard reads and reports are scoped.
+1. **Account managers are not scoped everywhere.** They can read all survey reminders, all client accounts and VA profiles, and generate scorecards for any VA. Assignments, work entries, EODs, reminders, reviews, scorecard reads and reports are scoped.
 2. **Login does not check app access.** A user can obtain a session for an app they cannot use; routes still refuse them.
 3. **Permission and role changes are not instant** (token-baked), and there is no `tokenVersion` or per-request check. Deactivation is only enforced at login and refresh.
 4. **User "delete" is a hard delete** (`DELETE /shared/users/:id`), leaving `createdBy`, assignments and logs pointing at a missing user. There is no last-admin protection.

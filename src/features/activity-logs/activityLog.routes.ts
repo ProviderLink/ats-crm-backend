@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authenticate from '../../shared/middleware/authenticate';
 import {
   hasPermission,
+  requireAppAccess,
   requirePermission,
 } from '../../shared/middleware/authorize';
 import AppError from '../../shared/utils/AppError';
@@ -45,6 +46,10 @@ const canReadRecordLogs = catchAsync(async (req, _res, next) => {
 });
 
 router.use(authenticate);
+// The activity log is an ATS feature. Account managers only have CRM access, so
+// holding `activityLogs.read` no longer lets them read every candidate, job and
+// client log.
+router.use(requireAppAccess('ats'));
 
 router.get('/', requirePermission('activityLogs', 'read'), getAllLogs);
 

@@ -257,7 +257,9 @@ export const assignPipeline = async (
   }));
 
   // --- Remap applications to new stages ---
-  const applications = await Application.find({ jobId });
+  // Only candidates currently in the pipeline hold a stage to remap. Pending,
+  // rejected and hired applications keep their history untouched.
+  const applications = await Application.find({ jobId, phase: 'approved' });
 
   if (applications.length > 0) {
     // Build lookup: new stage name (lowercased) → new stage

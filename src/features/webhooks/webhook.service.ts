@@ -145,6 +145,13 @@ export async function handleEmailReceived(data: { email_id: string }) {
     return;
   }
 
+  // Resend retries webhooks that time out or fail, so the same inbound email
+  // can be delivered more than once. Store each one only once.
+  if (await Email.exists({ direction: 'inbound', resendId: emailId })) {
+    logger.info(`Inbound email ${emailId} already stored, skipping`);
+    return;
+  }
+
   logger.info(
     `Fetching full email content from Resend API for email_id: ${emailId}`
   );

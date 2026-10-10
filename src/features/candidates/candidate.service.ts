@@ -523,18 +523,27 @@ export const updateCandidate = async (
     candidate.cityOfResidence = input.cityOfResidence;
   }
   if (input.tags !== undefined) {
-    changes.push('Tags updated');
+    const currentTags = candidate.tags.map(String).sort().join(',');
+    const nextTags = [...input.tags].map(String).sort().join(',');
+    if (currentTags !== nextTags) changes.push('Tags updated');
     candidate.tags = input.tags.map(
       t => new mongoose.Types.ObjectId(t)
     ) as unknown as mongoose.Types.ObjectId[];
   }
   if (input.parsedData !== undefined) {
-    changes.push('Profile data updated');
+    if (
+      JSON.stringify(candidate.parsedData ?? null) !==
+      JSON.stringify(input.parsedData ?? null)
+    ) {
+      changes.push('Profile data updated');
+    }
     candidate.parsedData = input.parsedData;
     candidate.markModified('parsedData');
   }
   if (input.appliedJobId !== undefined) {
-    changes.push('Applied job updated');
+    if (String(candidate.appliedJobId ?? '') !== String(input.appliedJobId ?? '')) {
+      changes.push('Applied job updated');
+    }
     candidate.appliedJobId = input.appliedJobId
       ? new mongoose.Types.ObjectId(input.appliedJobId)
       : null;
@@ -548,13 +557,16 @@ export const updateCandidate = async (
 
   await candidate.save();
 
-  createLog({
-    action: 'updated',
-    resourceType: 'candidate',
-    resourceId: id,
-    metadata: changes.length > 0 ? { changes } : {},
-    performedBy: updatedBy,
-  });
+  // An update that changed nothing is not an event worth a timeline row.
+  if (changes.length > 0) {
+    createLog({
+      action: 'updated',
+      resourceType: 'candidate',
+      resourceId: id,
+      metadata: { changes },
+      performedBy: updatedBy,
+    });
+  }
 
   const result = candidate.toSafeObject();
   emitToAts('candidates', 'candidate:updated', result);

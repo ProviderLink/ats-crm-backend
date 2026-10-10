@@ -5,6 +5,50 @@ import { createLog } from '../activity-logs/activityLog.service';
 import Settings from './settings.model';
 import type { ISettings, UpdateSettingsInput } from './settings.types';
 
+const onOff = (value: boolean) => (value ? 'on' : 'off');
+
+/** One short line per setting that actually changed, for the activity log. */
+function describeSettingsChanges(before: ISettings, after: ISettings): string[] {
+  const changes: string[] = [];
+  if (before.email.fromName !== after.email.fromName) {
+    changes.push(
+      `Sender name changed from "${before.email.fromName}" to "${after.email.fromName}"`
+    );
+  }
+  if (before.ai.provider !== after.ai.provider) {
+    changes.push(
+      `AI provider changed from "${before.ai.provider}" to "${after.ai.provider}"`
+    );
+  }
+  const toggles: [string, boolean, boolean][] = [
+    ['Resume validation', before.ai.resumeValidation, after.ai.resumeValidation],
+    ['Candidate scoring', before.ai.candidateScoring, after.ai.candidateScoring],
+    ['Resume parsing', before.ai.resumeParsing, after.ai.resumeParsing],
+    [
+      'Application confirmation email',
+      before.applicationConfirmation.enabled,
+      after.applicationConfirmation.enabled,
+    ],
+  ];
+  for (const [name, was, now] of toggles) {
+    if (was !== now) {
+      changes.push(`${name} changed from "${onOff(was)}" to "${onOff(now)}"`);
+    }
+  }
+  if (
+    String(before.applicationConfirmation.templateId ?? '') !==
+    String(after.applicationConfirmation.templateId ?? '')
+  ) {
+    changes.push('Confirmation email template updated');
+  }
+  if (before.companyTimezone !== after.companyTimezone) {
+    changes.push(
+      `Company timezone changed from "${before.companyTimezone}" to "${after.companyTimezone}"`
+    );
+  }
+  return changes;
+}
+
 export const getSettings = async (): Promise<ISettings> => {
   const settings = await Settings.getSettings();
   return settings.toSafeObject();
@@ -15,6 +59,7 @@ export const updateSettings = async (
   updatedBy?: string | null
 ): Promise<ISettings> => {
   const settings = await Settings.getSettings();
+  const before = settings.toSafeObject();
 
   if (input.email) {
     if (input.email.fromEmail) {
@@ -68,12 +113,16 @@ export const updateSettings = async (
   // The resolver caches for 60s — drop it so the new value applies immediately.
   if (input.companyTimezone) clearCompanyTimezoneCache();
 
+  const after = settings.toSafeObject();
+  const changes = describeSettingsChanges(before, after);
+
   createLog({
     action: 'settings_updated',
     resourceType: 'settings',
     resourceId: settings._id.toString(),
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy ?? null,
   });
 
-  return settings.toSafeObject();
+  return after;
 };

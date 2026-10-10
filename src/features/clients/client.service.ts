@@ -170,12 +170,18 @@ export const updateClient = async (
     client.description = input.description;
   }
   if (input.address !== undefined) {
-    changes.push('Address updated');
-    client.address = { ...client.address, ...input.address };
+    const nextAddress = { ...client.address, ...input.address };
+    if (JSON.stringify(nextAddress) !== JSON.stringify(client.address)) {
+      changes.push('Address updated');
+    }
+    client.address = nextAddress;
     client.markModified('address');
   }
   if (input.tags !== undefined) {
-    changes.push('Tags updated');
+    const currentTags = client.tags.map(String).sort().join(',');
+    if (currentTags !== [...input.tags].map(String).sort().join(',')) {
+      changes.push('Tags updated');
+    }
     client.tags = input.tags.map(id => new mongoose.Types.ObjectId(id));
     client.markModified('tags');
   }
@@ -183,13 +189,16 @@ export const updateClient = async (
 
   await client.save();
 
-  createLog({
-    action: 'updated',
-    resourceType: 'client',
-    resourceId: id,
-    metadata: changes.length > 0 ? { changes } : {},
-    performedBy: updatedBy ?? null,
-  });
+  // An update that changed nothing is not an event worth a timeline row.
+  if (changes.length > 0) {
+    createLog({
+      action: 'updated',
+      resourceType: 'client',
+      resourceId: id,
+      metadata: { changes },
+      performedBy: updatedBy ?? null,
+    });
+  }
 
   const result = client.toSafeObject();
   emitToAts('clients', 'client:updated', result);
@@ -624,7 +633,7 @@ export const updateNote = async (
     action: 'note_updated',
     resourceType: 'client',
     resourceId: clientId,
-    metadata: { noteId },
+    metadata: { noteId, method: note.method },
     performedBy: updatedBy ?? null,
   });
 
@@ -651,6 +660,7 @@ export const deleteNote = async (
     throw new AppError(404, 'NOTE_NOT_FOUND', 'Note not found');
   }
 
+  const removedMethod = client.notes[index].method;
   client.notes.splice(index, 1);
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await client.save();
@@ -659,7 +669,7 @@ export const deleteNote = async (
     action: 'note_deleted',
     resourceType: 'client',
     resourceId: clientId,
-    metadata: { noteId },
+    metadata: { noteId, method: removedMethod },
     performedBy: updatedBy ?? null,
   });
 

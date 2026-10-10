@@ -185,13 +185,16 @@ export const updateJob = async (
 
   await job.save();
 
-  createLog({
-    action: 'updated',
-    resourceType: 'job',
-    resourceId: id,
-    metadata: changes.length > 0 ? { changes } : {},
-    performedBy: updatedBy,
-  });
+  // An update that changed nothing is not an event worth a timeline row.
+  if (changes.length > 0) {
+    createLog({
+      action: 'updated',
+      resourceType: 'job',
+      resourceId: id,
+      metadata: { changes },
+      performedBy: updatedBy,
+    });
+  }
 
   const result = job.toSafeObject();
   emitToAts('jobs', 'job:updated', result);

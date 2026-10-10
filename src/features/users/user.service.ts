@@ -365,19 +365,45 @@ export const updateUser = async (
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
+  const changes: string[] = [];
+  const label = (roles: string[]) =>
+    [...roles]
+      .sort()
+      .map(r => r.replace(/_/g, ' '))
+      .join(', ') || 'none';
   if (input.roles !== undefined) {
+    const before = label(user.roles);
+    const after = label(input.roles);
+    if (before !== after) {
+      changes.push(`Roles changed from "${before}" to "${after}"`);
+    }
     user.roles = input.roles as UserRole[];
     user.appAccess = deriveAppAccess(input.roles) as AppAccess[];
     user.permissions = buildPermissionsForRoles(input.roles);
     user.markModified('permissions');
   }
+  const nameBefore = `${user.firstName} ${user.lastName}`.trim();
   if (input.firstName !== undefined) user.firstName = input.firstName;
   if (input.lastName !== undefined) user.lastName = input.lastName;
+  const nameAfter = `${user.firstName} ${user.lastName}`.trim();
+  if (nameBefore !== nameAfter) {
+    changes.push(`Name changed from "${nameBefore}" to "${nameAfter}"`);
+  }
+  if (input.phone !== undefined && input.phone !== user.phone) {
+    changes.push('Phone number updated');
+  }
   if (input.phone !== undefined) user.phone = input.phone;
-  if (input.avatar !== undefined) user.avatar = input.avatar;
+  if (input.avatar !== undefined) {
+    changes.push('Profile photo updated');
+    user.avatar = input.avatar;
+  }
   if (input.permissions !== undefined) {
+    changes.push('Permissions updated');
     user.permissions = input.permissions;
     user.markModified('permissions');
+  }
+  if (input.isActive !== undefined && input.isActive !== user.isActive) {
+    changes.push(input.isActive ? 'Account activated' : 'Account deactivated');
   }
   if (input.isActive !== undefined) user.isActive = input.isActive;
   if (input.isActive === false) {
@@ -393,6 +419,7 @@ export const updateUser = async (
     action: 'updated',
     resourceType: 'user',
     resourceId: id,
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy ?? null,
   });
 
@@ -419,6 +446,10 @@ export const updatePermissions = async (
     merged[key] = { ...(current[key] ?? {}), ...(incoming[key] ?? {}) };
   });
 
+  const changedResources = Object.keys(merged).filter(
+    key => JSON.stringify(merged[key]) !== JSON.stringify(current[key] ?? {})
+  );
+
   user.permissions = merged as unknown as UserPermissions;
   user.markModified('permissions');
   await user.save();
@@ -427,6 +458,7 @@ export const updatePermissions = async (
     action: 'permissions_updated',
     resourceType: 'user',
     resourceId: id,
+    metadata: { resources: changedResources },
     performedBy: updatedBy ?? null,
   });
 

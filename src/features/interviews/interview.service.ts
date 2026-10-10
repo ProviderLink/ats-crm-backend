@@ -369,6 +369,7 @@ export const createInterview = async (
     metadata: {
       interviewId: interview._id.toString(),
       type: input.type,
+      scheduledAt: scheduledAt.toISOString(),
       jobId: input.jobId,
       jobTitle,
     },

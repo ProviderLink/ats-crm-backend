@@ -188,10 +188,31 @@ export const updateClientAccount = async (
   if (updatedBy) client.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await client.save();
 
+  const FIELD_LABELS: Record<string, string> = {
+    healthStatus: 'Health status',
+    baaSigned: 'BAA signed',
+    baaSignedDate: 'BAA signed date',
+    emrSystem: 'EMR system',
+    onboardingComplete: 'Onboarding',
+    sopReceived: 'SOP received',
+    satisfactionScore: 'Satisfaction score',
+    openIssuesCount: 'Open issues',
+    lastClientCheckin: 'Last check-in',
+    notes: 'Notes',
+    accountOwnerId: 'Account owner',
+    serviceStartDate: 'Service start date',
+    primaryContact: 'Primary contact',
+    secondaryContact: 'Secondary contact',
+  };
+  const changes = Object.keys(input)
+    .filter(key => (input as Record<string, unknown>)[key] !== undefined)
+    .map(key => `${FIELD_LABELS[key] ?? key} updated`);
+
   await createLog({
     action: 'crm_client_account_updated',
     resourceType: 'client',
     resourceId: clientId,
+    metadata: changes.length > 0 ? { changes } : {},
     performedBy: updatedBy ?? null,
   });
 

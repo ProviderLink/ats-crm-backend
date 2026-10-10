@@ -32,7 +32,11 @@ export const initializeCrmSocket = (io: Server): void => {
       return;
     }
 
-    socket.join('assignments');
+    // Work, EOD and review payloads are only for staff. VAs and clients are
+    // scoped per record by the REST API, so they must not receive the feed.
+    if (roles.includes('admin') || roles.includes('account_manager')) {
+      socket.join('assignments');
+    }
     socket.join(`user:${decoded._id}`);
 
     socket.on('disconnect', () => {

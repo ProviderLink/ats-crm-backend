@@ -1,5 +1,4 @@
 import AppError from '../../shared/utils/AppError';
-import { emitToAts } from '../../sockets';
 // activityLog.types.ts is not in the allowed-edit list, so we reuse the
 // generic 'created' action and carry the scorecard-specific verb in the
 // description + metadata (see "Anything that didn't go as planned" in the
@@ -175,13 +174,6 @@ export const createScorecard = async (
     performedBy: createdBy,
   });
 
-  emitToAts(
-    // broadcast to the candidate's room so any open candidate views refresh
-    `candidate:${input.candidateId}`,
-    'interview-scorecard:created',
-    safe
-  );
-
   return safe;
 };
 
@@ -324,12 +316,6 @@ export const updateScorecard = async (
     },
     performedBy,
   });
-
-  emitToAts(
-    `candidate:${safe.candidateId}`,
-    'interview-scorecard:updated',
-    safe
-  );
 
   return safe;
 };

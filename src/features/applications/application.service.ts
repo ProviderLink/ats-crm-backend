@@ -776,6 +776,5 @@ export const updateAiValidation = async (
   // around it by re-fetching rows that lacked validation data.
   const result = application.toSafeObject();
   emitToAts('applications', 'application:updated', result);
-  emitToAts('candidates', 'candidate:updated', result);
   return result;
 };

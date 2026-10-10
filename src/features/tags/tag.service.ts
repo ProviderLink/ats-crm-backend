@@ -4,6 +4,9 @@ import { createLog } from '../activity-logs/activityLog.service';
 import Tag from './tag.model';
 import type { CreateTagInput, ITag, UpdateTagInput } from './tag.types';
 
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export const getAllTags = async (): Promise<ITag[]> => {
   const tags = await Tag.find().sort({ name: 1 });
   return tags.map(t => t.toSafeObject());
@@ -14,7 +17,7 @@ export const createTag = async (
   createdBy: string
 ): Promise<ITag> => {
   const existing = await Tag.findOne({
-    name: { $regex: new RegExp(`^${input.name}$`, 'i') },
+    name: { $regex: new RegExp(`^${escapeRegex(input.name)}$`, 'i') },
   });
   if (existing) {
     throw new AppError(
@@ -50,7 +53,7 @@ export const updateTag = async (
   if (input.name) {
     const duplicate = await Tag.findOne({
       _id: { $ne: id },
-      name: { $regex: new RegExp(`^${input.name}$`, 'i') },
+      name: { $regex: new RegExp(`^${escapeRegex(input.name)}$`, 'i') },
     });
     if (duplicate) {
       throw new AppError(

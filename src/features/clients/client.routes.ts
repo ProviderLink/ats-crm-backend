@@ -7,7 +7,10 @@ import {
   requireRoles,
 } from '../../shared/middleware/authorize';
 import { uploadLogo as uploadLogoMiddleware } from '../../shared/middleware/upload';
-import { validate } from '../../shared/validators/common.validator';
+import {
+  httpUrlSchema,
+  validate,
+} from '../../shared/validators/common.validator';
 import {
   addContact,
   createClient,
@@ -29,7 +32,7 @@ const createClientSchema = z.object({
   companyName: z.string().min(1).max(100),
   email: z.string().email(),
   phone: z.string().optional(),
-  website: z.string().url().optional().or(z.literal('')),
+  website: httpUrlSchema.optional().or(z.literal('')),
   industry: z.string().optional(),
   companySize: z
     .enum(['1-10', '11-50', '51-200', '201-500', '500+'])

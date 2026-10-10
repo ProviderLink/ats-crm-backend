@@ -54,8 +54,12 @@ function buildEodQ1Cell(submission: any): string {
 function generateCsv(headers: string[], rows: string[][]): string {
   const escape = (value: string) =>
     `"${String(value ?? '').replace(/"/g, '""')}"`;
+  // Spreadsheet apps run cells that start with = + - @ as formulas, and free
+  // text such as EOD notes is written by users. A leading ' keeps it as text.
+  const safe = (value: string) =>
+    escape(/^[=+\-@\t\r]/.test(String(value ?? '')) ? `'${value}` : value);
   const headerLine = headers.map(escape).join(',');
-  const rowLines = rows.map(row => row.map(escape).join(','));
+  const rowLines = rows.map(row => row.map(safe).join(','));
   return [headerLine, ...rowLines].join('\n');
 }
 

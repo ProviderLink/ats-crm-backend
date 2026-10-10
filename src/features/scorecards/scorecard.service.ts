@@ -236,8 +236,15 @@ export const generateScorecards = async (
     await createLog({
       action: 'scorecard_generated',
       resourceType: 'scorecards',
-      resourceId: 'bulk',
+      // The log's resource id must be an ObjectId; a run has no single record,
+      // so each run gets its own id.
+      resourceId: new mongoose.Types.ObjectId().toString(),
       description: `Generated ${generated} scorecards for week of ${weekStart.toISOString().slice(0, 10)}`,
+      metadata: {
+        count: generated,
+        weekStart: weekStart.toISOString().slice(0, 10),
+        ...(vaId ? { vaId } : {}),
+      },
       performedBy,
     });
   }

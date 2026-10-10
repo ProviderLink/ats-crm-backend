@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import AppError from '../../shared/utils/AppError';
+import { createLog } from '../activity-logs/activityLog.service';
 import SurveyReminder from './surveyReminder.model';
 import type {
   CreateSurveyReminderInput,
@@ -67,7 +68,8 @@ export const getSurveyReminderById = async (
 };
 
 export const createSurveyReminder = async (
-  input: CreateSurveyReminderInput
+  input: CreateSurveyReminderInput,
+  createdBy?: string | null
 ): Promise<ISurveyReminder> => {
   const surveyReminder = await SurveyReminder.create({
     relatedType: input.relatedType,
@@ -75,6 +77,15 @@ export const createSurveyReminder = async (
     surveyType: input.surveyType,
     dueDate: new Date(input.dueDate),
     assignedTo: new mongoose.Types.ObjectId(input.assignedTo),
+  });
+  createLog({
+    action: 'survey_created',
+    resourceType: 'survey',
+    resourceId: surveyReminder._id.toString(),
+    relatedType: input.relatedType,
+    relatedId: input.relatedId,
+    metadata: { surveyType: input.surveyType, dueDate: input.dueDate },
+    performedBy: createdBy ?? null,
   });
   return surveyReminder.toSafeObject();
 };
@@ -102,7 +113,8 @@ export const createAssignmentReminders = async (
 
 export const updateSurveyReminder = async (
   id: string,
-  input: UpdateSurveyReminderInput
+  input: UpdateSurveyReminderInput,
+  updatedBy?: string | null
 ): Promise<ISurveyReminder> => {
   const surveyReminder = await SurveyReminder.findById(id);
   if (!surveyReminder)
@@ -112,6 +124,19 @@ export const updateSurveyReminder = async (
       'Survey reminder not found'
     );
 
+  const changes: string[] = [];
+  if (input.status !== undefined && input.status !== surveyReminder.status) {
+    changes.push(
+      `Status changed from "${surveyReminder.status}" to "${input.status}"`
+    );
+  }
+  if (input.dueDate !== undefined) changes.push('Due date updated');
+  if (
+    input.assignedTo !== undefined &&
+    input.assignedTo !== String(surveyReminder.assignedTo)
+  ) {
+    changes.push('Assigned account manager updated');
+  }
   if (input.status !== undefined) surveyReminder.status = input.status;
   if (input.completedDate !== undefined)
     surveyReminder.completedDate = input.completedDate ?? null;
@@ -121,5 +146,16 @@ export const updateSurveyReminder = async (
     surveyReminder.assignedTo = new mongoose.Types.ObjectId(input.assignedTo);
 
   await surveyReminder.save();
+  if (changes.length > 0) {
+    createLog({
+      action: 'survey_updated',
+      resourceType: 'survey',
+      resourceId: id,
+      relatedType: surveyReminder.relatedType,
+      relatedId: String(surveyReminder.relatedId),
+      metadata: { surveyType: surveyReminder.surveyType, changes },
+      performedBy: updatedBy ?? null,
+    });
+  }
   return surveyReminder.toSafeObject();
 };

@@ -82,7 +82,8 @@ export const updateEodSubmission = catchAsync(
     const eodSubmission = await eodService.updateEodSubmission(
       id,
       body,
-      req.user!
+      req.user!,
+      req.user!._id
     );
     sendSuccess(res, eodSubmission, 'EOD submission updated', 200);
   }

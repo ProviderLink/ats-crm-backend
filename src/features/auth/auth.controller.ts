@@ -7,7 +7,8 @@ import * as authService from './auth.service';
 
 export const login = catchAsync(async (req: Request, res: Response) => {
   const { user, accessToken, refreshToken, app } = await authService.login(
-    req.body
+    req.body,
+    req.ip
   );
   const cookieName = app === 'crm' ? 'refreshTokenCrm' : 'refreshTokenAts';
   const isProd = env.NODE_ENV === 'production';

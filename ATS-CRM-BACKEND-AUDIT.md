@@ -116,7 +116,7 @@ Convention: routes → (validate, guards) → controller (thin, `catchAsync`) �
 23 collections (list and fields in `ats/BUSINESS_LOGIC.md` §3). Notes that matter operationally:
 
 - Key unique indexes: `applications (candidateId, jobId)`, `eodsubmissions (assignmentId, dateKey)`, `scorecards (vaId, assignmentId, weekStart)`, one default pipeline template (partial index), `vaprofiles.vaId`.
-- Activity logs are fire-and-forget and indexed by resource, performer, action and time.
+- Activity logs are fire-and-forget and indexed by resource, performer, action and time. They now include sign-ins (success and failure for existing accounts, with ip), password and invite events, template, survey, EOD and review edits, and report exports.
 - Work entries are soft-deleted; candidate permanent delete cascades by hand across ten collections.
 - Settings is a singleton upserted on first read.
 - Legacy fields kept for old documents: interview `round` / `interviewType`, `Candidate.crmProfile`, EOD `summaryOfWork`.

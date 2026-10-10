@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { emitToAts } from '../../sockets';
+import { createLog } from '../activity-logs/activityLog.service';
 import Job from '../jobs/job.model';
 import PipelineTemplate from './pipelineTemplate.model';
 import type {
@@ -104,6 +105,13 @@ export const createTemplate = async (
     handleDefaultGuardError(err);
   }
   const result = template!.toSafeObject();
+  createLog({
+    action: 'created',
+    resourceType: 'pipeline_template',
+    resourceId: result._id,
+    metadata: { name: result.name, stages: result.stages.length },
+    performedBy: createdBy,
+  });
   emitToAts('pipeline-templates', 'pipeline_template:created', result);
   return result;
 };
@@ -135,8 +143,16 @@ export const updateTemplate = async (
       'Cannot deactivate the default pipeline template. Assign default status to another active template first.'
     );
   }
+  const changes: string[] = [];
+  const stageNames = (stages: { name: string }[]) =>
+    stages.map(s => s.name).join('|');
   if (input.stages !== undefined) {
     validateStages(input.stages);
+    if (stageNames(template.stages) !== stageNames(input.stages)) {
+      changes.push(
+        `Stages changed from "${template.stages.length}" to "${input.stages.length}"`
+      );
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     template.stages = input.stages as any;
   }
@@ -168,6 +184,18 @@ export const updateTemplate = async (
       );
     }
   }
+  if (input.name !== undefined && input.name !== template.name) {
+    changes.push(`Name changed from "${template.name}" to "${input.name}"`);
+  }
+  if (input.description !== undefined && input.description !== template.description) {
+    changes.push('Description updated');
+  }
+  if (input.isDefault !== undefined && input.isDefault !== template.isDefault) {
+    changes.push(input.isDefault ? 'Set as default' : 'Removed as default');
+  }
+  if (input.isActive !== undefined && input.isActive !== template.isActive) {
+    changes.push(input.isActive ? 'Activated' : 'Deactivated');
+  }
   if (input.name !== undefined) template.name = input.name;
   if (input.description !== undefined) template.description = input.description;
   if (input.isDefault !== undefined) template.isDefault = input.isDefault;
@@ -179,12 +207,22 @@ export const updateTemplate = async (
     handleDefaultGuardError(err);
   }
   const result = template.toSafeObject();
+  if (changes.length > 0) {
+    createLog({
+      action: 'updated',
+      resourceType: 'pipeline_template',
+      resourceId: id,
+      metadata: { name: result.name, changes },
+      performedBy: updatedBy,
+    });
+  }
   emitToAts('pipeline-templates', 'pipeline_template:updated', result);
   return result;
 };
 
 export const deleteTemplate = async (
-  id: string
+  id: string,
+  deletedBy?: string | null
 ): Promise<{ deleted: boolean }> => {
   const template = await PipelineTemplate.findById(id);
   if (!template) {
@@ -213,6 +251,13 @@ export const deleteTemplate = async (
     );
   }
   await template.deleteOne();
+  createLog({
+    action: 'deleted',
+    resourceType: 'pipeline_template',
+    resourceId: id,
+    metadata: { name: template.name },
+    performedBy: deletedBy ?? null,
+  });
   emitToAts('pipeline-templates', 'pipeline_template:deleted', { _id: id });
   return { deleted: true };
 };

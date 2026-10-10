@@ -11,6 +11,7 @@ import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
 import Job from '../jobs/job.model';
 import { assertOwnsPair, pairScope } from '../assignments/assignmentScope';
+import { createLog } from '../activity-logs/activityLog.service';
 import * as reviewService from './performanceReview.service';
 
 // An account manager may only touch reviews of VAs on assignments they manage.
@@ -120,7 +121,11 @@ export const regenerateSection = catchAsync(
     const { id } = req.params;
     const { section } = req.body;
     await assertManagesReview(req, id);
-    const review = await reviewService.regenerateSection(id, section);
+    const review = await reviewService.regenerateSection(
+      id,
+      section,
+      req.user!._id
+    );
     sendSuccess(res, review, `${section} regenerated successfully`, 200);
   }
 );
@@ -151,6 +156,16 @@ export const exportReviewPdf = catchAsync(
       },
       timezone
     );
+
+    createLog({
+      action: 'review_exported',
+      resourceType: 'performance_review',
+      resourceId: id,
+      relatedType: 'candidate',
+      relatedId: String(review.candidateId),
+      metadata: { format: 'pdf' },
+      performedBy: req.user!._id,
+    });
 
     const filename = `performance-review-${id}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

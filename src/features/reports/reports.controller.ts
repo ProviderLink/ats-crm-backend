@@ -3,6 +3,30 @@ import catchAsync from '../../shared/utils/catchAsync';
 import type { ExportFormat } from './reports.service';
 import { assignmentScope, pairScope } from '../assignments/assignmentScope';
 import * as reportsService from './reports.service';
+import { createLog } from '../activity-logs/activityLog.service';
+import mongoose from 'mongoose';
+
+/** Record who exported which report; a data export is worth an audit entry. */
+function logExport(
+  req: Request,
+  report: string,
+  format: ExportFormat,
+  range: { startDate?: string; endDate?: string }
+) {
+  createLog({
+    action: 'report_exported',
+    resourceType: 'report',
+    // A report is not a stored record, so each export gets its own id.
+    resourceId: new mongoose.Types.ObjectId().toString(),
+    metadata: {
+      report,
+      format,
+      ...(range.startDate ? { startDate: range.startDate } : {}),
+      ...(range.endDate ? { endDate: range.endDate } : {}),
+    },
+    performedBy: req.user!._id,
+  });
+}
 
 function sendReport(
   res: Response,
@@ -56,6 +80,7 @@ export const exportWorkEntries = catchAsync(
       scope: await assignmentScope(req.user!),
       format: fmt,
     });
+    logExport(req, 'work_entries', fmt, { startDate, endDate });
     sendReport(res, result, fmt);
   }
 );
@@ -73,6 +98,7 @@ export const exportEodSubmissions = catchAsync(
       scope: await assignmentScope(req.user!),
       format: fmt,
     });
+    logExport(req, 'eod_submissions', fmt, { startDate, endDate });
     sendReport(res, result, fmt);
   }
 );
@@ -90,6 +116,7 @@ export const exportPerformance = catchAsync(
       scope: await pairScope(req.user!),
       format: fmt,
     });
+    logExport(req, 'performance', fmt, { startDate, endDate });
     sendReport(res, result, fmt);
   }
 );
@@ -98,6 +125,7 @@ export const exportDispositions = catchAsync(
   async (req: Request, res: Response) => {
     const filters = parseReportFilters(req);
     const result = await reportsService.getDispositionsReport(filters);
+    logExport(req, 'dispositions', filters.format, filters);
     sendReport(res, result, filters.format);
   }
 );

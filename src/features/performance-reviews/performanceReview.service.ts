@@ -315,6 +315,26 @@ export const updateReview = async (
   }
 
   await review.save();
+
+  const changes: string[] = [];
+  if (input.status !== undefined) changes.push('Status updated');
+  if (input.categories !== undefined) changes.push('Ratings updated');
+  if (input.aiGenerated !== undefined) changes.push('Summary updated');
+  if (input.overallRating !== undefined) changes.push('Overall rating updated');
+  if (input.clientSatisfactionScore !== undefined)
+    changes.push('Client satisfaction updated');
+  if (input.finalRecommendation !== undefined || input.finalManagerSummary !== undefined)
+    changes.push('Final recommendation updated');
+  createLog({
+    action: 'review_updated',
+    resourceType: 'performance_review',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(review.candidateId),
+    metadata: changes.length > 0 ? { changes } : {},
+    performedBy: updatedBy,
+  });
+
   const result = review.toSafeObject();
   emitToCrm('assignments', 'performanceReview:updated', result);
   return result;
@@ -381,7 +401,8 @@ export const deleteReview = async (
 
 export const regenerateSection = async (
   id: string,
-  section: 'categories' | 'goals' | 'summary'
+  section: 'categories' | 'goals' | 'summary',
+  regeneratedBy?: string | null
 ): Promise<IPerformanceReview> => {
   const review = await PerformanceReview.findById(id);
   if (!review) {
@@ -530,5 +551,16 @@ Respond with exactly this JSON structure:
   }
 
   await review.save();
+
+  createLog({
+    action: 'review_regenerated',
+    resourceType: 'performance_review',
+    resourceId: id,
+    relatedType: 'candidate',
+    relatedId: String(review.candidateId),
+    metadata: { section },
+    performedBy: regeneratedBy ?? null,
+  });
+
   return review.toSafeObject();
 };

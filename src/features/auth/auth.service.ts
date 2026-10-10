@@ -4,12 +4,32 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import AppError from '../../shared/utils/AppError';
 import { sendEmail } from '../../shared/utils/email';
+import { createLog } from '../activity-logs/activityLog.service';
 import User from '../users/user.model';
 import type { AuthTokenPayload, LoginInput } from './auth.types';
 
-export const login = async (input: LoginInput) => {
+/** Record a sign-in attempt against the account it was for. */
+const logSignIn = (
+  action: 'login' | 'login_failed',
+  userId: string,
+  app: 'ats' | 'crm',
+  ip?: string,
+  reason?: string
+): void => {
+  createLog({
+    action,
+    resourceType: 'user',
+    resourceId: userId,
+    metadata: { app, ...(ip ? { ip } : {}), ...(reason ? { reason } : {}) },
+    performedBy: action === 'login' ? userId : null,
+  });
+};
+
+export const login = async (input: LoginInput, ip?: string) => {
   const app = input.app ?? 'ats';
   const user = await User.findOne({ email: input.email.toLowerCase() });
+  // An unknown email is not logged: there is no account to attach it to and
+  // anyone could fill the log with made-up addresses.
   if (!user) {
     throw new AppError(
       401,
@@ -19,11 +39,13 @@ export const login = async (input: LoginInput) => {
   }
 
   if (!user.isActive) {
+    logSignIn('login_failed', String(user._id), app, ip, 'inactive');
     throw new AppError(401, 'USER_INACTIVE', 'Account is deactivated');
   }
 
   const match = await bcrypt.compare(input.password, user.passwordHash);
   if (!match) {
+    logSignIn('login_failed', String(user._id), app, ip, 'wrong_password');
     throw new AppError(
       401,
       'AUTH_INVALID_CREDENTIALS',
@@ -67,6 +89,8 @@ export const login = async (input: LoginInput) => {
     user.lastLoginAts = new Date();
   }
   await user.save();
+
+  logSignIn('login', String(user._id), app, ip);
 
   return { user: user.toSafeObject(), accessToken, refreshToken, app };
 };
@@ -252,6 +276,13 @@ export const resetPassword = async (token: string, password: string) => {
   user.refreshTokenAts = null;
   user.refreshTokenCrm = null;
   await user.save();
+
+  createLog({
+    action: viaInvite ? 'invite_accepted' : 'password_reset',
+    resourceType: 'user',
+    resourceId: String(user._id),
+    performedBy: String(user._id),
+  });
 };
 
 export const changePassword = async (
@@ -277,6 +308,13 @@ export const changePassword = async (
   user.refreshTokenAts = null;
   user.refreshTokenCrm = null;
   await user.save();
+
+  createLog({
+    action: 'password_changed',
+    resourceType: 'user',
+    resourceId: String(user._id),
+    performedBy: String(user._id),
+  });
 };
 
 export const verifyEmail = async (token: string) => {
@@ -319,4 +357,11 @@ export const setPassword = async (token: string, password: string) => {
   user.inviteToken = null;
   user.inviteTokenExpires = null;
   await user.save();
+
+  createLog({
+    action: 'invite_accepted',
+    resourceType: 'user',
+    resourceId: String(user._id),
+    performedBy: String(user._id),
+  });
 };

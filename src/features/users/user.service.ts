@@ -475,10 +475,17 @@ export const deactivateUser = async (
   const safeUser = user.toSafeObject();
   await User.findByIdAndDelete(id);
 
+  // This removes the account, so say so — and keep who it was, because the
+  // user record is gone and the id alone would identify nobody.
   createLog({
-    action: 'deactivated',
+    action: 'deleted',
     resourceType: 'user',
     resourceId: id,
+    metadata: {
+      name: `${safeUser.firstName} ${safeUser.lastName}`.trim(),
+      email: safeUser.email,
+      roles: safeUser.roles,
+    },
     performedBy: deactivatedBy ?? null,
   });
 
@@ -492,11 +499,30 @@ export const updateMe = async (
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
 
+  const changes: string[] = [];
+  const nameBefore = `${user.firstName} ${user.lastName}`.trim();
   if (input.firstName !== undefined) user.firstName = input.firstName;
   if (input.lastName !== undefined) user.lastName = input.lastName;
+  const nameAfter = `${user.firstName} ${user.lastName}`.trim();
+  if (nameBefore !== nameAfter) {
+    changes.push(`Name changed from "${nameBefore}" to "${nameAfter}"`);
+  }
+  if (input.phone !== undefined && input.phone !== user.phone) {
+    changes.push('Phone number updated');
+  }
   if (input.phone !== undefined) user.phone = input.phone;
 
   await user.save();
+
+  if (changes.length > 0) {
+    createLog({
+      action: 'updated',
+      resourceType: 'user',
+      resourceId: id,
+      metadata: { changes, self: true },
+      performedBy: id,
+    });
+  }
   return user.toSafeObject();
 };
 

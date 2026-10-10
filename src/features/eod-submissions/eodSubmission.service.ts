@@ -290,7 +290,8 @@ export const createEodSubmission = async (
 export const updateEodSubmission = async (
   id: string,
   input: UpdateEodSubmissionInput,
-  actor?: CrmActor
+  actor?: CrmActor,
+  updatedBy?: string | null
 ): Promise<IEodSubmission> => {
   const eodSubmission = await EodSubmission.findById(id);
   if (!eodSubmission)
@@ -325,6 +326,26 @@ export const updateEodSubmission = async (
     eodSubmission.clientNote = input.clientNote ?? null;
 
   await eodSubmission.save();
+
+  const changed: string[] = [];
+  if (input.shiftStart !== undefined || input.shiftEnd !== undefined)
+    changed.push('Shift times updated');
+  if (input.workEntries !== undefined || input.summaryOfWork !== undefined)
+    changed.push('Work entries updated');
+  if (input.pendingTasks !== undefined) changed.push('Pending tasks updated');
+  if (input.blockers !== undefined) changed.push('Blockers updated');
+  if (input.communicatedWithClient !== undefined || input.clientNote !== undefined)
+    changed.push('Client note updated');
+  createLog({
+    action: 'eod_updated',
+    resourceType: 'eod',
+    resourceId: id,
+    relatedType: 'assignment',
+    relatedId: String(eodSubmission.assignmentId),
+    metadata: changed.length > 0 ? { changes: changed } : {},
+    performedBy: updatedBy ?? null,
+  });
+
   const result = eodSubmission.toSafeObject();
   emitToCrm('assignments', 'eod:updated', result);
   return result;

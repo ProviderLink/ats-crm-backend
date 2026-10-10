@@ -14,7 +14,10 @@ export type ActivityLogResourceType =
   | 'settings'
   | 'scorecards'
   | 'vaProfile'
-  | 'client_account';
+  | 'client_account'
+  | 'pipeline_template'
+  | 'email_template'
+  | 'report';
 
 export type ActivityAction =
   // ── Generic ────────────────────────────────────────────
@@ -83,7 +86,21 @@ export type ActivityAction =
   | 'review_deleted'
   // ── Disposition ────────────────────────────────────────
   | 'ineligible_reapply_blocked'
-  | 'legal_hold_toggled';
+  | 'legal_hold_toggled'
+  // ── Sign-in and account security ───────────────────────
+  | 'login'
+  | 'login_failed'
+  | 'password_changed'
+  | 'password_reset'
+  | 'invite_accepted'
+  // ── CRM edits and exports ──────────────────────────────
+  | 'eod_updated'
+  | 'review_updated'
+  | 'review_regenerated'
+  | 'review_exported'
+  | 'survey_created'
+  | 'survey_updated'
+  | 'report_exported';
 
 export interface IActivityLog {
   _id: string;

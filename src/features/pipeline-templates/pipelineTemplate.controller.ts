@@ -50,7 +50,7 @@ export const updateTemplate = catchAsync(
 export const deleteTemplate = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    await templateService.deleteTemplate(id);
+    await templateService.deleteTemplate(id, req.user!._id);
     sendSuccess(res, { deleted: true }, 'Pipeline template deleted', 200);
   }
 );

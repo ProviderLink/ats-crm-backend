@@ -563,7 +563,7 @@ export const updateCrmProfile = async (
 export const listNotes = async (clientId: string): Promise<ClientNote[]> => {
   const client = await Client.findById(clientId);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
-  const notes = client.toSafeObject().notes ?? [];
+  const notes = client.toSafeObject({ includeNotes: true }).notes ?? [];
   // Newest first
   return [...notes].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

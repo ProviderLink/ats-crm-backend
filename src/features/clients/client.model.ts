@@ -59,7 +59,7 @@ export interface IClientDocument
   tags: mongoose.Types.ObjectId[];
   createdBy: mongoose.Types.ObjectId | null;
   updatedBy: mongoose.Types.ObjectId | null;
-  toSafeObject(): IClient;
+  toSafeObject(options?: { includeNotes?: boolean }): IClient;
 }
 
 const addressSchema = new Schema(
@@ -220,7 +220,9 @@ clientSchema.pre('findOneAndUpdate', function (next) {
   next();
 });
 
-clientSchema.methods.toSafeObject = function (): IClient {
+clientSchema.methods.toSafeObject = function (options?: {
+  includeNotes?: boolean;
+}): IClient {
   const raw = this.toObject({ versionKey: false }) as Record<string, unknown>;
   raw['_id'] = String(raw['_id']);
   raw['createdBy'] = raw['createdBy'] ? String(raw['createdBy']) : null;
@@ -231,8 +233,13 @@ clientSchema.methods.toSafeObject = function (): IClient {
   if (Array.isArray(contacts)) {
     raw['contacts'] = contacts.map(c => ({ ...c, _id: String(c['_id']) }));
   }
+  // The notes thread is admin-only (see the /:clientId/notes routes), so it is
+  // left out of every client payload, including socket broadcasts, unless the
+  // notes endpoint asks for it.
   const notes = raw['notes'] as Array<Record<string, unknown>>;
-  if (Array.isArray(notes)) {
+  if (!options?.includeNotes) {
+    delete raw['notes'];
+  } else if (Array.isArray(notes)) {
     raw['notes'] = notes.map(n => ({
       ...n,
       _id: String(n['_id']),

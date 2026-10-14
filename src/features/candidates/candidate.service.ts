@@ -201,8 +201,8 @@ export const findExistingApplicant = async (
 /**
  * Merge portfolio input onto an existing candidate on re-apply.
  *
- * Only overwrites what the applicant actually supplied, and deletes the
- * superseded Cloudinary file so re-applicants don't accumulate orphans.
+ * Only overwrites what the applicant actually supplied. The superseded
+ * Cloudinary file is kept so an overwrite from a public request is recoverable.
  */
 async function applyPortfolioToExisting(
   existing: ICandidateDocument,
@@ -217,13 +217,6 @@ async function applyPortfolioToExisting(
     input.portfolioFileUrl !== null &&
     input.portfolioFileUrl !== existing.portfolioFileUrl
   ) {
-    if (existing.portfolioFileUrl) {
-      const oldPublicId = extractCloudinaryPublicId(
-        existing.portfolioFileUrl,
-        'raw'
-      );
-      if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
-    }
     existing.portfolioFileUrl = input.portfolioFileUrl;
     existing.portfolioFileName = input.portfolioFileName ?? null;
   }
@@ -235,12 +228,8 @@ async function refreshFromApplication(
   input: CreateCandidateInput
 ): Promise<void> {
   if (input.resumeUrl && input.resumeRawText) {
-    // Delete the previous resume file before replacing it so re-applicants
-    // don't leave orphaned files in Cloudinary.
-    if (existing.resumeUrl && existing.resumeUrl !== input.resumeUrl) {
-      const oldPublicId = extractCloudinaryPublicId(existing.resumeUrl, 'raw');
-      if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'raw');
-    }
+    // The previous resume file is intentionally kept in Cloudinary: this
+    // refresh comes from a public request, so an overwrite stays recoverable.
     existing.resumeUrl = input.resumeUrl;
     existing.resumeOriginalName = input.resumeOriginalName;
     existing.resumeRawText = input.resumeRawText;

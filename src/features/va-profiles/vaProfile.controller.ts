@@ -27,7 +27,21 @@ export const getVaProfileById = catchAsync(
     assertOwnsCandidate(req.user!, id);
     try {
       const profile = await service.getVaProfileById(id);
-      sendSuccess(res, profile, 'VA profile retrieved', 200);
+      const { roles } = req.user!;
+      if (roles.includes('admin') || roles.includes('account_manager')) {
+        sendSuccess(res, profile, 'VA profile retrieved', 200);
+        return;
+      }
+      // A VA reads their own profile without the internal staff fields.
+      const {
+        noteThread: _noteThread,
+        notes: _notes,
+        burnoutRiskFlag: _burnoutRiskFlag,
+        replacementRiskFlag: _replacementRiskFlag,
+        satisfactionScore: _satisfactionScore,
+        ...vaView
+      } = profile;
+      sendSuccess(res, vaView, 'VA profile retrieved', 200);
     } catch {
       throw new AppError(404, 'VA_PROFILE_NOT_FOUND', 'VA profile not found');
     }

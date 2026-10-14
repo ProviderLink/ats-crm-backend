@@ -216,3 +216,43 @@ export const uploadUserAvatarFile: RequestHandler = (req, res, next) => {
     next();
   });
 };
+
+export const uploadEmailAttachment: RequestHandler = (req, res, next) => {
+  multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg',
+        'image/png',
+        'text/plain',
+      ];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(
+          new AppError(
+            400,
+            'FILE_INVALID_TYPE',
+            'Only PDF, Word, Excel, JPEG, PNG and text files are allowed'
+          ) as any
+        );
+      }
+    },
+  }).single('file')(req, res, err => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(
+          new AppError(400, 'FILE_TOO_LARGE', 'File size must not exceed 10MB')
+        );
+      }
+    }
+    if (err) return next(err);
+    next();
+  });
+};

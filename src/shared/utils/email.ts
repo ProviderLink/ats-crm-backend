@@ -23,6 +23,7 @@ export const sendEmail = async (params: {
   html: string;
   text?: string;
   replyTo?: string;
+  attachments?: { filename: string; url: string }[];
 }): Promise<{ id: string }> => {
   const { fromEmail, fromName, replyTo } = await getEmailSenderIdentity();
   const from = `${fromName} <${fromEmail}>`;
@@ -35,6 +36,9 @@ export const sendEmail = async (params: {
     subject: params.subject,
     html: params.html,
     text: params.text,
+    attachments: params.attachments?.length
+      ? params.attachments.map(a => ({ filename: a.filename, path: a.url }))
+      : undefined,
     // Always reply to the workspace mailbox so the inbound webhook keeps
     // matching candidate replies against their thread. An explicit caller
     // value still wins.

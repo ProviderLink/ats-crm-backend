@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
+import { uploadToCloudinary } from '../../config/cloudinary';
+import { AppError } from '../../shared/utils/AppError';
 import * as emailService from './email.service';
 
 export const getAllEmails = catchAsync(async (req: Request, res: Response) => {
@@ -85,3 +87,23 @@ export const deleteEmail = catchAsync(async (req: Request, res: Response) => {
   await emailService.deleteEmail(id);
   sendSuccess(res, null, 'Email deleted', 200);
 });
+
+export const uploadAttachment = catchAsync(
+  async (req: Request, res: Response) => {
+    if (!req.file) {
+      throw new AppError(400, 'FILE_REQUIRED', 'No file uploaded');
+    }
+    const { url } = await uploadToCloudinary(req.file, 'email-attachments');
+    sendSuccess(
+      res,
+      {
+        filename: req.file.originalname,
+        url,
+        contentType: req.file.mimetype,
+        size: req.file.size,
+      },
+      'Attachment uploaded',
+      201
+    );
+  }
+);

@@ -60,4 +60,5 @@ export interface SendEmailInput {
   threadId?: string;
   sentBy?: string;
   variables?: Record<string, string>;
+  attachments?: IEmailAttachment[];
 }

@@ -45,6 +45,17 @@ const assertCanManageTarget = async (
   }
 };
 
+/** Without admin rights, nobody may change their own roles or permissions. */
+const assertNotChangingOwnAccess = (req: Request, targetId: string): void => {
+  if (!isAdminRequest(req) && targetId === req.user!._id) {
+    throw new AppError(
+      403,
+      'AUTH_INSUFFICIENT_PERMISSIONS',
+      'You cannot change your own roles or permissions'
+    );
+  }
+};
+
 export const getAllUsers = catchAsync(async (req: Request, res: Response) => {
   const {
     role,
@@ -198,6 +209,7 @@ export const updateUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const body = req.body;
   assertCanAssignRoles(req, body.roles);
+  if (body.roles !== undefined) assertNotChangingOwnAccess(req, id);
   await assertCanManageTarget(req, id);
   const user = await userService.updateUser(id, body, req.user!._id);
   sendSuccess(res, user, 'User updated', 200);
@@ -232,6 +244,7 @@ export const updatePermissions = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const body = req.body;
+    assertNotChangingOwnAccess(req, id);
     await assertCanManageTarget(req, id);
     const user = await userService.updatePermissions(
       id,

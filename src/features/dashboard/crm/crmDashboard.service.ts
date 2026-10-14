@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { getCompanyTimezone } from '../../../shared/utils/companyTimezone';
 import { formatDateKey } from '../../../shared/utils/timezone';
 import Assignment from '../../assignments/assignment.model';
@@ -98,7 +99,10 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     entryDate: { $gte: weekStart, $lte: todayEnd },
   };
   if (candidateIdFilter) {
-    workEntryMatch.candidateId = { $in: candidateIdFilter };
+    // Aggregation pipelines are not cast by Mongoose, so ids must be ObjectIds.
+    workEntryMatch.candidateId = {
+      $in: candidateIdFilter.map(id => new mongoose.Types.ObjectId(id)),
+    };
   }
 
   const weeklyAgg = await WorkEntry.aggregate([

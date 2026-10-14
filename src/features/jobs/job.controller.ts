@@ -146,15 +146,14 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
   // (instead of during the stateless parse step) so abandoned applications
   // don't leave orphan files consuming storage.
   let resumeUrl = '';
-  let resumeRawText: string | undefined = body.resumeRawText;
+  let resumeRawText: string | undefined;
   let resumeOriginalName: string = body.resumeOriginalName || 'resume.pdf';
 
   if (refreshProfile) {
     resumeOriginalName = req.file.originalname || resumeOriginalName;
-    resumeRawText =
-      body.resumeRawText && body.resumeRawText.trim() !== ''
-        ? body.resumeRawText
-        : await extractResumeText(req.file.buffer, req.file.mimetype);
+    // Always read the text from the uploaded file: this route is public, so a
+    // client-supplied `resumeRawText` must not feed AI validation and scoring.
+    resumeRawText = await extractResumeText(req.file.buffer, req.file.mimetype);
     const { url } = await uploadToCloudinary(req.file, 'resumes');
     resumeUrl = url;
   }

@@ -11,7 +11,7 @@ import { z } from 'zod';
  * Deliberately absent, because the schedule form does not ask for them and the
  * server owns the value:
  * - `timezone`  → always the company timezone from Settings.
- * - `duration`  → fixed server-side default.
+ * - `duration` on UPDATE → create-only; reschedule reuses the stored value.
  * - `round` / `interviewType` → interviews are not numbered or staged.
  */
 
@@ -21,6 +21,16 @@ export const INTERVIEW_TYPES = [
   'phone_call',
   'in_person',
 ] as const;
+
+/** Allowed interview lengths in minutes. Omitted on create → 60. */
+export const INTERVIEW_DURATIONS = [10, 15, 30, 60] as const;
+
+const duration = z
+  .number()
+  .refine(v => (INTERVIEW_DURATIONS as readonly number[]).includes(v), {
+    message: `Duration must be one of ${INTERVIEW_DURATIONS.join(', ')} minutes`,
+  })
+  .optional();
 
 const MEETING_LINK_MAX = 2000;
 
@@ -61,6 +71,7 @@ export const createInterviewSchema = z.object({
   title: z.string().min(1).max(200),
   type: z.enum(INTERVIEW_TYPES),
   scheduledAt: z.string().datetime(),
+  duration,
   interviewerIds,
   meetingDetails: meetingDetailsSchema,
 });
@@ -70,6 +81,7 @@ export const createNestedInterviewSchema = z.object({
   type: z.enum(INTERVIEW_TYPES),
   jobId: z.string().min(1).optional(),
   scheduledAt: z.string().datetime(),
+  duration,
   interviewerIds,
   meetingDetails: meetingDetailsSchema,
 });

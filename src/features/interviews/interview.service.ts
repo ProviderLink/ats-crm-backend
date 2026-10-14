@@ -36,8 +36,8 @@ import {
 /**
  * Length of every interview.
  *
- * The schedule form no longer asks for a duration, so a single value is applied
- * server-side. Existing records keep whatever they were booked with.
+ * Default when the client sends no duration. Existing records keep whatever
+ * they were booked with.
  */
 export const INTERVIEW_DURATION_MINUTES = 60;
 
@@ -285,7 +285,7 @@ export const createInterview = async (
   // no longer sends it, so a stale browser value can never be stored.
   const timezone = await getCompanyTimezone();
   const scheduledAt = new Date(input.scheduledAt);
-  const duration = INTERVIEW_DURATION_MINUTES;
+  const duration = input.duration ?? INTERVIEW_DURATION_MINUTES;
 
   // Reject a slot that clashes with an existing interview for any of these
   // interviewers. The organiser fallback above means an ad-hoc booking is still

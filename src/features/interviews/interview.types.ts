@@ -44,8 +44,8 @@ export interface IInterview {
    */
   timezone: string;
   /**
-   * Kept for existing records and the calendar/email rendering, but no longer
-   * settable: a fixed 60-minute default is applied server-side.
+   * Minutes. Chosen at creation (10/15/30/60, default 60) and immutable
+   * afterwards; reschedule reuses the stored value.
    */
   duration: number;
   status: string;
@@ -77,6 +77,8 @@ export interface CreateInterviewInput {
   title: string;
   type: 'zoom' | 'google_meet' | 'phone_call' | 'in_person';
   scheduledAt: Date | string;
+  /** Minutes; one of 10/15/30/60. Defaults to 60 when omitted. */
+  duration?: number;
   /** Optional — defaults to the organiser when empty. */
   interviewerIds?: string[];
   organizerId: string;

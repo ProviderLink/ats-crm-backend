@@ -99,8 +99,8 @@ const interviewSchema = new Schema(
     },
     scheduledAt: { type: Date, required: true },
     /**
-     * Server-owned. A fixed default is applied on create and the value is part
-     * of the record (emails render it), but the client can no longer set it.
+     * Minutes. Client-chosen on create (validated allow-list, default 60) and
+     * not editable afterwards; emails and the calendar render it.
      */
     duration: { type: Number, required: true },
     /**

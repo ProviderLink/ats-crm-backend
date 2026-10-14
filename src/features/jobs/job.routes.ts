@@ -55,6 +55,7 @@ const createJobSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1),
   clientId: z.string(),
+  pipelineTemplateId: z.string().optional(),
   jobType: z.enum(['full_time', 'part_time', 'contract', 'temporary']),
   locationType: z.enum(['remote', 'hybrid', 'onsite']),
   location: z.string().optional(),
@@ -71,7 +72,9 @@ const createJobSchema = z.object({
   benefits: z.array(z.string()).optional(),
 });
 
-const updateJobSchema = createJobSchema.omit({ clientId: true }).partial();
+const updateJobSchema = createJobSchema
+  .omit({ clientId: true, pipelineTemplateId: true })
+  .partial();
 
 const updateStatusSchema = z.object({
   status: z.enum(['draft', 'open', 'on_hold', 'closed']),

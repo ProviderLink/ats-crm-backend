@@ -82,6 +82,7 @@ export const sendEmail = async (input: SendEmailInput): Promise<IEmail> => {
     templateId: input.templateId ?? null,
     context: input.context ?? {},
     sentBy: input.sentBy ?? null,
+    attachments: input.attachments ?? [],
   });
 
   try {
@@ -92,6 +93,7 @@ export const sendEmail = async (input: SendEmailInput): Promise<IEmail> => {
       subject,
       html: bodyHtml,
       text: input.bodyText,
+      attachments: input.attachments,
     });
     email.status = 'sent';
     email.resendId = result.id;
@@ -146,6 +148,10 @@ export const resendEmail = async (id: string): Promise<IEmail> => {
       subject: email.subject,
       html: email.bodyHtml,
       text: email.bodyText,
+      attachments: email.attachments.map(a => ({
+        filename: a.filename,
+        url: a.url,
+      })),
     });
     email.status = 'sent';
     email.resendId = result.id;

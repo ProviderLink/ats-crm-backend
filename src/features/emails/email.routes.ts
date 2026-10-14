@@ -5,6 +5,7 @@ import {
   requireAppAccess,
   requirePermission,
 } from '../../shared/middleware/authorize';
+import { uploadEmailAttachment } from '../../shared/middleware/upload';
 import { validate } from '../../shared/validators/common.validator';
 import {
   deleteEmail,
@@ -14,6 +15,7 @@ import {
   markAsRead,
   resendEmail,
   sendEmail,
+  uploadAttachment,
 } from './email.controller';
 
 const sendEmailSchema = z.object({
@@ -36,6 +38,17 @@ const sendEmailSchema = z.object({
   inReplyTo: z.string().optional(),
   threadId: z.string().optional(),
   variables: z.record(z.string()).optional(),
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string().min(1).max(255),
+        url: z.string().url().startsWith('https://'),
+        contentType: z.string().max(255),
+        size: z.number().nonnegative(),
+      })
+    )
+    .max(10)
+    .optional(),
 });
 
 const router = Router();
@@ -50,6 +63,13 @@ router.post(
   requirePermission('emails', 'write'),
   validate(sendEmailSchema),
   sendEmail
+);
+
+router.post(
+  '/attachments',
+  requirePermission('emails', 'write'),
+  uploadEmailAttachment,
+  uploadAttachment
 );
 
 router.get(

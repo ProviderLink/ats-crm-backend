@@ -8,7 +8,7 @@ import {
 import logger from '../../shared/utils/logger';
 import { DEFAULT_TIMEZONE, isValidTimeZone } from '../../shared/utils/timezone';
 import {
-  createZoomMeeting,
+  getPersonalMeetingRoom,
   deleteZoomMeeting,
   updateZoomMeeting,
 } from '../../shared/utils/zoom';
@@ -16,7 +16,6 @@ import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import type { ActivityAction } from '../activity-logs/activityLog.types';
 import Application from '../applications/application.model';
-import Candidate from '../candidates/candidate.model';
 import Job from '../jobs/job.model';
 import User from '../users/user.model';
 import Interview from './interview.model';
@@ -295,17 +294,9 @@ export const createInterview = async (
   let meetingDetails: IInterviewMeetingDetails;
 
   if (input.type === 'zoom') {
-    const candidate = await Candidate.findById(input.candidateId);
-    const candidateName = candidate
-      ? `${candidate.firstName} ${candidate.lastName}`
-      : 'Candidate';
-
-    const zoomResult = await createZoomMeeting({
-      topic: `${input.title} - ${candidateName}`,
-      scheduledAt: input.scheduledAt as string,
-      duration,
-      timezone,
-    });
+    // Every Zoom interview uses the owner's permanent Personal Meeting Room.
+    // Candidates wait in the waiting room until the interviewer admits them.
+    const zoomResult = await getPersonalMeetingRoom();
 
     meetingDetails = {
       link: zoomResult.link,

@@ -41,6 +41,84 @@ const getZoomToken = async (): Promise<string> => {
   return cachedToken;
 };
 
+/**
+ * The owner's Personal Meeting Room — one permanent link reused for every
+ * interview. `ZOOM_PERSONAL_MEETING_URL` (+ optional `ZOOM_PERSONAL_MEETING_ID`)
+ * overrides the API lookup, which needs the app to have a user-read scope.
+ */
+let cachedRoom: { meetingId: string; link: string; password: string } | null =
+  null;
+
+export const getPersonalMeetingRoom = async (): Promise<{
+  meetingId: string;
+  link: string;
+  password: string;
+}> => {
+  if (cachedRoom) return cachedRoom;
+
+  const envUrl = process.env.ZOOM_PERSONAL_MEETING_URL?.trim();
+  if (envUrl) {
+    const idFromUrl = /\/j\/(\d+)/.exec(envUrl)?.[1] ?? '';
+    cachedRoom = {
+      meetingId: process.env.ZOOM_PERSONAL_MEETING_ID?.trim() || idFromUrl,
+      link: envUrl,
+      password: '',
+    };
+    return cachedRoom;
+  }
+
+  try {
+    const token = await getZoomToken();
+    const response = await fetch('https://api.zoom.us/v2/users/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      console.error(`Zoom users/me failed: ${response.status}`);
+      throw new AppError(
+        500,
+        'ZOOM_API_ERROR',
+        'Failed to read the Zoom personal meeting room'
+      );
+    }
+    const data = (await response.json()) as {
+      pmi?: number;
+      personal_meeting_url?: string;
+    };
+    if (!data.pmi || !data.personal_meeting_url) {
+      throw new AppError(
+        500,
+        'ZOOM_API_ERROR',
+        'Zoom account has no personal meeting room'
+      );
+    }
+    cachedRoom = {
+      meetingId: String(data.pmi),
+      link: data.personal_meeting_url,
+      password: '',
+    };
+    return cachedRoom;
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(
+      500,
+      'ZOOM_API_ERROR',
+      'Failed to read the Zoom personal meeting room'
+    );
+  }
+};
+
+/**
+ * True when `meetingId` is the shared room — or when we cannot tell. Update and
+ * delete must never touch the shared room, so uncertainty counts as "yes".
+ */
+const isPersonalRoom = async (meetingId: string): Promise<boolean> => {
+  try {
+    return (await getPersonalMeetingRoom()).meetingId === meetingId;
+  } catch {
+    return true;
+  }
+};
+
 export const createZoomMeeting = async (params: {
   topic: string;
   scheduledAt: string;
@@ -103,6 +181,7 @@ export const updateZoomMeeting = async (
     timezone?: string;
   }
 ): Promise<void> => {
+  if (await isPersonalRoom(meetingId)) return;
   try {
     const token = await getZoomToken();
 
@@ -145,6 +224,7 @@ export const updateZoomMeeting = async (
 };
 
 export const deleteZoomMeeting = async (meetingId: string): Promise<void> => {
+  if (await isPersonalRoom(meetingId)) return;
   try {
     const token = await getZoomToken();
 

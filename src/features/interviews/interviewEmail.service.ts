@@ -611,8 +611,9 @@ export const sendInterviewUpdatedEmails = async (
       companyName: ctx.companyName,
     };
 
-    // Send to candidate
-    if (ctx.candidateEmail) {
+    // Candidates only hear about a reschedule. Other edits and status changes
+    // (completed, no-show, title, interviewers...) are interviewer-only.
+    if (ctx.candidateEmail && changes.includes('Date & time updated')) {
       await sendCandidateUpdate(candidateCtx, changes);
     }
 
@@ -651,11 +652,7 @@ export const sendInterviewCancelledEmails = async (
       companyName: ctx.companyName,
     };
 
-    // Send to candidate
-    if (ctx.candidateEmail) {
-      await sendCandidateCancellation(candidateCtx);
-    }
-
+    // Candidates are not emailed about cancellations; interviewers are.
     // Send to each interviewer
     for (const interviewer of ctx.interviewers) {
       await sendInterviewerCancellation({

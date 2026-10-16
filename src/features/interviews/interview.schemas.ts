@@ -11,7 +11,6 @@ import { z } from 'zod';
  * Deliberately absent, because the schedule form does not ask for them and the
  * server owns the value:
  * - `timezone`  → always the company timezone from Settings.
- * - `duration` on UPDATE → create-only; reschedule reuses the stored value.
  * - `round` / `interviewType` → interviews are not numbered or staged.
  */
 
@@ -90,6 +89,7 @@ export const updateInterviewSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   type: z.enum(INTERVIEW_TYPES).optional(),
   scheduledAt: z.string().datetime().optional(),
+  duration,
   interviewerIds: z.array(z.string().min(1)).optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no_show']).optional(),
   meetingDetails: meetingDetailsSchema,

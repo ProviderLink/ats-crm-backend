@@ -450,46 +450,60 @@ export const updateInterview = async (
     }
   }
 
-  if (input.scheduledAt !== undefined) {
-    const newDate = new Date(input.scheduledAt);
-    if (newDate.getTime() !== interview.scheduledAt.getTime()) {
-      // Guard the new slot against the interview's FINAL interviewer list.
-      await assertNoConflicts({
-        interviewerIds:
-          nextInterviewerIds ?? interview.interviewerIds.map(String),
-        scheduledAt: newDate,
-        duration: interview.duration,
-        excludeInterviewId: id,
-      });
+  const newDate =
+    input.scheduledAt !== undefined ? new Date(input.scheduledAt) : null;
+  const timeChanged =
+    newDate !== null && newDate.getTime() !== interview.scheduledAt.getTime();
+  const durationChanged =
+    input.duration !== undefined && input.duration !== interview.duration;
 
-      changes.push('Date & time updated');
-      interview.scheduledAt = newDate;
+  if (timeChanged || durationChanged) {
+    // Guard the final slot (new time and/or new length) against the
+    // interview's FINAL interviewer list.
+    await assertNoConflicts({
+      interviewerIds:
+        nextInterviewerIds ?? interview.interviewerIds.map(String),
+      scheduledAt: timeChanged && newDate ? newDate : interview.scheduledAt,
+      duration: input.duration ?? interview.duration,
+      excludeInterviewId: id,
+    });
+  }
 
-      // Update meeting if the interview is a video call. Duration and timezone
-      // are no longer client-supplied, so the stored values are reused.
-      if (interview.meetingDetails?.meetingId) {
-        if (interview.type === 'zoom') {
-          updateZoomMeeting(interview.meetingDetails.meetingId, {
-            topic: interview.title,
-            scheduledAt: input.scheduledAt as string,
-            duration: interview.duration,
-            timezone: interview.timezone,
-          }).catch(err => {
-            logger.error('Failed to update Zoom meeting on reschedule', err);
-          });
-        } else if (interview.type === 'google_meet') {
-          updateGoogleMeetMeeting(interview.meetingDetails.meetingId, {
-            topic: interview.title,
-            scheduledAt: input.scheduledAt as string,
-            duration: interview.duration,
-            timezone: interview.timezone,
-          }).catch(err => {
-            logger.error(
-              'Failed to update Google Meet meeting on reschedule',
-              err
-            );
-          });
-        }
+  if (durationChanged && input.duration !== undefined) {
+    changes.push(
+      `Duration changed from ${interview.duration} to ${input.duration} minutes`
+    );
+    interview.duration = input.duration;
+  }
+
+  if (timeChanged && newDate) {
+    changes.push('Date & time updated');
+    interview.scheduledAt = newDate;
+
+    // Update meeting if the interview is a video call. Duration and timezone
+    // are no longer client-supplied, so the stored values are reused.
+    if (interview.meetingDetails?.meetingId) {
+      if (interview.type === 'zoom') {
+        updateZoomMeeting(interview.meetingDetails.meetingId, {
+          topic: interview.title,
+          scheduledAt: input.scheduledAt as string,
+          duration: interview.duration,
+          timezone: interview.timezone,
+        }).catch(err => {
+          logger.error('Failed to update Zoom meeting on reschedule', err);
+        });
+      } else if (interview.type === 'google_meet') {
+        updateGoogleMeetMeeting(interview.meetingDetails.meetingId, {
+          topic: interview.title,
+          scheduledAt: input.scheduledAt as string,
+          duration: interview.duration,
+          timezone: interview.timezone,
+        }).catch(err => {
+          logger.error(
+            'Failed to update Google Meet meeting on reschedule',
+            err
+          );
+        });
       }
     }
   }

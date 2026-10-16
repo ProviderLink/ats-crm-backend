@@ -96,6 +96,7 @@ export interface UpdateInterviewInput {
   title?: string;
   type?: 'zoom' | 'google_meet' | 'phone_call' | 'in_person';
   scheduledAt?: Date | string;
+  duration?: number;
   interviewerIds?: string[];
   status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
   meetingDetails?: Partial<IInterviewMeetingDetails>;

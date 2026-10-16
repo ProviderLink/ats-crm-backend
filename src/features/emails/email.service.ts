@@ -15,6 +15,7 @@ export const getAllEmails = async (filters: {
   status?: string;
   direction?: string;
   threadId?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }) => {
@@ -27,6 +28,12 @@ export const getAllEmails = async (filters: {
   if (filters.status) query['status'] = filters.status;
   if (filters.direction) query['direction'] = filters.direction;
   if (filters.threadId) query['threadId'] = filters.threadId;
+
+  const search = filters.search?.trim();
+  if (search) {
+    const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    query['$or'] = [{ subject: rx }, { from: rx }, { to: rx }];
+  }
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;

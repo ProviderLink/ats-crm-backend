@@ -13,6 +13,7 @@ export const getAllEmails = catchAsync(async (req: Request, res: Response) => {
     status,
     direction,
     threadId,
+    search,
     page,
     limit,
   } = req.query;
@@ -24,6 +25,7 @@ export const getAllEmails = catchAsync(async (req: Request, res: Response) => {
     status: status as string | undefined,
     direction: direction as string | undefined,
     threadId: threadId as string | undefined,
+    search: typeof search === 'string' ? search : undefined,
     page: page ? Number(page) : undefined,
     limit: limit ? Number(limit) : undefined,
   });

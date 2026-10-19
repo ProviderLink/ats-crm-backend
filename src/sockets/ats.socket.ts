@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import { env } from '../config/env';
+import { hasPermission } from '../shared/middleware/authorize';
 import {
   initPresence,
   registerPresenceHandlers,
@@ -48,6 +49,13 @@ export const initializeAtsSocket = (io: Server): void => {
     socket.join('email-templates');
     socket.join('emails');
     socket.join(`user:${decoded._id}`);
+
+    // Rooms for data the HTTP API gates behind a permission: only members who
+    // could read it over REST receive it over the socket.
+    const permUser = { roles, permissions: decoded.permissions };
+    if (hasPermission(permUser, 'team', 'read')) socket.join('team');
+    if (hasPermission(permUser, 'interviewScorecards', 'read'))
+      socket.join('scorecards');
 
     const userId = String(decoded._id);
     trackConnect(userId, socket.id);

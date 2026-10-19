@@ -1,3 +1,4 @@
+import { safeEmitToAts } from '../../sockets';
 import { disconnectUser } from '../../sockets/presence';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -246,6 +247,7 @@ export const createUser = async (
     performedBy: createdBy ?? null,
   });
 
+  safeEmitToAts('team', 'user:created', user.toSafeObject());
   return { user: user.toSafeObject(), inviteToken };
 };
 
@@ -425,6 +427,7 @@ export const updateUser = async (
     performedBy: updatedBy ?? null,
   });
 
+  safeEmitToAts('team', 'user:updated', user.toSafeObject());
   return user.toSafeObject();
 };
 
@@ -464,6 +467,7 @@ export const updatePermissions = async (
     performedBy: updatedBy ?? null,
   });
 
+  safeEmitToAts('team', 'user:updated', user.toSafeObject());
   return user.toSafeObject();
 };
 
@@ -491,6 +495,8 @@ export const deactivateUser = async (
     },
     performedBy: deactivatedBy ?? null,
   });
+
+  safeEmitToAts('team', 'user:deleted', { _id: id });
 
   return safeUser;
 };
@@ -526,6 +532,7 @@ export const updateMe = async (
       performedBy: id,
     });
   }
+  safeEmitToAts('team', 'user:updated', user.toSafeObject());
   return user.toSafeObject();
 };
 
@@ -706,5 +713,6 @@ export const revokeCrmAccess = async (
     performedBy: revokedBy ?? null,
   });
 
+  safeEmitToAts('team', 'user:updated', user.toSafeObject());
   return user.toSafeObject();
 };

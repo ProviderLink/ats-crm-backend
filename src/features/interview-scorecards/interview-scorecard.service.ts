@@ -4,6 +4,7 @@ import AppError from '../../shared/utils/AppError';
 // description + metadata (see "Anything that didn't go as planned" in the
 // completion report).
 import mongoose from 'mongoose';
+import { safeEmitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Job from '../jobs/job.model';
@@ -174,6 +175,7 @@ export const createScorecard = async (
     performedBy: createdBy,
   });
 
+  safeEmitToAts('scorecards', 'interview_scorecard:created', safe);
   return safe;
 };
 
@@ -317,5 +319,6 @@ export const updateScorecard = async (
     performedBy,
   });
 
+  safeEmitToAts('scorecards', 'interview_scorecard:updated', safe);
   return safe;
 };

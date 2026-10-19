@@ -36,3 +36,21 @@ export const emitToCrm = (
 ): void => {
   io.of('/crm').to(room).emit(event, payload);
 };
+
+/**
+ * Fire-and-forget variant for emitters that run AFTER a successful database
+ * write: a socket problem must never fail the request that triggered it, so
+ * errors are logged and swallowed. Clients that miss an event catch up on
+ * their next reconnect refetch.
+ */
+export const safeEmitToAts = (
+  room: string,
+  event: string,
+  payload: unknown
+): void => {
+  try {
+    emitToAts(room, event, payload);
+  } catch (error) {
+    console.warn(`Realtime ${event} failed: ${(error as Error).message}`);
+  }
+};

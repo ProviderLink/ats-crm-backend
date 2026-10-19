@@ -12,6 +12,9 @@ export const initializeSockets = (server: HttpServer): void => {
       origin: [env.ATS_FRONTEND_URL, env.CRM_FRONTEND_URL],
       credentials: true,
     },
+    // Faster dead-connection detection so presence turns offline within ~25s.
+    pingInterval: 10_000,
+    pingTimeout: 15_000,
   });
 
   initializeAtsSocket(io);

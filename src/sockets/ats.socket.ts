@@ -1,9 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
 import { env } from '../config/env';
+import {
+  initPresence,
+  registerPresenceHandlers,
+  trackConnect,
+  trackDisconnect,
+} from './presence';
 
 export const initializeAtsSocket = (io: Server): void => {
   const ats = io.of('/ats');
+  initPresence(ats);
 
   ats.on('connection', socket => {
     const token =
@@ -41,6 +48,10 @@ export const initializeAtsSocket = (io: Server): void => {
     socket.join('email-templates');
     socket.join(`user:${decoded._id}`);
 
+    const userId = String(decoded._id);
+    trackConnect(userId, socket.id);
+    registerPresenceHandlers(socket, decoded);
+
     socket.on('join:job', (jobId: string) => {
       socket.join(`job:${jobId}`);
     });
@@ -50,6 +61,7 @@ export const initializeAtsSocket = (io: Server): void => {
     });
 
     socket.on('disconnect', () => {
+      trackDisconnect(userId, socket.id);
       console.log(`ATS socket disconnected: ${socket.id}`);
     });
   });

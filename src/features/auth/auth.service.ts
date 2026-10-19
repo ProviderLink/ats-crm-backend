@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import AppError from '../../shared/utils/AppError';
 import { sendEmail } from '../../shared/utils/email';
+import { disconnectUser } from '../../sockets/presence';
 import { createLog } from '../activity-logs/activityLog.service';
 import User from '../users/user.model';
 import type { AuthTokenPayload, LoginInput } from './auth.types';
@@ -108,6 +109,8 @@ export const logout = async (userId: string, app?: 'ats' | 'crm') => {
       user.refreshTokenCrm = null;
     }
     await user.save();
+    // Close the ATS sockets now so the presence dot clears immediately.
+    if (app !== 'crm') disconnectUser(String(user._id));
   }
 };
 

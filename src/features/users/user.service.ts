@@ -1,3 +1,4 @@
+import { disconnectUser } from '../../sockets/presence';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
@@ -414,6 +415,7 @@ export const updateUser = async (
   }
 
   await user.save();
+  if (input.isActive === false) disconnectUser(id);
 
   createLog({
     action: 'updated',
@@ -474,6 +476,7 @@ export const deactivateUser = async (
 
   const safeUser = user.toSafeObject();
   await User.findByIdAndDelete(id);
+  disconnectUser(id);
 
   // This removes the account, so say so — and keep who it was, because the
   // user record is gone and the id alone would identify nobody.

@@ -114,6 +114,9 @@ export const logout = async (userId: string, app?: 'ats' | 'crm') => {
   }
 };
 
+/** A session counts as active again only if the stored time is older than this. */
+const LAST_ACTIVE_THROTTLE_MS = 5 * 60 * 1000;
+
 export const refreshToken = async (
   token: string,
   app: 'ats' | 'crm' = 'ats'
@@ -160,6 +163,26 @@ export const refreshToken = async (
     expiresIn:
       env.JWT_ACCESS_EXPIRES as unknown as jwt.SignOptions['expiresIn'],
   });
+
+  // Staying signed in via the refresh cookie is still activity: without this
+  // "last sign-in" only moved on a password login and looked days old.
+  // `timestamps: false` keeps `updatedAt` meaning "profile changed", and a
+  // failure here must never block the refresh itself.
+  const field = app === 'crm' ? 'lastLoginCrm' : 'lastLoginAts';
+  const last = user[field];
+  if (!last || Date.now() - last.getTime() > LAST_ACTIVE_THROTTLE_MS) {
+    const now = new Date();
+    try {
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { [field]: now } },
+        { timestamps: false }
+      );
+      user[field] = now;
+    } catch {
+      // Best effort only.
+    }
+  }
 
   return { user: user.toSafeObject(), accessToken };
 };

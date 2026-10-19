@@ -5,6 +5,7 @@ import { env } from '../../config/env';
 import logger from '../../shared/utils/logger';
 import Candidate from '../candidates/candidate.model';
 import Email from '../emails/email.model';
+import { broadcastEmail } from '../emails/email.realtime';
 import type { ProcessedAttachment, ResendWebhookEvent } from './webhook.types';
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET || '';
@@ -278,7 +279,7 @@ export async function handleEmailReceived(data: { email_id: string }) {
 
   if (candidate) {
     // Create an Email record for the inbound email.
-    await Email.create({
+    const inbound = await Email.create({
       direction: 'inbound',
       from: fromEmail,
       to: Array.isArray(toEmail) ? toEmail : [toEmail],
@@ -304,6 +305,7 @@ export async function handleEmailReceived(data: { email_id: string }) {
         size: att.size,
       })),
     });
+    broadcastEmail('email:created', inbound);
 
     logger.info(
       `Created inbound email record for candidate ${candidate.email}`,
@@ -328,7 +330,7 @@ export async function handleEmailReceived(data: { email_id: string }) {
         { candidateId: linkedCandidate._id, threadId }
       );
 
-      await Email.create({
+      const inbound = await Email.create({
         direction: 'inbound',
         from: fromEmail,
         to: Array.isArray(toEmail) ? toEmail : [toEmail],
@@ -354,11 +356,12 @@ export async function handleEmailReceived(data: { email_id: string }) {
           size: att.size,
         })),
       });
+      broadcastEmail('email:created', inbound);
     } else {
       // Truly unknown — store for manual review.
       logger.warn(`Received email from unknown sender: ${fromEmail}`);
 
-      await Email.create({
+      const inbound = await Email.create({
         direction: 'inbound',
         from: fromEmail,
         to: Array.isArray(toEmail) ? toEmail : [toEmail],
@@ -378,6 +381,7 @@ export async function handleEmailReceived(data: { email_id: string }) {
           size: att.size,
         })),
       });
+      broadcastEmail('email:created', inbound);
 
       logger.info('Stored unmatched inbound email for manual review');
     }

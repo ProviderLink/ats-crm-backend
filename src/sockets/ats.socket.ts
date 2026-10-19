@@ -46,6 +46,7 @@ export const initializeAtsSocket = (io: Server): void => {
     socket.join('tags');
     socket.join('pipeline-templates');
     socket.join('email-templates');
+    socket.join('emails');
     socket.join(`user:${decoded._id}`);
 
     const userId = String(decoded._id);

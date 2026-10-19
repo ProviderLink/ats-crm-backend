@@ -5,6 +5,7 @@ import {
   sendEmail as sendEmailUtil,
   substituteVariables,
 } from '../../shared/utils/email';
+import { broadcastEmail } from './email.realtime';
 import Email from './email.model';
 import type { IEmail, SendEmailInput } from './email.types';
 
@@ -114,6 +115,7 @@ export const sendEmail = async (input: SendEmailInput): Promise<IEmail> => {
     await email.save();
   }
 
+  broadcastEmail('email:created', email);
   return email.toSafeObject();
 };
 
@@ -125,6 +127,7 @@ export const markEmailAsRead = async (id: string): Promise<IEmail> => {
   );
   if (!email) throw new AppError(404, 'EMAIL_NOT_FOUND', 'Email not found');
 
+  broadcastEmail('email:updated', email);
   return email.toSafeObject();
 };
 
@@ -172,5 +175,6 @@ export const resendEmail = async (id: string): Promise<IEmail> => {
     await email.save();
   }
 
+  broadcastEmail('email:updated', email);
   return email.toSafeObject();
 };

@@ -4,7 +4,7 @@ import Client from '../../clients/client.model';
 import Interview from '../../interviews/interview.model';
 import Job from '../../jobs/job.model';
 
-export const getDashboardStats = async () => {
+export const getOverview = async () => {
   const [
     totalCandidates,
     approvedCandidates,
@@ -47,6 +47,29 @@ export const getDashboardStats = async () => {
     Interview.countDocuments({ status: 'scheduled' }),
     Interview.countDocuments({ status: 'completed' }),
   ]);
+
+  return {
+    totalCandidates,
+    approvedCandidates,
+    hiredCandidates,
+    totalJobs,
+    openJobs,
+    totalClients,
+    activeClients,
+    totalApplications,
+    pendingApplications,
+    approvedApplications,
+    // Fields required by frontend dashboard
+    hiredCount,
+    activeCandidates: approvedCandidates,
+    totalInterviews,
+    scheduledInterviews,
+    completedInterviews,
+  };
+};
+
+export const getDashboardStats = async () => {
+  const overview = await getOverview();
 
   const recentApplications = await Application.find({})
     .sort({ createdAt: -1 })
@@ -92,26 +115,75 @@ export const getDashboardStats = async () => {
   );
 
   return {
-    overview: {
-      totalCandidates,
-      approvedCandidates,
-      hiredCandidates,
-      totalJobs,
-      openJobs,
-      totalClients,
-      activeClients,
-      totalApplications,
-      pendingApplications,
-      approvedApplications,
-      // Fields required by frontend dashboard
-      hiredCount,
-      activeCandidates: approvedCandidates,
-      totalInterviews,
-      scheduledInterviews,
-      completedInterviews,
-    },
+    overview,
     recentApplications,
     upcomingInterviews,
     jobStats,
+  };
+};
+
+const idOf = (v: unknown): string => String(v);
+
+/**
+ * Slim payload for the ATS dashboard: the aggregate counts plus ONLY the
+ * fields the dashboard charts read from each entity (see Dash* types in the
+ * frontend `dashboard.types.ts` — keep the two in step). The full list
+ * endpoints return whole documents (parsed resumes, AI data, feedback…) which
+ * made the dashboard download megabytes to draw a handful of charts.
+ *
+ * Documents are hydrated (not lean) so schema defaults still apply to legacy
+ * records, matching what the list endpoints return.
+ */
+export const getDashboardMetrics = async () => {
+  const [overview, clients, jobs, candidates, applications, interviews] =
+    await Promise.all([
+      getOverview(),
+      Client.find({}).select('createdAt companyName'),
+      Job.find({}).select('status clientId createdAt title'),
+      // Same default as the candidates list: permanently ineligible excluded.
+      Candidate.find({
+        eligibilityStatus: { $ne: 'permanently_ineligible' },
+      }).select('status createdAt inTalentPool eligibilityStatus'),
+      Application.find({}).select(
+        'phase jobId candidateId appliedAt hiredAt source'
+      ),
+      Interview.find({}).select('status'),
+    ]);
+
+  return {
+    overview,
+    clients: clients.map(c => ({
+      _id: idOf(c._id),
+      createdAt: c.createdAt,
+      companyName: c.companyName,
+    })),
+    jobs: jobs.map(j => ({
+      _id: idOf(j._id),
+      status: j.status,
+      clientId: idOf(j.clientId),
+      createdAt: j.createdAt,
+      title: j.title,
+    })),
+    candidates: candidates.map(c => ({
+      _id: idOf(c._id),
+      // Same guards as Candidate.toSafeObject for legacy documents.
+      status: c.status || 'pending',
+      createdAt: c.createdAt,
+      inTalentPool: c.inTalentPool,
+      eligibilityStatus: c.eligibilityStatus || 'eligible',
+    })),
+    applications: applications.map(a => ({
+      _id: idOf(a._id),
+      phase: a.phase,
+      jobId: idOf(a.jobId),
+      candidateId: idOf(a.candidateId),
+      appliedAt: a.appliedAt,
+      hiredAt: a.hiredAt,
+      source: a.source,
+    })),
+    interviews: interviews.map(i => ({
+      _id: idOf(i._id),
+      status: i.status,
+    })),
   };
 };

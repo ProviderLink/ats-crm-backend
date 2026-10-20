@@ -10,6 +10,7 @@ Sentry.init({
   integrations: [Sentry.expressIntegration()],
 });
 
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { Request, Response } from 'express';
@@ -58,6 +59,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet());
+app.use(compression());
 app.use(
   cors({
     origin: [env.ATS_FRONTEND_URL, env.CRM_FRONTEND_URL],

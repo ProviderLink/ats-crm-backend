@@ -132,6 +132,8 @@ export const getAllCandidates = async (filters: {
       const safe = c.toSafeObject() as ICandidate & {
         permanentlyIneligibleReasonLabel?: string | null;
       };
+      // Full resume text is large and only the detail/export paths need it.
+      delete (safe as Partial<ICandidate>)['resumeRawText'];
       const reasonId = safe.permanentlyIneligibleReason;
       safe.permanentlyIneligibleReasonLabel = reasonId
         ? (reasonLabelMap[String(reasonId)] ?? null)

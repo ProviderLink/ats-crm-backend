@@ -25,7 +25,7 @@ const refreshTimezoneFallback = async (): Promise<void> => {
 /**
  * Format a date for display in email.
  */
-const formatDateTime = (date: Date | string, timezone?: string): string => {
+export const formatDateTime = (date: Date | string, timezone?: string): string => {
   const d = new Date(date);
   return d.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -60,7 +60,7 @@ const formatInterviewType = (type: string): string => {
 /**
  * Build the meeting details section for email body.
  */
-const buildMeetingDetailsHtml = (
+export const buildMeetingDetailsHtml = (
   type: string,
   meetingDetails: IInterviewMeetingDetails | null
 ): string => {
@@ -116,7 +116,11 @@ const buildInterviewerNames = (
 /**
  * Base email wrapper with professional styling.
  */
-const wrapEmail = (content: string, companyName: string): string => `
+export const wrapEmail = (
+  content: string,
+  companyName: string,
+  options: { footer?: boolean } = {}
+): string => `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -135,13 +139,17 @@ const wrapEmail = (content: string, companyName: string): string => `
               ${content}
             </td>
           </tr>
-          <tr>
+          ${
+            options.footer === false
+              ? ''
+              : `<tr>
             <td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0">
               <p style="color:#94a3b8;font-size:12px;margin:0">
                 This is an automated message from ${companyName} ATS. Please do not reply to this email.
               </p>
             </td>
-          </tr>
+          </tr>`
+          }
         </table>
       </td>
     </tr>

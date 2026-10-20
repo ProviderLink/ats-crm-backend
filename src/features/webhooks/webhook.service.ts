@@ -6,6 +6,7 @@ import logger from '../../shared/utils/logger';
 import Candidate from '../candidates/candidate.model';
 import Email from '../emails/email.model';
 import { broadcastEmail } from '../emails/email.realtime';
+import ExternalMeeting from '../external-meetings/externalMeeting.model';
 import type { ProcessedAttachment, ResendWebhookEvent } from './webhook.types';
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET || '';
@@ -361,6 +362,18 @@ export async function handleEmailReceived(data: { email_id: string }) {
       // Truly unknown — store for manual review.
       logger.warn(`Received email from unknown sender: ${fromEmail}`);
 
+      // A reply from someone we booked an external meeting with is still
+      // "unknown" to the ATS (not a candidate), but the Emails page marks it
+      // as external so it stands out from other unmatched mail.
+      // The sender is the raw header ("Jane Doe <jane@x.com>"), so compare the
+      // bare address.
+      const senderAddress = (/<([^>]+)>/.exec(fromEmail)?.[1] ?? fromEmail)
+        .trim()
+        .toLowerCase();
+      const isExternalContact = await ExternalMeeting.exists({
+        personEmail: senderAddress,
+      });
+
       const inbound = await Email.create({
         direction: 'inbound',
         from: fromEmail,
@@ -372,6 +385,7 @@ export async function handleEmailReceived(data: { email_id: string }) {
         receivedAt: new Date(),
         resendId: emailId,
         threadId,
+        ...(isExternalContact && { context: { type: 'external_meeting' } }),
         inReplyTo: inReplyTo || null,
         messageId: messageId || null,
         attachments: processedAttachments.map(att => ({

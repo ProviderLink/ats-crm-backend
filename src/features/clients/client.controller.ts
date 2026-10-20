@@ -81,6 +81,24 @@ export const uploadLogo = catchAsync(async (req: Request, res: Response) => {
   sendSuccess(res, updatedClient, 'Logo uploaded', 200);
 });
 
+export const removeLogo = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const updatedBy = req.user!._id;
+  const client = await clientService.getClientById(id);
+  if (client.logo) {
+    const publicId = extractPublicIdFromUrl(client.logo);
+    if (publicId) {
+      await deleteFromCloudinary(publicId, 'image');
+    }
+  }
+  const updatedClient = await clientService.updateClient(
+    id,
+    { logo: '' },
+    updatedBy
+  );
+  sendSuccess(res, updatedClient, 'Logo removed', 200);
+});
+
 export const addContact = catchAsync(async (req: Request, res: Response) => {
   const clientId = req.params.id;
   const body = req.body;

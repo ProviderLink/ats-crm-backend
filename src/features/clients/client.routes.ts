@@ -21,6 +21,7 @@ import {
   getAllClients,
   getClientById,
   listClientNotes,
+  removeLogo,
   updateClient,
   updateClientNote,
   updateContact,
@@ -121,6 +122,8 @@ router.post(
   uploadLogoMiddleware,
   uploadLogo
 );
+
+router.delete('/:id/logo', requirePermission('clients', 'write'), removeLogo);
 
 router.post(
   '/:id/contacts',

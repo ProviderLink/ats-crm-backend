@@ -5,6 +5,7 @@ import {
   createScorecard,
   getScorecardById,
   getScorecardsByCandidate,
+  getTagSuggestions as fetchTagSuggestions,
   updateScorecard,
 } from './interview-scorecard.service';
 
@@ -58,6 +59,14 @@ export const getInterviewScorecard = catchAsync(
     const { id } = req.params;
     const scorecard = await getScorecardById(id);
     sendSuccess(res, scorecard, 'Interview scorecard retrieved', 200);
+  }
+);
+
+// GET /api/v1/ats/interview-scorecards/tag-suggestions
+export const getTagSuggestions = catchAsync(
+  async (_req: Request, res: Response) => {
+    const suggestions = await fetchTagSuggestions();
+    sendSuccess(res, suggestions, 'Tag suggestions retrieved', 200);
   }
 );
 

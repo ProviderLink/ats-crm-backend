@@ -9,6 +9,7 @@ import { validate } from '../../shared/validators/common.validator';
 import {
   createInterviewScorecard,
   getInterviewScorecard,
+  getTagSuggestions,
   listInterviewScorecards,
   updateInterviewScorecard,
 } from './interview-scorecard.controller';
@@ -36,12 +37,16 @@ const FINAL_RECOMMENDATIONS = [
   'do_not_recommend',
 ] as const;
 
+// Free-form EMR / speciality tags: trimmed, non-empty, short, capped.
+const tagList = z.array(z.string().trim().min(1).max(50)).max(20).default([]);
+
 // Create: deliberately does NOT accept server-computed score fields
 // (communicationRating, *Weighted, overallScore) — the service recomputes
 // them and overwrites any client-supplied values.
 const createScorecardSchema = z.object({
   candidateId: z.string().min(1, 'candidateId is required'),
   jobId: z.string().min(1, 'jobId is required'),
+  interviewId: z.string().min(1).nullable().optional(),
   // Optional in the schema → service defaults to req.user._id
   interviewerId: z.string().min(1).optional(),
 
@@ -55,6 +60,8 @@ const createScorecardSchema = z.object({
   // Category 2 — Relevant Experience
   experienceSelections: z.array(z.enum(EXPERIENCE_SELECTIONS)).default([]),
   experienceRating: ratingField,
+  emrTags: tagList,
+  specialtyTags: tagList,
   // Category 3 — Professionalism
   profPreparedOnTime: z.boolean(),
   profAppearanceDemeanor: z.boolean(),
@@ -68,12 +75,20 @@ const createScorecardSchema = z.object({
   techBackupInternet: z.boolean(),
   techBackupGenerator: z.boolean(),
   technologyRating: ratingField,
+  techInternetSpeedValue: z.string().max(100).optional().default(''),
   // Category 5 — Availability & Overall Fit
   availUsHours: z.boolean(),
   availCompensationAcceptable: z.boolean(),
   availStartAvailability: z.boolean(),
   availOverallFit: z.boolean(),
   availabilityRating: ratingField,
+
+  // Per-category notes (all optional)
+  commNotes: z.string().max(2000).optional().default(''),
+  experienceNotes: z.string().max(2000).optional().default(''),
+  professionalismNotes: z.string().max(2000).optional().default(''),
+  technologyNotes: z.string().max(2000).optional().default(''),
+  availabilityNotes: z.string().max(2000).optional().default(''),
 
   // Interview notes (all optional)
   strengths: z.string().optional().default(''),
@@ -100,6 +115,7 @@ const listScorecardsSchema = z.object({
 const updateScorecardSchema = createScorecardSchema.omit({
   candidateId: true,
   jobId: true,
+  interviewId: true,
 });
 
 // ── Router ────────────────────────────────────────────────────────────────
@@ -120,6 +136,13 @@ router.get(
   requirePermission('interviewScorecards', 'read'),
   validate(listScorecardsSchema, 'query'),
   listInterviewScorecards
+);
+
+// Registered before '/:id' so "tag-suggestions" is not read as an id.
+router.get(
+  '/tag-suggestions',
+  requirePermission('interviewScorecards', 'read'),
+  getTagSuggestions
 );
 
 router.get(

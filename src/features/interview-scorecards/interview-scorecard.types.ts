@@ -37,6 +37,8 @@ export interface IInterviewScorecard {
   _id: string;
   candidateId: string;
   jobId: string;
+  /** Calendar interview this scorecard covers; null when not linked. */
+  interviewId: string | null;
   interviewerId: string;
 
   interviewDate: Date;
@@ -50,6 +52,8 @@ export interface IInterviewScorecard {
   // Category 2 — Relevant Experience (weight 25)
   experienceSelections: ExperienceSelection[];
   experienceRating: number;
+  emrTags: string[];
+  specialtyTags: string[];
 
   // Category 3 — Professionalism (weight 15)
   profPreparedOnTime: boolean;
@@ -65,6 +69,7 @@ export interface IInterviewScorecard {
   techBackupInternet: boolean;
   techBackupGenerator: boolean;
   technologyRating: number;
+  techInternetSpeedValue: string;
 
   // Category 5 — Availability & Overall Fit (weight 10)
   availUsHours: boolean;
@@ -72,6 +77,13 @@ export interface IInterviewScorecard {
   availStartAvailability: boolean;
   availOverallFit: boolean;
   availabilityRating: number;
+
+  // Per-category notes
+  commNotes: string;
+  experienceNotes: string;
+  professionalismNotes: string;
+  technologyNotes: string;
+  availabilityNotes: string;
 
   // Server-computed weighted scores
   communicationWeighted: number;
@@ -102,6 +114,8 @@ export interface IInterviewScorecard {
 export interface CreateInterviewScorecardInput {
   candidateId: string;
   jobId: string;
+  /** Optional link to a calendar interview (immutable once created). */
+  interviewId?: string | null;
   interviewerId: string;
   interviewDate: Date | string;
   // Deliberately NO: communicationRating, communicationWeighted,
@@ -127,6 +141,14 @@ export interface CreateInterviewScorecardInput {
   availStartAvailability: boolean;
   availOverallFit: boolean;
   availabilityRating: number;
+  techInternetSpeedValue?: string;
+  emrTags?: string[];
+  specialtyTags?: string[];
+  commNotes?: string;
+  experienceNotes?: string;
+  professionalismNotes?: string;
+  technologyNotes?: string;
+  availabilityNotes?: string;
   strengths?: string;
   concerns?: string;
   generalNotes?: string;
@@ -140,7 +162,7 @@ export interface CreateInterviewScorecardInput {
 // interviewerId stays optional (omit to keep the existing interviewer).
 export type UpdateInterviewScorecardInput = Omit<
   CreateInterviewScorecardInput,
-  'candidateId' | 'jobId' | 'interviewerId'
+  'candidateId' | 'jobId' | 'interviewId' | 'interviewerId'
 > & {
   interviewerId?: string;
 };

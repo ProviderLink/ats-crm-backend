@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { safeEmitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
+import Interview from '../interviews/interview.model';
 import Job from '../jobs/job.model';
 import InterviewScorecard from './interview-scorecard.model';
 import type {
@@ -69,6 +70,34 @@ export function computeScores(input: {
   };
 }
 
+/** Trim, drop empties and case-insensitive duplicates (first spelling wins). */
+function normalizeTags(tags: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags ?? []) {
+    const tag = raw.trim();
+    const key = tag.toLowerCase();
+    if (!tag || seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+  }
+  return out;
+}
+
+/** Distinct EMR / speciality tags already used, for the form's autocomplete. */
+export const getTagSuggestions = async (): Promise<{
+  emr: string[];
+  specialty: string[];
+}> => {
+  const [emr, specialty] = await Promise.all([
+    InterviewScorecard.distinct('emrTags') as Promise<string[]>,
+    InterviewScorecard.distinct('specialtyTags') as Promise<string[]>,
+  ]);
+  const sort = (a: string[]) =>
+    a.sort((x, y) => x.localeCompare(y, undefined, { sensitivity: 'base' }));
+  return { emr: sort(emr), specialty: sort(specialty) };
+};
+
 /** Round to 1 decimal place - matches the spec's overallScore requirement. */
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
@@ -90,6 +119,21 @@ export const createScorecard = async (
     throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
   }
 
+  // A linked interview must belong to this candidate; its job wins over any
+  // client-supplied jobId so the two can never disagree.
+  let jobId = input.jobId;
+  if (input.interviewId) {
+    const interview = await Interview.findById(input.interviewId);
+    if (!interview || String(interview.candidateId) !== input.candidateId) {
+      throw new AppError(
+        400,
+        'INTERVIEW_MISMATCH',
+        'Interview not found for this candidate'
+      );
+    }
+    jobId = String(interview.jobId);
+  }
+
   // Recompute server-derived fields — IGNORE any client value for them.
   const computed = computeScores({
     commEnglishDiction: input.commEnglishDiction,
@@ -102,7 +146,8 @@ export const createScorecard = async (
 
   const doc = await InterviewScorecard.create({
     candidateId: input.candidateId,
-    jobId: input.jobId,
+    jobId,
+    interviewId: input.interviewId || null,
     interviewerId: input.interviewerId,
     interviewDate: new Date(input.interviewDate),
     interviewType: 'initial_screening',
@@ -114,6 +159,8 @@ export const createScorecard = async (
     // category 2
     experienceSelections: input.experienceSelections ?? [],
     experienceRating: input.experienceRating,
+    emrTags: normalizeTags(input.emrTags),
+    specialtyTags: normalizeTags(input.specialtyTags),
     // category 3
     profPreparedOnTime: input.profPreparedOnTime,
     profAppearanceDemeanor: input.profAppearanceDemeanor,
@@ -127,6 +174,7 @@ export const createScorecard = async (
     techBackupInternet: input.techBackupInternet,
     techBackupGenerator: input.techBackupGenerator,
     technologyRating: input.technologyRating,
+    techInternetSpeedValue: input.techInternetSpeedValue ?? '',
     // category 5
     availUsHours: input.availUsHours,
     availCompensationAcceptable: input.availCompensationAcceptable,
@@ -140,6 +188,12 @@ export const createScorecard = async (
     technologyWeighted: computed.technologyWeighted,
     availabilityWeighted: computed.availabilityWeighted,
     overallScore: computed.overallScore,
+    // per-category notes
+    commNotes: input.commNotes ?? '',
+    experienceNotes: input.experienceNotes ?? '',
+    professionalismNotes: input.professionalismNotes ?? '',
+    technologyNotes: input.technologyNotes ?? '',
+    availabilityNotes: input.availabilityNotes ?? '',
     // notes
     strengths: input.strengths ?? '',
     concerns: input.concerns ?? '',
@@ -262,6 +316,8 @@ export const updateScorecard = async (
   // category 2
   doc.experienceSelections = input.experienceSelections ?? [];
   doc.experienceRating = input.experienceRating;
+  doc.emrTags = normalizeTags(input.emrTags);
+  doc.specialtyTags = normalizeTags(input.specialtyTags);
   // category 3
   doc.profPreparedOnTime = input.profPreparedOnTime;
   doc.profAppearanceDemeanor = input.profAppearanceDemeanor;
@@ -275,6 +331,7 @@ export const updateScorecard = async (
   doc.techBackupInternet = input.techBackupInternet;
   doc.techBackupGenerator = input.techBackupGenerator;
   doc.technologyRating = input.technologyRating;
+  doc.techInternetSpeedValue = input.techInternetSpeedValue ?? '';
   // category 5
   doc.availUsHours = input.availUsHours;
   doc.availCompensationAcceptable = input.availCompensationAcceptable;
@@ -288,6 +345,12 @@ export const updateScorecard = async (
   doc.technologyWeighted = computed.technologyWeighted;
   doc.availabilityWeighted = computed.availabilityWeighted;
   doc.overallScore = computed.overallScore;
+  // per-category notes
+  doc.commNotes = input.commNotes ?? '';
+  doc.experienceNotes = input.experienceNotes ?? '';
+  doc.professionalismNotes = input.professionalismNotes ?? '';
+  doc.technologyNotes = input.technologyNotes ?? '';
+  doc.availabilityNotes = input.availabilityNotes ?? '';
   // notes
   doc.strengths = input.strengths ?? '';
   doc.concerns = input.concerns ?? '';

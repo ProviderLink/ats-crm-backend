@@ -1,3 +1,4 @@
+import { env } from '../../config/env';
 import { clearAiProviderCache } from '../../shared/utils/ai/index';
 import { clearCompanyTimezoneCache } from '../../shared/utils/companyTimezone';
 import { clearEmailSenderCache } from '../../shared/utils/emailSender';
@@ -49,9 +50,19 @@ function describeSettingsChanges(before: ISettings, after: ISettings): string[] 
   return changes;
 }
 
+/**
+ * Outbound mail is always sent from `COMPANY_EMAIL` (see emailSender.ts), so
+ * that is the address the UI must show — the value stored in the settings row
+ * is legacy and can be stale. Display-only: nothing is written back.
+ */
+const withLiveSender = (settings: ISettings): ISettings => ({
+  ...settings,
+  email: { ...settings.email, fromEmail: env.COMPANY_EMAIL },
+});
+
 export const getSettings = async (): Promise<ISettings> => {
   const settings = await Settings.getSettings();
-  return settings.toSafeObject();
+  return withLiveSender(settings.toSafeObject());
 };
 
 export const updateSettings = async (
@@ -124,5 +135,5 @@ export const updateSettings = async (
     performedBy: updatedBy ?? null,
   });
 
-  return after;
+  return withLiveSender(after);
 };

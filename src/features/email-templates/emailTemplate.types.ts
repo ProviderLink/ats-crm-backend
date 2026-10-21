@@ -11,6 +11,7 @@ export type EmailTemplateType =
 export const SYSTEM_VARIABLES = [
   'candidateName',
   'candidateEmail',
+  'candidatePhone',
   'jobTitle',
   'clientName',
   'interviewDate',
@@ -19,6 +20,7 @@ export const SYSTEM_VARIABLES = [
   'meetingLink',
   'interviewerName',
   'companyName',
+  'currentStage',
   'senderName',
 ] as const;
 

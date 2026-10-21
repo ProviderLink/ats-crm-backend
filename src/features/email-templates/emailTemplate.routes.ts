@@ -13,6 +13,7 @@ const router = Router();
 const SYSTEM_VARIABLES_ENUM = z.enum([
   'candidateName',
   'candidateEmail',
+  'candidatePhone',
   'jobTitle',
   'clientName',
   'interviewDate',
@@ -21,6 +22,7 @@ const SYSTEM_VARIABLES_ENUM = z.enum([
   'meetingLink',
   'interviewerName',
   'companyName',
+  'currentStage',
   'senderName',
 ]);
 

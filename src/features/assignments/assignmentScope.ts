@@ -148,3 +148,23 @@ export async function assertOwnsReminder(
   );
   if (!matches) throw forbidden();
 }
+
+/**
+ * The VAs and clients an account manager manages (through any of their
+ * assignments). `undefined` for anyone who is not an account manager.
+ */
+export async function managedIds(
+  user: Actor
+): Promise<{ candidateIds: unknown[]; clientIds: unknown[] } | undefined> {
+  if (!isAccountManagerOnly(user)) return undefined;
+  const own = await ownAssignments(user);
+  return {
+    candidateIds: [...new Set(own.map(a => String(a.candidateId)))].map(
+      id => new mongoose.Types.ObjectId(id)
+    ),
+    clientIds: [...new Set(own.map(a => String(a.clientId)))].map(
+      id => new mongoose.Types.ObjectId(id)
+    ),
+  };
+}
+

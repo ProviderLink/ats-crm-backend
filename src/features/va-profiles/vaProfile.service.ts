@@ -11,6 +11,8 @@ import type {
 } from './vaProfile.types';
 
 export const getAllVaProfiles = async (filters: {
+  /** Extra Mongo conditions, e.g. an account manager's managed VAs. */
+  scope?: Record<string, unknown>;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -20,12 +22,12 @@ export const getAllVaProfiles = async (filters: {
   limit: number;
   totalPages: number;
 }> => {
-  const { page = 1, limit = 20 } = filters;
+  const { scope = {}, page = 1, limit = 20 } = filters;
   const skip = (page - 1) * limit;
 
   const [profiles, total] = await Promise.all([
-    VaProfile.find().sort({ updatedAt: -1 }).skip(skip).limit(limit),
-    VaProfile.countDocuments(),
+    VaProfile.find(scope).sort({ updatedAt: -1 }).skip(skip).limit(limit),
+    VaProfile.countDocuments(scope),
   ]);
 
   return {

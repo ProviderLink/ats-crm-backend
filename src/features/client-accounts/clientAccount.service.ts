@@ -76,6 +76,8 @@ export const getProvisionedClients = async (): Promise<
 };
 
 export const getAllClientAccounts = async (filters: {
+  /** Extra Mongo conditions, e.g. an account manager's managed clients. */
+  scope?: Record<string, unknown>;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -85,16 +87,17 @@ export const getAllClientAccounts = async (filters: {
   limit: number;
   totalPages: number;
 }> => {
-  const { page = 1, limit = 20 } = filters;
+  const { scope = {}, page = 1, limit = 20 } = filters;
   const skip = (page - 1) * limit;
+  const query = { crmProfile: { $ne: null }, ...scope };
 
   // Only return clients that have a crmProfile (i.e., CRM-relevant clients)
   const [clients, total] = await Promise.all([
-    Client.find({ crmProfile: { $ne: null } })
+    Client.find(query)
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit),
-    Client.countDocuments({ crmProfile: { $ne: null } }),
+    Client.countDocuments(query),
   ]);
 
   return {

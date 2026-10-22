@@ -3,13 +3,18 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { assertOwnsCandidate } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
-import { assertManagesCandidate } from '../assignments/assignmentScope';
+import {
+  assertManagesCandidate,
+  managedIds,
+} from '../assignments/assignmentScope';
 import * as service from './vaProfile.service';
 
 export const getAllVaProfiles = catchAsync(
   async (req: Request, res: Response) => {
     const { page, limit } = req.query as Record<string, string | undefined>;
+    const managed = await managedIds(req.user!);
     const result = await service.getAllVaProfiles({
+      scope: managed ? { vaId: { $in: managed.candidateIds } } : undefined,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
@@ -26,6 +31,7 @@ export const getVaProfileById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     assertOwnsCandidate(req.user!, id);
+    await assertManagesCandidate(req.user!, id);
     try {
       const profile = await service.getVaProfileById(id);
       const { roles } = req.user!;

@@ -3,7 +3,10 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { assertOwnsRecord } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
-import { assertManagesClient } from '../assignments/assignmentScope';
+import {
+  assertManagesClient,
+  managedIds,
+} from '../assignments/assignmentScope';
 import * as service from './clientAccount.service';
 
 export const getProvisionedClients = catchAsync(
@@ -16,7 +19,9 @@ export const getProvisionedClients = catchAsync(
 export const getAllClientAccounts = catchAsync(
   async (req: Request, res: Response) => {
     const { page, limit } = req.query as Record<string, string | undefined>;
+    const managed = await managedIds(req.user!);
     const result = await service.getAllClientAccounts({
+      scope: managed ? { _id: { $in: managed.clientIds } } : undefined,
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
@@ -32,6 +37,7 @@ export const getAllClientAccounts = catchAsync(
 export const getClientAccountById = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    await assertManagesClient(req.user!, id);
     try {
       const account = await service.getClientAccountById(id);
       sendSuccess(res, account, 'Client account retrieved', 200);

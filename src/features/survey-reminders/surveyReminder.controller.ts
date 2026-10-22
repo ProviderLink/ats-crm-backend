@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
+import {
+  assertOwnsReminder,
+  reminderScope,
+} from '../assignments/assignmentScope';
 import * as surveyReminderService from './surveyReminder.service';
 
 export const getAllSurveyReminders = catchAsync(
@@ -12,6 +16,7 @@ export const getAllSurveyReminders = catchAsync(
       relatedId,
       status,
       assignedTo,
+      scope: await reminderScope(req.user!),
       page: page !== undefined ? Number(page) : undefined,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
@@ -35,6 +40,7 @@ export const getSurveyReminderById = catchAsync(
     const { id } = req.params;
     const surveyReminder =
       await surveyReminderService.getSurveyReminderById(id);
+    await assertOwnsReminder(req.user!, surveyReminder);
     sendSuccess(res, surveyReminder, 'Survey reminder retrieved', 200);
   }
 );
@@ -52,6 +58,10 @@ export const createSurveyReminder = catchAsync(
 export const updateSurveyReminder = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    await assertOwnsReminder(
+      req.user!,
+      await surveyReminderService.getSurveyReminderById(id)
+    );
     const surveyReminder = await surveyReminderService.updateSurveyReminder(
       id,
       req.body,

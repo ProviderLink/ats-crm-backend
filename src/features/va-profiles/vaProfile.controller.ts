@@ -3,6 +3,7 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { assertOwnsCandidate } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertManagesCandidate } from '../assignments/assignmentScope';
 import * as service from './vaProfile.service';
 
 export const getAllVaProfiles = catchAsync(
@@ -52,6 +53,7 @@ export const upsertVaProfile = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const updatedBy = req.user!._id;
+    await assertManagesCandidate(req.user!, id);
     const profile = await service.upsertVaProfile(id, req.body, updatedBy);
     sendSuccess(res, profile, 'VA profile updated', 200);
   }

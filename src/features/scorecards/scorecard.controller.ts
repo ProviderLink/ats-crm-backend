@@ -2,7 +2,11 @@ import { Request, Response } from 'express';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { sendSuccess } from '../../shared/utils/response';
-import { assertOwnsAssignment, assignmentScope } from '../assignments/assignmentScope';
+import {
+  assertOwnsAssignment,
+  assignmentScope,
+  isAccountManagerOnly,
+} from '../assignments/assignmentScope';
 import * as scorecardService from './scorecard.service';
 
 export const getAllScorecards = catchAsync(
@@ -43,9 +47,11 @@ export const getScorecardById = catchAsync(
 export const generateScorecards = catchAsync(
   async (req: Request, res: Response) => {
     const { vaId } = req.body as { vaId?: string };
+    // An account manager generates only for the assignments they manage.
     const result = await scorecardService.generateScorecards(
       vaId,
-      req.user!._id
+      req.user!._id,
+      isAccountManagerOnly(req.user!) ? req.user!._id : undefined
     );
     sendSuccess(res, result, `Generated ${result.generated} scorecards`, 201);
   }

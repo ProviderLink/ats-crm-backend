@@ -13,6 +13,8 @@ export const getAllSurveyReminders = async (filters: {
   relatedId?: string;
   status?: string;
   assignedTo?: string;
+  /** Extra Mongo conditions, e.g. an account manager's reminder scope. */
+  scope?: Record<string, unknown>;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -27,10 +29,11 @@ export const getAllSurveyReminders = async (filters: {
     relatedId,
     status,
     assignedTo,
+    scope,
     page = 1,
     limit = 20,
   } = filters;
-  const query: Record<string, unknown> = {};
+  const query: Record<string, unknown> = { ...scope };
 
   if (relatedType !== undefined) query['relatedType'] = relatedType;
   if (relatedId !== undefined)

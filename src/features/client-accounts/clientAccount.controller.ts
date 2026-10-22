@@ -3,6 +3,7 @@ import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { assertOwnsRecord } from '../../shared/utils/crmScope';
 import { sendSuccess } from '../../shared/utils/response';
+import { assertManagesClient } from '../assignments/assignmentScope';
 import * as service from './clientAccount.service';
 
 export const getProvisionedClients = catchAsync(
@@ -53,6 +54,7 @@ export const updateClientAccount = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const updatedBy = req.user!._id;
+    await assertManagesClient(req.user!, id);
     try {
       const account = await service.updateClientAccount(
         id,

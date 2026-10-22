@@ -88,3 +88,63 @@ export async function assertOwnsPair(
   });
   if (!owned) throw forbidden();
 }
+
+/** An account manager may only act on a VA they manage. */
+export async function assertManagesCandidate(
+  user: Actor,
+  candidateId: unknown
+): Promise<void> {
+  if (!isAccountManagerOnly(user)) return;
+  const owned = await Assignment.exists({
+    candidateId,
+    accountManagerId: new mongoose.Types.ObjectId(user._id),
+  });
+  if (!owned) throw forbidden();
+}
+
+/** An account manager may only act on a client they manage. */
+export async function assertManagesClient(
+  user: Actor,
+  clientId: unknown
+): Promise<void> {
+  if (!isAccountManagerOnly(user)) return;
+  const owned = await Assignment.exists({
+    clientId,
+    accountManagerId: new mongoose.Types.ObjectId(user._id),
+  });
+  if (!owned) throw forbidden();
+}
+
+/**
+ * Survey reminders reach an account manager when they are assigned to them or
+ * relate to one of their assignments, VAs or clients. `undefined` for anyone
+ * who is not an account manager.
+ */
+export async function reminderScope(
+  user: Actor
+): Promise<Record<string, unknown> | undefined> {
+  if (!isAccountManagerOnly(user)) return undefined;
+  const own = await ownAssignments(user);
+  const relatedIds = own.flatMap(a => [a._id, a.candidateId, a.clientId]);
+  return {
+    $or: [
+      { assignedTo: new mongoose.Types.ObjectId(user._id) },
+      { relatedId: { $in: relatedIds } },
+    ],
+  };
+}
+
+/** The reminder must fall inside the caller's `reminderScope`. */
+export async function assertOwnsReminder(
+  user: Actor,
+  reminder: { relatedId: unknown; assignedTo?: unknown }
+): Promise<void> {
+  if (!isAccountManagerOnly(user)) return;
+  if (String(reminder.assignedTo) === String(user._id)) return;
+  const own = await ownAssignments(user);
+  const related = String(reminder.relatedId);
+  const matches = own.some(a =>
+    [a._id, a.candidateId, a.clientId].some(id => String(id) === related)
+  );
+  if (!matches) throw forbidden();
+}

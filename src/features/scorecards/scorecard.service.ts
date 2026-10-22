@@ -128,9 +128,15 @@ export const getScorecardById = async (id: string): Promise<IScorecard> => {
 
 export const generateScorecards = async (
   vaId?: string,
-  performedBy?: string
+  performedBy?: string,
+  accountManagerId?: string
 ): Promise<{ generated: number }> => {
   const assignmentFilter: Record<string, unknown> = { status: 'active' };
+  if (accountManagerId) {
+    assignmentFilter['accountManagerId'] = new mongoose.Types.ObjectId(
+      accountManagerId
+    );
+  }
   if (vaId) {
     assignmentFilter['candidateId'] = new mongoose.Types.ObjectId(vaId);
   }

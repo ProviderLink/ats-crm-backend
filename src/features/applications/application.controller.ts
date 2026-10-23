@@ -4,6 +4,13 @@ import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
 import * as applicationService from './application.service';
 
+export const getCandidateCountsByJob = catchAsync(
+  async (_req: Request, res: Response) => {
+    const counts = await applicationService.getCandidateCountsByJob();
+    sendSuccess(res, counts, 'Candidate counts retrieved');
+  }
+);
+
 export const getAllApplications = catchAsync(
   async (req: Request, res: Response) => {
     const { jobId, candidateId, clientId, phase, page, limit } =

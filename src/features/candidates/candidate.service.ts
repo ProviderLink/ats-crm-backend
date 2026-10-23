@@ -50,6 +50,43 @@ function extractCloudinaryPublicId(
   return publicId;
 }
 
+/** A candidate as list endpoints return it by default: everything but the resume text. */
+export function toFullListCandidate(
+  c: ICandidateDocument
+): ICandidate & { permanentlyIneligibleReasonLabel?: string | null } {
+  const safe = c.toSafeObject() as ICandidate & {
+    permanentlyIneligibleReasonLabel?: string | null;
+  };
+  delete (safe as Partial<ICandidate>)['resumeRawText'];
+  return safe;
+}
+
+/**
+ * A candidate as slim list endpoints return it: no resume text, and a trimmed parsed
+ * profile. The full parsed profile is ~70% of a row, while tables, search and
+ * filters only read skills and the latest role; detail sheets load the full
+ * record on open.
+ */
+export function toListCandidate(
+  c: ICandidateDocument
+): ICandidate & { permanentlyIneligibleReasonLabel?: string | null } {
+  const safe = c.toSafeObject() as ICandidate & {
+    permanentlyIneligibleReasonLabel?: string | null;
+  };
+  delete (safe as Partial<ICandidate>)['resumeRawText'];
+  if (safe.parsedData) {
+    safe.parsedData = {
+      ...safe.parsedData,
+      summary: '',
+      languages: [],
+      certifications: [],
+      education: [],
+      experience: (safe.parsedData.experience ?? []).slice(0, 1),
+    };
+  }
+  return safe;
+}
+
 export const getAllCandidates = async (filters: {
   status?: string;
   inTalentPool?: boolean;
@@ -60,6 +97,10 @@ export const getAllCandidates = async (filters: {
   limit?: number;
   includeIneligible?: boolean;
   includeBlockedApps?: boolean;
+  /** Restrict to these candidate ids (lookup by id). */
+  ids?: string[];
+  /** Return trimmed rows (see `toListCandidate`); detail loads the rest. */
+  slim?: boolean;
 }): Promise<{
   candidates: ICandidate[];
   total: number;
@@ -76,9 +117,12 @@ export const getAllCandidates = async (filters: {
     page = 1,
     limit = 20,
     includeIneligible = false,
+    ids,
+    slim = false,
   } = filters;
   const query: Record<string, unknown> = {};
 
+  if (ids !== undefined) query['_id'] = { $in: ids };
   if (status !== undefined) query['status'] = status;
   if (inTalentPool !== undefined) query['inTalentPool'] = inTalentPool;
   if (tags !== undefined && tags.length > 0) query['tags'] = { $in: tags };
@@ -135,11 +179,7 @@ export const getAllCandidates = async (filters: {
 
   return {
     candidates: candidates.map(c => {
-      const safe = c.toSafeObject() as ICandidate & {
-        permanentlyIneligibleReasonLabel?: string | null;
-      };
-      // Full resume text is large and only the detail/export paths need it.
-      delete (safe as Partial<ICandidate>)['resumeRawText'];
+      const safe = slim ? toListCandidate(c) : toFullListCandidate(c);
       const reasonId = safe.permanentlyIneligibleReason;
       safe.permanentlyIneligibleReasonLabel = reasonId
         ? (reasonLabelMap[String(reasonId)] ?? null)

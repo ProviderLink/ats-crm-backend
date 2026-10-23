@@ -22,6 +22,7 @@ import {
 import {
   approveApplication,
   getAllApplications,
+  getCandidateCountsByJob,
   getApplicationById,
   hireApplication,
   moveStage,
@@ -55,6 +56,11 @@ router.use(authenticate);
 router.use(requireAppAccess('ats'));
 
 router.get('/', requirePermission('candidates', 'read'), getAllApplications);
+router.get(
+  '/counts-by-job',
+  requirePermission('candidates', 'read'),
+  getCandidateCountsByJob
+);
 
 router.get('/:id', requirePermission('candidates', 'read'), getApplicationById);
 

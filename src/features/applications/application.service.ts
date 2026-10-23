@@ -55,6 +55,49 @@ export const getAllApplications = async (filters: {
   };
 };
 
+/**
+ * Candidates shown under each job: every application except pending ones and
+ * rejections into the permanently-ineligible destination. A rejection whose
+ * candidate is gone or has since been made permanently ineligible is skipped
+ * too, matching what the job cards counted from the full candidate list.
+ */
+export const getCandidateCountsByJob = async (): Promise<
+  Record<string, number>
+> => {
+  const apps = await Application.find(
+    { phase: { $ne: 'pending' } },
+    'jobId phase candidateId dispositionDestination'
+  ).lean();
+
+  const rejectedCandidateIds = [
+    ...new Set(
+      apps.filter(a => a.phase === 'rejected').map(a => String(a.candidateId))
+    ),
+  ];
+  const visible = new Set(
+    (
+      await Candidate.find(
+        {
+          _id: { $in: rejectedCandidateIds },
+          eligibilityStatus: { $ne: 'permanently_ineligible' },
+        },
+        '_id'
+      ).lean()
+    ).map(c => String(c._id))
+  );
+
+  const counts: Record<string, number> = {};
+  for (const a of apps) {
+    if (a.phase === 'rejected') {
+      if (a.dispositionDestination === 'permanently_ineligible') continue;
+      if (!visible.has(String(a.candidateId))) continue;
+    }
+    const key = String(a.jobId);
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+};
+
 export const getApplicationById = async (id: string): Promise<IApplication> => {
   const application = await Application.findById(id);
   if (!application) {

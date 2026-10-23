@@ -18,6 +18,8 @@ import {
   createCandidate,
   deleteCandidate,
   getAllCandidates,
+  getCandidateTable,
+  getCandidateTableIds,
   getCandidateById,
   publicParse,
   publicUploadAndParse,
@@ -221,6 +223,16 @@ router.use(authenticate);
 router.use(requireAppAccess('ats'));
 
 router.get('/', requirePermission('candidates', 'read'), getAllCandidates);
+router.get(
+  '/table',
+  requirePermission('candidates', 'read'),
+  getCandidateTable
+);
+router.get(
+  '/table/ids',
+  requirePermission('candidates', 'read'),
+  getCandidateTableIds
+);
 
 router.post(
   '/',

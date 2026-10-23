@@ -13,6 +13,7 @@ import { sendSuccess } from '../../shared/utils/response';
 import * as applicationService from '../applications/application.service';
 import { getJobById } from '../jobs/job.service';
 import * as candidateService from './candidate.service';
+import * as tableService from './candidate.table.service';
 
 export const getAllCandidates = catchAsync(
   async (req: Request, res: Response) => {
@@ -25,6 +26,8 @@ export const getAllCandidates = catchAsync(
       page,
       limit,
       includeIneligible: includeIneligibleStr,
+      ids: idsStr,
+      slim: slimStr,
     } = req.query as Record<string, string | undefined>;
 
     const inTalentPool =
@@ -56,6 +59,17 @@ export const getAllCandidates = catchAsync(
       );
     }
 
+    // Lookup by id: only well-formed ObjectIds are queried; the page size
+    // follows the id count so a lookup is never silently truncated.
+    const ids =
+      idsStr !== undefined
+        ? idsStr
+            .split(',')
+            .map(i => i.trim())
+            .filter(i => /^[a-f\d]{24}$/i.test(i))
+            .slice(0, 500)
+        : undefined;
+
     const tags =
       tagsStr !== undefined
         ? tagsStr
@@ -71,8 +85,15 @@ export const getAllCandidates = catchAsync(
       search,
       tags,
       page: page !== undefined ? Number(page) : undefined,
-      limit: limit !== undefined ? Number(limit) : undefined,
+      limit:
+        limit !== undefined
+          ? Number(limit)
+          : ids !== undefined
+            ? Math.max(ids.length, 1)
+            : undefined,
       includeIneligible,
+      ids,
+      slim: slimStr === '1' || slimStr === 'true',
     });
 
     sendSuccess(res, result.candidates, 'Candidates retrieved', 200, {
@@ -81,6 +102,55 @@ export const getAllCandidates = catchAsync(
       limit: result.limit,
       totalPages: result.totalPages,
     });
+  }
+);
+
+const TABLE_TABS = ['pending', 'approved', 'hired'] as const;
+const TABLE_SORTS = [
+  'newest',
+  'oldest',
+  'a_z',
+  'z_a',
+  'highest_score',
+  'lowest_score',
+] as const;
+
+function parseTableQuery(req: Request): tableService.TableQuery {
+  const { tab, jobId, q, sort, page, limit } = req.query as Record<
+    string,
+    string | undefined
+  >;
+  return {
+    tab: (TABLE_TABS as readonly string[]).includes(tab ?? '')
+      ? (tab as tableService.TableTab)
+      : 'pending',
+    jobId: jobId || undefined,
+    q: q || undefined,
+    sort: (TABLE_SORTS as readonly string[]).includes(sort ?? '')
+      ? (sort as tableService.TableSort)
+      : 'newest',
+    page: Math.max(1, Number(page) || 1),
+    limit: Math.min(100, Math.max(1, Number(limit) || 20)),
+  };
+}
+
+export const getCandidateTable = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await tableService.getCandidateTable(parseTableQuery(req));
+    sendSuccess(res, result.candidates, 'Candidates retrieved', 200, {
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+      counts: result.counts,
+    });
+  }
+);
+
+export const getCandidateTableIds = catchAsync(
+  async (req: Request, res: Response) => {
+    const { ids } = await tableService.resolveTable(parseTableQuery(req));
+    sendSuccess(res, ids, 'Candidate ids retrieved');
   }
 );
 

@@ -1,3 +1,4 @@
+import { cachedList } from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { sanitizeJobDescription } from '../../shared/utils/sanitize-job-description';
@@ -21,7 +22,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   closed: [],
 };
 
-export const getAllJobs = async (filters: {
+const loadGetAllJobs = async (filters: {
   clientId?: string;
   status?: string;
   search?: string;
@@ -382,3 +383,10 @@ export const updateJobStatus = async (
   emitToAts('jobs', 'job:statusChanged', { _id: result._id, status });
   return result;
 };
+
+export const getAllJobs = (
+  filters: Parameters<typeof loadGetAllJobs>[0]
+): ReturnType<typeof loadGetAllJobs> =>
+  cachedList('jobs', ['jobs', 'clients'], filters, () =>
+    loadGetAllJobs(filters)
+  );

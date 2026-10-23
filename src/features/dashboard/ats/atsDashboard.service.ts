@@ -1,3 +1,4 @@
+import { cachedList } from '../../../shared/utils/listCache';
 import Application from '../../applications/application.model';
 import Candidate from '../../candidates/candidate.model';
 import Client from '../../clients/client.model';
@@ -68,7 +69,7 @@ export const getOverview = async () => {
   };
 };
 
-export const getDashboardStats = async () => {
+const loadDashboardStats = async () => {
   const overview = await getOverview();
 
   const recentApplications = await Application.find({})
@@ -134,7 +135,7 @@ const idOf = (v: unknown): string => String(v);
  * Documents are hydrated (not lean) so schema defaults still apply to legacy
  * records, matching what the list endpoints return.
  */
-export const getDashboardMetrics = async () => {
+const loadDashboardMetrics = async () => {
   const [overview, clients, jobs, candidates, applications, interviews] =
     await Promise.all([
       getOverview(),
@@ -187,3 +188,15 @@ export const getDashboardMetrics = async () => {
     })),
   };
 };
+
+// The dashboard re-counts every collection on each visit; the numbers only move
+// when something is written, so serve them from the shared list cache (rebuilt
+// on any candidate, application, job or client change).
+const DASHBOARD_ROOMS = ['candidates', 'applications', 'jobs', 'clients'];
+
+export const getDashboardStats = (): ReturnType<typeof loadDashboardStats> =>
+  cachedList('dashboard-stats', DASHBOARD_ROOMS, {}, loadDashboardStats);
+
+export const getDashboardMetrics = (): ReturnType<
+  typeof loadDashboardMetrics
+> => cachedList('dashboard-metrics', DASHBOARD_ROOMS, {}, loadDashboardMetrics);

@@ -1,3 +1,4 @@
+import { cachedList } from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { emitToAts } from '../../sockets';
@@ -15,7 +16,7 @@ import type {
   UpdateContactInput,
 } from './client.types';
 
-export const getAllClients = async (filters: {
+const loadGetAllClients = async (filters: {
   status?: string;
   search?: string;
   page?: number;
@@ -675,3 +676,10 @@ export const deleteNote = async (
 
   return { deleted: true };
 };
+
+export const getAllClients = (
+  filters: Parameters<typeof loadGetAllClients>[0]
+): ReturnType<typeof loadGetAllClients> =>
+  cachedList('clients', ['clients'], filters, () =>
+    loadGetAllClients(filters)
+  );

@@ -1,3 +1,4 @@
+import { cachedList } from '../../shared/utils/listCache';
 import { safeEmitToAts } from '../../sockets';
 import { disconnectUser } from '../../sockets/presence';
 import bcrypt from 'bcryptjs';
@@ -155,7 +156,7 @@ export function buildPermissionsForRoles(roles: UserRole[]): UserPermissions {
   return perms;
 }
 
-export const getAllUsers = async (filters: {
+const loadGetAllUsers = async (filters: {
   role?: string;
   roles?: string[];
   appAccess?: string;
@@ -716,3 +717,10 @@ export const revokeCrmAccess = async (
   safeEmitToAts('team', 'user:updated', user.toSafeObject());
   return user.toSafeObject();
 };
+
+export const getAllUsers = (
+  filters: Parameters<typeof loadGetAllUsers>[0]
+): ReturnType<typeof loadGetAllUsers> =>
+  cachedList('users', ['team'], filters, () =>
+    loadGetAllUsers(filters)
+  );

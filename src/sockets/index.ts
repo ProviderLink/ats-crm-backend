@@ -1,6 +1,8 @@
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { env } from '../config/env';
+import { onRealtimeEmit } from '../features/candidates/candidate.table.cache';
+import { invalidateListsForRoom } from '../shared/utils/listCache';
 import { initializeAtsSocket } from './ats.socket';
 import { initializeCrmSocket } from './crm.socket';
 
@@ -26,6 +28,9 @@ export const emitToAts = (
   event: string,
   payload: unknown
 ): void => {
+  // Drop the cached Candidates-table data before clients refetch it.
+  onRealtimeEmit(room);
+  invalidateListsForRoom(room);
   io.of('/ats').to(room).emit(event, payload);
 };
 

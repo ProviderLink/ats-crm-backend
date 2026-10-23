@@ -1,3 +1,4 @@
+import { cachedList } from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
@@ -209,7 +210,7 @@ const assertNoConflicts = async (params: {
   );
 };
 
-export const getAllInterviews = async (filters: {
+const loadGetAllInterviews = async (filters: {
   candidateId?: string;
   jobId?: string;
   applicationId?: string;
@@ -675,3 +676,10 @@ export const submitFeedback = async (
   emitToAts('applications', 'interview:updated', result);
   return result;
 };
+
+export const getAllInterviews = (
+  filters: Parameters<typeof loadGetAllInterviews>[0]
+): ReturnType<typeof loadGetAllInterviews> =>
+  cachedList('interviews', ['applications', 'candidates', 'jobs', 'team'], filters, () =>
+    loadGetAllInterviews(filters)
+  );

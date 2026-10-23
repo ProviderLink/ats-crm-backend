@@ -1,3 +1,4 @@
+import { cachedList } from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
 import { env } from '../../config/env';
 import AppError from '../../shared/utils/AppError';
@@ -9,7 +10,7 @@ import { broadcastEmail } from './email.realtime';
 import Email from './email.model';
 import type { IEmail, SendEmailInput } from './email.types';
 
-export const getAllEmails = async (filters: {
+const loadGetAllEmails = async (filters: {
   candidateId?: string;
   jobId?: string;
   applicationId?: string;
@@ -178,3 +179,10 @@ export const resendEmail = async (id: string): Promise<IEmail> => {
   broadcastEmail('email:updated', email);
   return email.toSafeObject();
 };
+
+export const getAllEmails = (
+  filters: Parameters<typeof loadGetAllEmails>[0]
+): ReturnType<typeof loadGetAllEmails> =>
+  cachedList('emails', ['emails', 'candidates'], filters, () =>
+    loadGetAllEmails(filters)
+  );

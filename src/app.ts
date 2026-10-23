@@ -17,6 +17,13 @@ import express, { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { connectDB } from './config/db';
+import { getDashboardMetrics } from './features/dashboard/ats/atsDashboard.service';
+import { getAllApplications } from './features/applications/application.service';
+import { getAllClients } from './features/clients/client.service';
+import { getAllInterviews } from './features/interviews/interview.service';
+import { getAllJobs } from './features/jobs/job.service';
+import { getAllUsers } from './features/users/user.service';
+import { warmUpCandidateTable } from './features/candidates/candidate.table.service';
 import activityLogRouter from './features/activity-logs/activityLog.routes';
 import applicationRouter from './features/applications/application.routes';
 import assignmentRouter from './features/assignments/assignment.routes';
@@ -176,6 +183,21 @@ app.use(errorHandler);
 connectDB()
   .then(() => {
     logger.info('Database connected');
+    // Build the Candidates-table data now so the first page view is not the
+    // one that pays for it. Failure only means the first request loads it.
+    void warmUpCandidateTable().catch(error =>
+      logger.warn('Candidate table warm-up failed', { error })
+    );
+    // The lists every login asks for, so the first user does not wait on them.
+    const all = { page: 1, limit: 9999 };
+    void Promise.allSettled([
+      getAllJobs(all),
+      getAllClients(all),
+      getAllApplications(all),
+      getAllInterviews(all),
+      getAllUsers(all),
+      getDashboardMetrics(),
+    ]);
     return seedEmailTemplates();
   })
   .catch(error => {

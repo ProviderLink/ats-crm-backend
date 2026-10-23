@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { cachedList } from '../../shared/utils/listCache';
 import { deleteFromCloudinary } from '../../config/cloudinary';
 import { runResumeParsing } from '../../jobs';
 import { AppError } from '../../shared/utils/AppError';
@@ -87,7 +88,7 @@ export function toListCandidate(
   return safe;
 }
 
-export const getAllCandidates = async (filters: {
+const loadAllCandidates = async (filters: {
   status?: string;
   inTalentPool?: boolean;
   eligibilityStatus?: 'eligible' | 'permanently_ineligible';
@@ -1248,3 +1249,10 @@ export const updateCandidateLegalHold = async (
   emitToAts('candidates', 'candidate:updated', result);
   return result;
 };
+
+export const getAllCandidates = (
+  filters: Parameters<typeof loadAllCandidates>[0]
+): ReturnType<typeof loadAllCandidates> =>
+  cachedList('candidates', ['candidates'], filters, () =>
+    loadAllCandidates(filters)
+  );

@@ -1,3 +1,4 @@
+import { cachedList } from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
 import {
   runCandidateScoring,
@@ -23,7 +24,7 @@ import type {
   RejectApplicationInput,
 } from './application.types';
 
-export const getAllApplications = async (filters: {
+const loadGetAllApplications = async (filters: {
   jobId?: string;
   candidateId?: string;
   clientId?: string;
@@ -821,3 +822,10 @@ export const updateAiValidation = async (
   emitToAts('applications', 'application:updated', result);
   return result;
 };
+
+export const getAllApplications = (
+  filters: Parameters<typeof loadGetAllApplications>[0]
+): ReturnType<typeof loadGetAllApplications> =>
+  cachedList('applications', ['applications', 'candidates', 'jobs', 'clients'], filters, () =>
+    loadGetAllApplications(filters)
+  );

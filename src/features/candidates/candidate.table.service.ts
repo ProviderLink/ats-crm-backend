@@ -2,6 +2,7 @@ import Application from '../applications/application.model';
 import Client from '../clients/client.model';
 import Job from '../jobs/job.model';
 import Candidate from './candidate.model';
+import { getCachedTableData } from './candidate.table.cache';
 import { toListCandidate } from './candidate.service';
 import type { ICandidate } from './candidate.types';
 
@@ -61,59 +62,61 @@ const toTime = (v: unknown): number => {
 };
 const time = (t: number) => t;
 
-async function loadSlimCandidates(): Promise<SlimCandidate[]> {
-  const rows = await Candidate.aggregate([
-    { $match: { eligibilityStatus: { $ne: 'permanently_ineligible' } } },
-    { $sort: { createdAt: -1 } },
-    {
-      $project: {
-        firstName: 1,
-        lastName: 1,
-        email: 1,
-        phone: 1,
-        status: 1,
-        inTalentPool: 1,
-        appliedJobId: 1,
-        createdAt: 1,
-        aiScore: '$aiScore.score',
-        valScore: '$aiValidation.score',
-        skills: '$parsedData.skills',
-        role: { $arrayElemAt: ['$parsedData.experience', 0] },
-      },
-    },
-  ]);
-  return rows.map(r => ({
-    _id: String(r._id),
-    firstName: r.firstName ?? '',
-    lastName: r.lastName ?? '',
-    email: r.email ?? '',
-    phone: r.phone ?? '',
-    status: r.status || 'pending',
-    inTalentPool: !!r.inTalentPool,
-    appliedJobId: r.appliedJobId ? String(r.appliedJobId) : null,
-    createdAt: toTime(r.createdAt),
-    score: r.aiScore ?? r.valScore ?? -1,
-    skills: Array.isArray(r.skills) ? r.skills : [],
-    role: r.role ?? null,
-  }));
+/**
+ * Every non-ineligible candidate, once: the trimmed row served to the table
+ * plus the few fields the rules below read. Built in one database read so a
+ * warm cache answers page changes, searches and sorts without touching it.
+ */
+async function loadCandidates(): Promise<{
+  slim: SlimCandidate[];
+  rows: Map<string, ICandidate>;
+}> {
+  const docs = await Candidate.find({
+    eligibilityStatus: { $ne: 'permanently_ineligible' },
+  })
+    .select('-resumeRawText')
+    .sort({ createdAt: -1 });
+  const slim: SlimCandidate[] = [];
+  const rows = new Map<string, ICandidate>();
+  for (const d of docs) {
+    const row = toListCandidate(d);
+    rows.set(row._id, row);
+    slim.push({
+      _id: row._id,
+      firstName: row.firstName ?? '',
+      lastName: row.lastName ?? '',
+      email: row.email ?? '',
+      phone: row.phone ?? '',
+      status: row.status || 'pending',
+      inTalentPool: !!row.inTalentPool,
+      appliedJobId: row.appliedJobId ? String(row.appliedJobId) : null,
+      createdAt: toTime(row.createdAt),
+      score: row.aiScore?.score ?? row.aiValidation?.score ?? -1,
+      skills: Array.isArray(row.parsedData?.skills) ? row.parsedData!.skills : [],
+      role: row.parsedData?.experience?.[0] ?? null,
+    });
+  }
+  return { slim, rows };
 }
 
 export interface TableData {
   candidates: SlimCandidate[];
+  rows: Map<string, ICandidate>;
   apps: SlimApp[];
   jobs: Map<string, { title: string; clientId: string }>;
   clientNames: Map<string, string>;
 }
 
 export async function loadTableData(): Promise<TableData> {
-  const [candidates, apps, jobs, clients] = await Promise.all([
-    loadSlimCandidates(),
+  const [{ slim: candidates, rows }, apps, jobs, clients] = await Promise.all([
+    loadCandidates(),
     Application.find({}, 'candidateId jobId phase').lean(),
     Job.find({}, 'title clientId').lean(),
     Client.find({}, 'companyName').lean(),
   ]);
   return {
     candidates,
+    rows,
     apps: apps.map(a => ({
       candidateId: String(a.candidateId),
       jobId: String(a.jobId),
@@ -256,8 +259,13 @@ export function computeTable(
   return { ids: sorted.map(c => c._id), counts };
 }
 
+/** Load the table data into the cache ahead of the first request. */
+export async function warmUpCandidateTable(): Promise<void> {
+  await getCachedTableData(loadTableData);
+}
+
 export async function resolveTable(query: TableQuery) {
-  return computeTable(await loadTableData(), query);
+  return computeTable(await getCachedTableData(loadTableData), query);
 }
 
 export async function getCandidateTable(query: TableQuery): Promise<{
@@ -268,17 +276,13 @@ export async function getCandidateTable(query: TableQuery): Promise<{
   totalPages: number;
   counts: Record<TableTab, number>;
 }> {
-  const { ids, counts } = await resolveTable(query);
+  const data = await getCachedTableData(loadTableData);
+  const { ids, counts } = computeTable(data, query);
   const start = (query.page - 1) * query.limit;
-  const pageIds = ids.slice(start, start + query.limit);
-  const docs = await Candidate.find({ _id: { $in: pageIds } }).select(
-    '-resumeRawText'
-  );
-  const byId = new Map(docs.map(d => [String(d._id), d]));
-  const candidates = pageIds
-    .map(id => byId.get(id))
-    .filter((d): d is NonNullable<typeof d> => !!d)
-    .map(d => toListCandidate(d));
+  const candidates = ids
+    .slice(start, start + query.limit)
+    .map(id => data.rows.get(id))
+    .filter((r): r is ICandidate => !!r);
   return {
     candidates,
     total: ids.length,

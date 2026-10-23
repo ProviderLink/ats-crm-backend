@@ -98,7 +98,13 @@ export const getAllCandidates = async (filters: {
 
   const skip = (page - 1) * limit;
   const [candidates, total] = await Promise.all([
-    Candidate.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    // `resumeRawText` is the largest field (~2.4 KB of a ~6 KB document) and is
+    // never returned by this list, so keep it out of the database read too.
+    Candidate.find(query)
+      .select('-resumeRawText')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
     Candidate.countDocuments(query),
   ]);
 

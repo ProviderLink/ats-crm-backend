@@ -32,9 +32,10 @@ export const initializeCrmSocket = (io: Server): void => {
       return;
     }
 
-    // Work, EOD and review payloads are only for staff. VAs and clients are
-    // scoped per record by the REST API, so they must not receive the feed.
-    if (roles.includes('admin') || roles.includes('account_manager')) {
+    // Work, EOD and review payloads carry every assignment's data. Only an
+    // admin may see them all: account managers are scoped to their own
+    // assignments by the REST API, and VAs and clients to their own records.
+    if (roles.includes('admin')) {
       socket.join('assignments');
     }
     socket.join(`user:${decoded._id}`);

@@ -196,10 +196,16 @@ export const forgotPassword = async (email: string) => {
   user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
-  const resetUrl = `${env.ATS_FRONTEND_URL}/ats/reset-password?token=${resetToken}`;
+  // CRM-only accounts (VAs, clients, account managers) reset in the CRM.
+  const crmOnly =
+    user.appAccess.includes('crm') && !user.appAccess.includes('ats');
+  const productName = crmOnly ? 'Arista CRM' : 'Arista ATS';
+  const resetUrl = crmOnly
+    ? `${env.CRM_FRONTEND_URL}/reset-password?token=${resetToken}`
+    : `${env.ATS_FRONTEND_URL}/ats/reset-password?token=${resetToken}`;
   await sendEmail({
     to: [user.email],
-    subject: 'Reset your Arista ATS password',
+    subject: `Reset your ${productName} password`,
     html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -214,7 +220,7 @@ export const forgotPassword = async (email: string) => {
           <!-- Header -->
           <tr>
             <td style="background-color:#1a1a2e;padding:32px 40px;text-align:center;">
-              <h1 style="color:#ffffff;font-size:24px;margin:0;font-weight:700;">Arista ATS</h1>
+              <h1 style="color:#ffffff;font-size:24px;margin:0;font-weight:700;">${productName}</h1>
             </td>
           </tr>
           <!-- Body -->
@@ -222,7 +228,7 @@ export const forgotPassword = async (email: string) => {
             <td style="padding:40px;">
               <h2 style="color:#1a1a2e;font-size:20px;margin:0 0 16px;">Password Reset Request</h2>
               <p style="color:#4a4a5a;font-size:15px;line-height:1.6;margin:0 0 24px;">
-                You recently requested to reset your password for your Arista ATS account.
+                You recently requested to reset your password for your ${productName} account.
                 Click the button below to set a new password:
               </p>
               <table cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
@@ -252,7 +258,7 @@ export const forgotPassword = async (email: string) => {
           <tr>
             <td style="background-color:#fafafa;padding:24px 40px;text-align:center;">
               <p style="color:#8a8a9a;font-size:12px;margin:0;">
-                &copy; ${new Date().getFullYear()} Arista ATS. All rights reserved.
+                &copy; ${new Date().getFullYear()} ${productName}. All rights reserved.
               </p>
             </td>
           </tr>

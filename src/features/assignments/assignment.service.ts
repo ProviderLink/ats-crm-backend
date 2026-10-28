@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { env } from '../../config/env';
 import AppError from '../../shared/utils/AppError';
 import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
@@ -115,6 +116,23 @@ export const getAssignmentById = async (id: string): Promise<IAssignment> => {
   return assignment.toSafeObject();
 };
 
+/** The account manager must be an active CRM user who can manage assignments. */
+const assertValidAccountManager = async (id: string): Promise<void> => {
+  const manager = await User.findById(id).select('roles isActive');
+  const valid =
+    manager &&
+    manager.isActive &&
+    (manager.roles.includes('account_manager') ||
+      manager.roles.includes('admin'));
+  if (!valid) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Account manager must be an active account manager or admin'
+    );
+  }
+};
+
 export const createAssignment = async (
   input: CreateAssignmentInput,
   createdBy: string
@@ -125,6 +143,15 @@ export const createAssignment = async (
 
   const client = await Client.findById(input.clientId);
   if (!client) throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
+
+  await assertValidAccountManager(input.accountManagerId);
+  if (input.endDate && new Date(input.endDate) < new Date(input.startDate)) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'End date cannot be before the start date'
+    );
+  }
 
   const assignment = await Assignment.create({
     candidateId: new mongoose.Types.ObjectId(input.candidateId),
@@ -138,32 +165,42 @@ export const createAssignment = async (
     createdBy: new mongoose.Types.ObjectId(createdBy),
   });
 
-  const primaryContact = client.contacts.find(
-    (c: { isPrimary: boolean }) => c.isPrimary
-  );
-  const clientEmail = primaryContact?.email ?? client.email;
-  const firstName = primaryContact?.name?.split(' ')[0] ?? 'Client';
-  const lastName = primaryContact?.name?.split(' ').slice(1).join(' ') ?? '';
+  // The assignment is saved, so a CRM provisioning problem must not fail the
+  // request (a retry would create a duplicate); it is logged instead.
+  try {
+    const primaryContact = client.contacts.find(
+      (c: { isPrimary: boolean }) => c.isPrimary
+    );
+    const clientEmail = primaryContact?.email ?? client.email;
+    if (clientEmail) {
+      const firstName = primaryContact?.name?.split(' ')[0] ?? 'Client';
+      const lastName = primaryContact?.name?.split(' ').slice(1).join(' ') ?? '';
 
-  const { inviteToken } = await userService.provisionClient(
-    String(client._id),
-    firstName,
-    lastName,
-    clientEmail,
-    createdBy
-  );
-
-  if (inviteToken !== null) {
-    userService
-      .sendTeamMemberInvite({
-        email: clientEmail,
+      const { inviteToken } = await userService.provisionClient(
+        String(client._id),
         firstName,
-        inviteToken,
-        invitedByName: 'CRM System',
-      })
-      .catch(err => {
-        console.error('Failed to send client invite email:', err);
-      });
+        lastName,
+        clientEmail,
+        createdBy
+      );
+
+      if (inviteToken !== null) {
+        userService
+          .sendTeamMemberInvite({
+            email: clientEmail,
+            firstName,
+            inviteToken,
+            invitedByName: 'CRM System',
+            // A client works in the CRM, so the invite must open the CRM page.
+            inviteUrl: `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
+          })
+          .catch(err => {
+            console.error('Failed to send client invite email:', err);
+          });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to provision CRM access for client:', err);
   }
 
   createAssignmentReminders(
@@ -242,6 +279,7 @@ export const updateAssignment = async (
     input.accountManagerId !== undefined &&
     String(assignment.accountManagerId) !== input.accountManagerId
   ) {
+    await assertValidAccountManager(input.accountManagerId);
     changes.push('Account manager changed');
     assignment.accountManagerId = new mongoose.Types.ObjectId(
       input.accountManagerId

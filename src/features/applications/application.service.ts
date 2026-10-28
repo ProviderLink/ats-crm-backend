@@ -1,5 +1,6 @@
 import { cachedList } from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
+import { env } from '../../config/env';
 import {
   runCandidateScoring,
   runResumeParsing,
@@ -681,25 +682,33 @@ export const hireApplication = async (
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
   }
 
-  const { inviteToken } = await userService.provisionVA(
-    String(candidate._id),
-    candidate.firstName,
-    candidate.lastName,
-    candidate.email,
-    input.hiredBy
-  );
+  // The hire is already saved, so a CRM provisioning problem must not fail it:
+  // the "Give CRM Portal Access" button on the candidate can be used to retry.
+  try {
+    const { inviteToken } = await userService.provisionVA(
+      String(candidate._id),
+      candidate.firstName,
+      candidate.lastName,
+      candidate.email,
+      input.hiredBy
+    );
 
-  if (inviteToken !== null) {
-    userService
-      .sendTeamMemberInvite({
-        email: candidate.email,
-        firstName: candidate.firstName,
-        inviteToken,
-        invitedByName: 'ATS System',
-      })
-      .catch(err => {
-        console.error('Failed to send VA invite email:', err);
-      });
+    if (inviteToken !== null) {
+      userService
+        .sendTeamMemberInvite({
+          email: candidate.email,
+          firstName: candidate.firstName,
+          inviteToken,
+          invitedByName: 'ATS System',
+          // A VA works in the CRM, so the invite must open the CRM page.
+          inviteUrl: `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`,
+        })
+        .catch(err => {
+          console.error('Failed to send VA invite email:', err);
+        });
+    }
+  } catch (err) {
+    console.error('Failed to provision CRM access for hired VA:', err);
   }
 
   createLog({

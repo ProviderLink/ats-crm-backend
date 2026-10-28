@@ -111,17 +111,23 @@ app.use((req, res, next) => {
 if (env.NODE_ENV === 'production') {
   app.use(
     '/api',
+    // Per IP, and a whole office can share one, so this is a flood guard
+    // rather than a per-user budget.
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 100,
+      max: 1000,
     })
   );
 
   app.use(
     '/api/v1/auth',
+    // Slows password guessing: only failed attempts count, and the silent
+    // refresh every page load makes is not a login attempt.
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 10,
+      max: 20,
+      skipSuccessfulRequests: true,
+      skip: req => req.path === '/refresh-token',
     })
   );
 }

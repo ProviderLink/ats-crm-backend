@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
 import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
+import AppError from '../../shared/utils/AppError';
 import {
   assertOwnsCandidate,
+  isStaff,
   scopeListFilters,
 } from '../../shared/utils/crmScope';
 import { buildReviewPdf } from '../../shared/utils/pdf';
@@ -13,6 +15,19 @@ import Job from '../jobs/job.model';
 import { assertOwnsPair, pairScope } from '../assignments/assignmentScope';
 import { createLog } from '../activity-logs/activityLog.service';
 import * as reviewService from './performanceReview.service';
+
+// A VA reads their own review only once it is finished; drafts and AI output
+// are staff working copies.
+const VA_VISIBLE_STATUSES = ['completed', 'sent_to_client'];
+
+const assertVisibleToViewer = (req: Request, status: string) => {
+  if (isStaff(req.user!) || VA_VISIBLE_STATUSES.includes(status)) return;
+  throw new AppError(
+    404,
+    'PERFORMANCE_REVIEW_NOT_FOUND',
+    'Performance review not found'
+  );
+};
 
 // An account manager may only touch reviews of VAs on assignments they manage.
 const assertManagesReview = async (req: Request, id: string) => {
@@ -33,7 +48,9 @@ export const getAllReviews = catchAsync(async (req: Request, res: Response) => {
   const result = await reviewService.getAllReviews({
     candidateId: scoped.candidateId,
     clientId: scoped.clientId,
-    scope: await pairScope(req.user!),
+    scope: isStaff(req.user!)
+      ? await pairScope(req.user!)
+      : { status: { $in: VA_VISIBLE_STATUSES } },
     reviewType,
     status,
     page: page !== undefined ? Number(page) : undefined,
@@ -53,6 +70,7 @@ export const getReviewById = catchAsync(async (req: Request, res: Response) => {
   const review = await reviewService.getReviewById(id);
   assertOwnsCandidate(req.user!, review.candidateId);
   await assertOwnsPair(req.user!, review.candidateId, review.clientId);
+  assertVisibleToViewer(req, review.status);
 
   const [candidate, client, job] = await Promise.all([
     Candidate.findById(review.candidateId).lean(),
@@ -136,6 +154,7 @@ export const exportReviewPdf = catchAsync(
     const review = await reviewService.getReviewById(id);
     assertOwnsCandidate(req.user!, review.candidateId);
     await assertOwnsPair(req.user!, review.candidateId, review.clientId);
+    assertVisibleToViewer(req, review.status);
 
     // Populate names for the PDF
     const [candidate, client, job, timezone] = await Promise.all([

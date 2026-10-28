@@ -47,6 +47,8 @@ export const getSurveyReminderById = catchAsync(
 
 export const createSurveyReminder = catchAsync(
   async (req: Request, res: Response) => {
+    // An account manager can only schedule reminders about their own records
+    await assertOwnsReminder(req.user!, { relatedId: req.body.relatedId });
     const surveyReminder = await surveyReminderService.createSurveyReminder(
       req.body,
       req.user!._id

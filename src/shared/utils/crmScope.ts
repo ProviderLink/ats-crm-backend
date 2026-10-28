@@ -14,7 +14,7 @@ const forbidden = () =>
   );
 
 /** Admins and account managers see every CRM record. */
-const isStaff = (actor: CrmActor): boolean =>
+export const isStaff = (actor: CrmActor): boolean =>
   actor.roles.includes('admin') || actor.roles.includes('account_manager');
 
 /** A VA owns records of their own candidate; a client owns their own client's. */

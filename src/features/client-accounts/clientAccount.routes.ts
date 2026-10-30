@@ -74,9 +74,11 @@ router.post(
   controller.createClientNote
 );
 
+// Editing a client's CRM profile is admin-only; account managers can read the
+// clients they manage and add notes.
 router.patch(
   '/:id',
-  requireRoles('admin', 'account_manager'),
+  requireRoles('admin'),
   validate(updateClientAccountSchema),
   controller.updateClientAccount
 );

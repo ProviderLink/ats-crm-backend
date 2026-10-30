@@ -3,6 +3,8 @@ import { createLog } from '../activity-logs/activityLog.service';
 import Application from '../applications/application.model';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
+import { addNote, listNotes } from '../clients/client.service';
+import type { ClientNote, CreateClientNoteInput } from '../clients/client.types';
 import User from '../users/user.model';
 import type {
   IClientAccount,
@@ -243,4 +245,45 @@ export const getHiredVasForClient = async (
     firstName: String((c as any).firstName ?? ''),
     lastName: String((c as any).lastName ?? ''),
   }));
+};
+
+type NoteWithAuthor = ClientNote & { authorName: string };
+
+/** Looks up the display name of each note author, so the thread can show it. */
+async function authorNames(
+  authorIds: Array<string | null | undefined>
+): Promise<Record<string, string>> {
+  const ids = [...new Set(authorIds.filter((a): a is string => !!a))];
+  if (ids.length === 0) return {};
+  const docs = await User.find({ _id: { $in: ids } }).select(
+    'firstName lastName'
+  );
+  return Object.fromEntries(
+    docs.map(u => [
+      String(u._id),
+      `${(u as any).firstName ?? ''} ${(u as any).lastName ?? ''}`.trim(),
+    ])
+  );
+}
+
+/** A client's internal notes thread, each note with its author's name. */
+export const listClientNotes = async (
+  clientId: string
+): Promise<NoteWithAuthor[]> => {
+  const notes = await listNotes(clientId);
+  const names = await authorNames(notes.map(n => n.author));
+  return notes.map(n => ({
+    ...n,
+    authorName: n.author ? (names[n.author] ?? '') : '',
+  }));
+};
+
+export const addClientNote = async (
+  clientId: string,
+  input: CreateClientNoteInput,
+  authorId: string
+): Promise<NoteWithAuthor> => {
+  const note = await addNote(clientId, input, authorId);
+  const names = await authorNames([authorId]);
+  return { ...note, authorName: names[authorId] ?? '' };
 };

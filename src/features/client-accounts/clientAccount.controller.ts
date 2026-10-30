@@ -7,6 +7,7 @@ import {
   assertManagesClient,
   managedIds,
 } from '../assignments/assignmentScope';
+import * as clientService from '../clients/client.service';
 import * as service from './clientAccount.service';
 
 export const getProvisionedClients = catchAsync(
@@ -71,5 +72,23 @@ export const updateClientAccount = catchAsync(
     } catch {
       throw new AppError(404, 'CLIENT_NOT_FOUND', 'Client not found');
     }
+  }
+);
+
+export const listClientNotes = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await assertManagesClient(req.user!, id);
+    const notes = await clientService.listNotes(id);
+    sendSuccess(res, notes, 'Notes retrieved', 200);
+  }
+);
+
+export const createClientNote = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await assertManagesClient(req.user!, id);
+    const note = await clientService.addNote(id, req.body, req.user!._id);
+    sendSuccess(res, note, 'Note created', 201);
   }
 );

@@ -46,13 +46,18 @@ router.patch(
   controller.upsertVaProfile
 );
 
-// --- Admin internal notes thread (Requirement 4) --------------------------
-// Admin-only: account_manager / client / va roles must not read or write.
-router.get('/:vaId/notes', requireRoles('admin'), controller.listVaNotes);
+// --- Internal notes thread (Requirement 4) --------------------------------
+// Admin, or the account manager of that VA (checked in the controller).
+// Client and VA roles must not read or write.
+router.get(
+  '/:vaId/notes',
+  requireRoles('admin', 'account_manager'),
+  controller.listVaNotes
+);
 
 router.post(
   '/:vaId/notes',
-  requireRoles('admin'),
+  requireRoles('admin', 'account_manager'),
   validate(createVaNoteSchema),
   controller.createVaNote
 );

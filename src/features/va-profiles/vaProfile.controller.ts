@@ -67,6 +67,7 @@ export const upsertVaProfile = catchAsync(
 
 export const listVaNotes = catchAsync(async (req: Request, res: Response) => {
   const { vaId } = req.params;
+  await assertManagesCandidate(req.user!, vaId);
   const notes = await service.listVaNotes(vaId);
   sendSuccess(res, notes, 'VA notes retrieved', 200);
 });
@@ -74,6 +75,7 @@ export const listVaNotes = catchAsync(async (req: Request, res: Response) => {
 export const createVaNote = catchAsync(async (req: Request, res: Response) => {
   const { vaId } = req.params;
   const author = req.user!._id;
+  await assertManagesCandidate(req.user!, vaId);
   const note = await service.addVaNote(vaId, req.body, author);
   sendSuccess(res, note, 'VA note created', 201);
 });

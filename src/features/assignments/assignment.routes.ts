@@ -40,9 +40,11 @@ router.get(
   assignmentController.getAllAssignments
 );
 
+// Creating, editing and ending an assignment are admin-only for now; account
+// managers can read the ones they manage.
 router.post(
   '/',
-  requireRoles('admin', 'account_manager'),
+  requireRoles('admin'),
   validate(createAssignmentSchema),
   assignmentController.createAssignment
 );
@@ -55,14 +57,14 @@ router.get(
 
 router.patch(
   '/:id',
-  requireRoles('admin', 'account_manager'),
+  requireRoles('admin'),
   validate(updateAssignmentSchema),
   assignmentController.updateAssignment
 );
 
 router.delete(
   '/:id',
-  requireRoles('admin', 'account_manager'),
+  requireRoles('admin'),
   assignmentController.endAssignment
 );
 

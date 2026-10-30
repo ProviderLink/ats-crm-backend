@@ -25,6 +25,11 @@ const updateClientAccountSchema = z.object({
   secondaryContact: z.string().optional(),
 });
 
+const createClientNoteSchema = z.object({
+  method: z.enum(['call', 'email', 'meeting', 'message', 'other']),
+  content: z.string().min(1).max(5000),
+});
+
 const router = Router();
 
 router.use(authenticate);
@@ -52,6 +57,21 @@ router.get(
   '/:id',
   requireRoles('admin', 'account_manager'),
   controller.getClientAccountById
+);
+
+// Internal notes thread. Admin, or the account manager of that client (checked
+// in the controller); editing and deleting notes stays with the ATS routes.
+router.get(
+  '/:id/notes',
+  requireRoles('admin', 'account_manager'),
+  controller.listClientNotes
+);
+
+router.post(
+  '/:id/notes',
+  requireRoles('admin', 'account_manager'),
+  validate(createClientNoteSchema),
+  controller.createClientNote
 );
 
 router.patch(

@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
-import { getCompanyTimezone } from '../../../shared/utils/companyTimezone';
-import { formatDateKey } from '../../../shared/utils/timezone';
+import {
+  isWorkingDayKey,
+  resolveCompanyDay,
+} from '../../../shared/utils/companyDay';
 import Assignment from '../../assignments/assignment.model';
 import Candidate from '../../candidates/candidate.model';
 import Client from '../../clients/client.model';
-import EodReminder from '../../eod-reminders/eodReminder.model';
 import EodSubmission from '../../eod-submissions/eodSubmission.model';
 import { IEodSubmission } from '../../eod-submissions/eodSubmission.types';
 import WorkEntry from '../../work-entries/workEntry.model';
@@ -25,8 +26,8 @@ export const getDashboardStats = async (accountManagerId?: string) => {
   // EOD counts use the company business day, not a server-local window, so the
   // dashboard agrees with the compliance job and the EOD list for VAs spread
   // across the world.
-  const companyTimezone = await getCompanyTimezone();
-  const companyTodayKey = formatDateKey(new Date(), companyTimezone);
+  const companyDay = await resolveCompanyDay();
+  const companyTodayKey = companyDay.dateKey;
 
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 7);
@@ -58,7 +59,7 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     endedAssignments,
     totalEodToday,
     totalWorkEntriesToday,
-    missingEodsToday,
+    dueAssignments,
   ] = await Promise.all([
     Assignment.countDocuments(assignmentBase),
     Assignment.countDocuments({ ...assignmentBase, status: 'active' }),
@@ -73,17 +74,32 @@ export const getDashboardStats = async (accountManagerId?: string) => {
       entryDate: { $gte: todayStart, $lte: todayEnd },
       ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
     }),
-    EodReminder.countDocuments({
-      reminderDate: { $gte: todayStart, $lte: todayEnd },
-      status: 'sent',
-      ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
-    }),
+    // A report is due from active assignments that have started, on working
+    // days only; at the weekend nobody is missing one.
+    isWorkingDayKey(companyTodayKey)
+      ? Assignment.find({
+          ...assignmentBase,
+          status: 'active',
+          startDate: { $lt: companyDay.end },
+        })
+          .select('_id')
+          .lean()
+      : Promise.resolve([]),
   ]);
 
+  const dueIds = dueAssignments.map(a => a._id);
+  const filedIds =
+    dueIds.length > 0
+      ? await EodSubmission.distinct('assignmentId', {
+          dateKey: companyTodayKey,
+          assignmentId: { $in: dueIds },
+        })
+      : [];
+  const dueCount = dueIds.length;
+  const filedCount = filedIds.length;
+  const missingEodsToday = dueCount - filedCount;
   const complianceRate =
-    activeAssignments > 0
-      ? Math.round((totalEodToday / activeAssignments) * 100)
-      : 100;
+    dueCount > 0 ? Math.round((filedCount / dueCount) * 100) : 100;
 
   const eodQuery: Record<string, unknown> = {};
   if (candidateIdFilter) {
@@ -194,8 +210,9 @@ export const getDashboardStats = async (accountManagerId?: string) => {
       missingEodsToday,
     },
     eodCompliance: {
-      totalActive: activeAssignments,
-      submittedToday: totalEodToday,
+      // Assignments that owe a report today, and how many have filed one.
+      totalActive: dueCount,
+      submittedToday: filedCount,
       missingToday: missingEodsToday,
       complianceRate,
     },

@@ -4,7 +4,7 @@ import Assignment from '../features/assignments/assignment.model';
 import Candidate from '../features/candidates/candidate.model';
 import { createEodReminder } from '../features/eod-reminders/eodReminder.service';
 import EodSubmission from '../features/eod-submissions/eodSubmission.model';
-import { resolveCompanyDay } from '../shared/utils/companyDay';
+import { isWorkingDayKey, resolveCompanyDay } from '../shared/utils/companyDay';
 import { sendEmail } from '../shared/utils/email';
 import logger from '../shared/utils/logger';
 import { scheduleDailyInCompanyTimezone } from './companyScheduler';
@@ -28,7 +28,19 @@ async function runEodComplianceCheck(): Promise<void> {
       timeZone: companyDay.timezone,
     });
 
-    const assignments = await Assignment.find({ status: 'active' });
+    // No report is due at the weekend, so nobody is chased for one.
+    if (!isWorkingDayKey(companyDay.dateKey)) {
+      logger.info('EOD compliance check skipped: not a working day', {
+        dateKey: companyDay.dateKey,
+      });
+      return;
+    }
+
+    // Only assignments that have started owe a report today.
+    const assignments = await Assignment.find({
+      status: 'active',
+      startDate: { $lt: companyDay.end },
+    });
 
     for (const assignment of assignments) {
       const eodExists = await EodSubmission.findOne({

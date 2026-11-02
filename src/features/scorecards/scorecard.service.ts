@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { countWorkingDays } from '../../shared/utils/companyDay';
 import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
 import { formatDateKey } from '../../shared/utils/timezone';
 import { createLog } from '../activity-logs/activityLog.service';
@@ -182,10 +183,18 @@ export const generateScorecards = async (
       assignmentId: assignment._id,
       dateKey: { $gte: dateKeyFrom, $lte: dateKeyTo },
     });
-    const eodComplianceRate = Math.min(
-      100,
-      Math.round((eodCount / DAYS_IN_WEEK) * 100)
+    // Reports are due on working days from the assignment's start up to today,
+    // not on all seven days of the week.
+    const dueFrom = [
+      dateKeyFrom,
+      formatDateKey(assignment.startDate, companyTimezone),
+    ].reduce((a, b) => (a > b ? a : b));
+    const dueTo = [dateKeyTo, formatDateKey(new Date(), companyTimezone)].reduce(
+      (a, b) => (a < b ? a : b)
     );
+    const dueDays = countWorkingDays(dueFrom, dueTo);
+    const eodComplianceRate =
+      dueDays > 0 ? Math.min(100, Math.round((eodCount / dueDays) * 100)) : 100;
 
     // On-time = submitted during the company day it reports on. Comparing ISO
     // dates (rather than parsed local dates) keeps this correct for a VA whose

@@ -125,3 +125,25 @@ export function computeShiftHours(start: string, end: string): number {
 export function dateKeyDaysBefore(dateKey: string, days: number): string {
   return addDaysToDateKey(dateKey, -days);
 }
+
+/** Monday to Friday on the company calendar; no daily report is due at the weekend. */
+export function isWorkingDayKey(dateKey: string): boolean {
+  const parts = parseDateKey(dateKey);
+  if (!parts) return false;
+  const weekday = new Date(
+    Date.UTC(parts.year, parts.month - 1, parts.day)
+  ).getUTCDay();
+  return weekday >= 1 && weekday <= 5;
+}
+
+/** Working days from `fromKey` through `toKey`, both inclusive; 0 if the range is empty. */
+export function countWorkingDays(fromKey: string, toKey: string): number {
+  let count = 0;
+  let day = fromKey;
+  // The bound only guards against a malformed key looping forever.
+  for (let i = 0; i < 400 && day <= toKey; i++) {
+    if (isWorkingDayKey(day)) count++;
+    day = addDaysToDateKey(day, 1);
+  }
+  return count;
+}

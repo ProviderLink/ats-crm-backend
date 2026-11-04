@@ -5,7 +5,10 @@ import { emitToCrm } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
-import { createAssignmentReminders } from '../survey-reminders/surveyReminder.service';
+import {
+  closeCheckins,
+  createAssignmentReminders,
+} from '../survey-reminders/surveyReminder.service';
 import User from '../users/user.model';
 import * as userService from '../users/user.service';
 import Assignment from './assignment.model';
@@ -157,6 +160,7 @@ export const createAssignment = async (
     candidateId: new mongoose.Types.ObjectId(input.candidateId),
     clientId: new mongoose.Types.ObjectId(input.clientId),
     serviceType: input.serviceType,
+    weeklyHours: input.weeklyHours ?? 40,
     status: input.status ?? 'active',
     startDate: new Date(input.startDate),
     endDate: input.endDate ? new Date(input.endDate) : null,
@@ -267,6 +271,13 @@ export const updateAssignment = async (
   } else if (input.serviceType !== undefined) {
     assignment.serviceType = input.serviceType;
   }
+  if (
+    input.weeklyHours !== undefined &&
+    input.weeklyHours !== assignment.weeklyHours
+  ) {
+    changes.push(`Weekly hours changed to ${input.weeklyHours}`);
+    assignment.weeklyHours = input.weeklyHours;
+  }
   if (input.startDate !== undefined) {
     changes.push('Start date updated');
     assignment.startDate = new Date(input.startDate);
@@ -304,6 +315,7 @@ export const updateAssignment = async (
 
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
+  if (assignment.status === 'ended') await closeCheckins(id);
 
   createLog({
     action: 'updated',
@@ -350,6 +362,7 @@ export const endAssignment = async (
   if (!assignment.endDate) assignment.endDate = new Date();
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
+  await closeCheckins(id);
 
   createLog({
     action: 'ended',

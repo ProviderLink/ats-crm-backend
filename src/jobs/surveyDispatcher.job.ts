@@ -1,6 +1,8 @@
 import os from 'os';
 import { createLog } from '../features/activity-logs/activityLog.service';
+import Assignment from '../features/assignments/assignment.model';
 import SurveyReminder from '../features/survey-reminders/surveyReminder.model';
+import { syncAssignmentCheckins } from '../features/survey-reminders/surveyReminder.service';
 import User from '../features/users/user.model';
 import { getCompanyTimezone } from '../shared/utils/companyTimezone';
 import { sendEmail } from '../shared/utils/email';
@@ -26,12 +28,25 @@ async function runSurveyDispatcher(): Promise<void> {
     const { end } = getDayRangeInTimeZone(new Date(), timeZone);
     const endOfToday = new Date(end.getTime() - 1);
 
+    await syncAssignmentCheckins();
+
     const reminders = await SurveyReminder.find({
       status: 'pending',
       dueDate: { $lte: endOfToday },
     });
 
+    // A check-in on a paused assignment stays pending until it resumes.
+    const onHold = await Assignment.find({ status: 'on_hold' }).select('_id');
+    const onHoldIds = new Set(onHold.map(a => String(a._id)));
+
     for (const reminder of reminders) {
+      if (
+        reminder.relatedType === 'assignment' &&
+        onHoldIds.has(String(reminder.relatedId))
+      ) {
+        continue;
+      }
+
       const accountManager = await User.findById(reminder.assignedTo);
       if (!accountManager) continue;
 

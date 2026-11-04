@@ -38,16 +38,18 @@ function getWeekRange(dayKey: string): {
 
 function computeProductivityScore(params: {
   totalHours: number;
+  weeklyHours: number;
   totalTasks: number;
   eodCompliance: number;
   onTimeRate: number;
 }): number {
-  const { totalHours, totalTasks, eodCompliance, onTimeRate } = params;
+  const { totalHours, weeklyHours, totalTasks, eodCompliance, onTimeRate } =
+    params;
   // Weighted score per spec: EOD Compliance 40%, Work Volume 30%, Task Completion 20%, Consistency 10%
-  // Work Volume = total hours normalized to a 40h week
+  // Work Volume = total hours against the assignment's contracted week
   // Task Completion = completed tasks normalized to ~15 tasks/week (3/day)
   // Consistency = on-time submission rate
-  const hoursScore = Math.min(totalHours / 40, 1) * 30; // Work Volume 30%
+  const hoursScore = Math.min(totalHours / weeklyHours, 1) * 30; // Work Volume 30%
   const tasksScore = Math.min(totalTasks / (DAYS_IN_WEEK * 3), 1) * 20; // Task Completion 20%
   const eodScore = (eodCompliance / 100) * 40; // EOD Compliance 40%
   const onTimeScore = (onTimeRate / 100) * 10; // Consistency 10%
@@ -268,6 +270,7 @@ async function writeScorecards(
 
     const productivityScore = computeProductivityScore({
       totalHours,
+      weeklyHours: assignment.weeklyHours ?? 40,
       totalTasks: totalTasksCompleted,
       eodCompliance: eodComplianceRate,
       onTimeRate: onTimeSubmissionRate,

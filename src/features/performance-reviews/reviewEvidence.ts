@@ -84,7 +84,12 @@ export async function buildReviewEvidence(input: {
     .map(([name, count]) => `${name}: ${count}`)
     .join(', ');
 
+  const contracted = [
+    ...new Set(assignments.map(a => a.weeklyHours ?? 40)),
+  ].join(', ');
+
   const lines = [
+    `Contracted hours per week: ${contracted}`,
     `Hours recorded: ${Math.round((activity.totalMinutes / 60) * 10) / 10}`,
     `Tasks completed: ${activity.tasksCompleted}`,
     `Work by category (number of tasks): ${categories || 'none recorded'}`,

@@ -22,6 +22,8 @@ const assignmentSchema = new Schema(
       default: 'active',
     },
     serviceType: { type: String, required: true },
+    // Contracted hours per week; scorecards measure hours against this.
+    weeklyHours: { type: Number, default: 40, min: 1, max: 60 },
     startDate: { type: Date, required: true },
     endDate: { type: Date, default: null },
     accountManagerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },

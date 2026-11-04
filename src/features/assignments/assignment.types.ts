@@ -5,6 +5,7 @@ export interface IAssignment {
   companyName?: string;
   status: string;
   serviceType: string;
+  weeklyHours: number;
   startDate: Date;
   endDate: Date | null;
   accountManagerId: string;
@@ -19,6 +20,7 @@ export interface CreateAssignmentInput {
   candidateId: string;
   clientId: string;
   serviceType: string;
+  weeklyHours?: number;
   startDate: Date | string;
   endDate?: Date | string | null;
   accountManagerId: string;
@@ -29,6 +31,7 @@ export interface CreateAssignmentInput {
 
 export interface UpdateAssignmentInput {
   serviceType?: string;
+  weeklyHours?: number;
   startDate?: Date | string;
   endDate?: Date | string | null;
   accountManagerId?: string;

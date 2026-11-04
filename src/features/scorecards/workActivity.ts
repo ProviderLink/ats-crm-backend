@@ -4,6 +4,14 @@ import EodSubmission, {
 } from '../eod-submissions/eodSubmission.model';
 import WorkEntry from '../work-entries/workEntry.model';
 
+const NO_BLOCKER = /^(none|n\/a|na|no|nil|nothing|-+)\.?$/i;
+
+/** A blocker counts only when the VA wrote something other than "None". */
+export const hasBlocker = (text: string | null | undefined): boolean => {
+  const trimmed = text?.trim();
+  return !!trimmed && !NO_BLOCKER.test(trimmed);
+};
+
 export interface WorkActivity {
   totalMinutes: number;
   tasksCompleted: number;

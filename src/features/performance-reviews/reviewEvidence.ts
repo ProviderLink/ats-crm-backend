@@ -4,10 +4,9 @@ import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
 import { formatDateKey } from '../../shared/utils/timezone';
 import Assignment from '../assignments/assignment.model';
 import Scorecard from '../scorecards/scorecard.model';
-import { loadWorkActivity } from '../scorecards/workActivity';
+import { hasBlocker, loadWorkActivity } from '../scorecards/workActivity';
 import { getSettings } from '../settings/settings.service';
 
-const NO_BLOCKER = /^(none|n\/a|na|no|nil|nothing|-+)\.?$/i;
 const MAX_TEXT_LINES = 60;
 const MAX_LINE_LENGTH = 300;
 
@@ -73,9 +72,7 @@ export async function buildReviewEvidence(input: {
   const eods = [...activity.eods].sort((a, b) =>
     b.dateKey.localeCompare(a.dateKey)
   );
-  const blockers = eods.filter(
-    e => e.blockers?.trim() && !NO_BLOCKER.test(e.blockers.trim())
-  );
+  const blockers = eods.filter(e => hasBlocker(e.blockers));
   const noClientContact = eods.filter(
     e => e.communicatedWithClient === 'no'
   ).length;

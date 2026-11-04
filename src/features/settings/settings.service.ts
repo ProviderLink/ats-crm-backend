@@ -26,6 +26,11 @@ function describeSettingsChanges(before: ISettings, after: ISettings): string[] 
     ['Candidate scoring', before.ai.candidateScoring, after.ai.candidateScoring],
     ['Resume parsing', before.ai.resumeParsing, after.ai.resumeParsing],
     [
+      'Work text in AI reviews',
+      before.ai.reviewWorkText,
+      after.ai.reviewWorkText,
+    ],
+    [
       'Application confirmation email',
       before.applicationConfirmation.enabled,
       after.applicationConfirmation.enabled,
@@ -97,6 +102,9 @@ export const updateSettings = async (
     }
     if (input.ai.resumeParsing !== undefined) {
       settings.ai.resumeParsing = input.ai.resumeParsing;
+    }
+    if (input.ai.reviewWorkText !== undefined) {
+      settings.ai.reviewWorkText = input.ai.reviewWorkText;
     }
     settings.markModified('ai');
     clearAiProviderCache();

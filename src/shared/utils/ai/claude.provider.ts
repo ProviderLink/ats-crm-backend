@@ -1,6 +1,23 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../../config/env';
 import { AppError } from '../AppError';
-import type { IAiProvider, IAiProviderGenerateOptions } from './types';
+import type { AiTier, IAiProvider, IAiProviderGenerateOptions } from './types';
+
+// Change here to move every AI feature to another model.
+const MODELS: Record<AiTier, string> = {
+  fast: 'claude-haiku-5-5',
+  smart: 'claude-sonnet-5-5',
+};
+const EFFORT: Record<AiTier, 'low' | 'medium'> = {
+  fast: 'low',
+  smart: 'medium',
+};
+
+// Thinking counts toward max_tokens, so callers' reply sizes are too small on
+// their own. Only what is actually used is billed.
+const MIN_MAX_TOKENS = 16_000;
+
+const TIMEOUT_MS = 30_000;
 
 export class ClaudeProvider implements IAiProvider {
   readonly name = 'claude';
@@ -9,7 +26,7 @@ export class ClaudeProvider implements IAiProvider {
     prompt: string,
     options: IAiProviderGenerateOptions = {}
   ): Promise<string> {
-    const { maxTokens = 1024, prefillAssistant } = options;
+    const { maxTokens = 1024, jsonSchema, tier = 'fast' } = options;
 
     if (!env.ANTHROPIC_API_KEY) {
       throw new AppError(
@@ -19,62 +36,75 @@ export class ClaudeProvider implements IAiProvider {
       );
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    // Callers that want retries wrap this in `withRetry`.
+    const client = new Anthropic({
+      apiKey: env.ANTHROPIC_API_KEY,
+      timeout: TIMEOUT_MS,
+      maxRetries: 0,
+    });
 
     try {
-      const messages: Array<{ role: string; content: string }> = [
-        { role: 'user', content: prompt },
-      ];
+      const request = (model: AiTier) => ({
+        model: MODELS[model],
+        max_tokens: Math.max(maxTokens, MIN_MAX_TOKENS),
+        messages: [{ role: 'user', content: prompt }],
+        output_config: {
+          effort: EFFORT[model],
+          ...(jsonSchema && {
+            format: { type: 'json_schema', schema: jsonSchema },
+          }),
+        },
+      });
+      type Params = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
 
-      // Prefill assistant response to force a specific output format (e.g., '{' for JSON)
-      if (prefillAssistant) {
-        messages.push({ role: 'assistant', content: prefillAssistant });
+      const askSmart = () =>
+        client.beta.messages.create({
+          ...request('smart'),
+          // A declined request is retried server-side on another model.
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+        } as unknown as Params);
+
+      let response =
+        tier === 'smart'
+          ? await askSmart()
+          : await client.beta.messages.create(
+              request('fast') as unknown as Params
+            );
+
+      // The fast model has no server-side fallback.
+      if (tier === 'fast' && response.stop_reason === 'refusal') {
+        response = await askSmart();
       }
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: maxTokens,
-          messages,
-        }),
-        signal: controller.signal,
-      });
+      if (response.stop_reason === 'refusal') {
+        throw new AppError(500, 'AI_REFUSED', 'Claude declined the request');
+      }
+      if (response.stop_reason === 'max_tokens') {
+        throw new AppError(500, 'AI_TRUNCATED', 'Claude response was cut off');
+      }
 
-      if (!response.ok) {
-        const body = await response.text().catch(() => '');
+      // The reply can start with thinking blocks, so read by type.
+      return response.content
+        .map(block => (block.type === 'text' ? block.text : ''))
+        .join('');
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error instanceof Anthropic.APIConnectionTimeoutError) {
+        throw new AppError(500, 'AI_TIMEOUT', 'Claude API request timed out');
+      }
+      if (error instanceof Anthropic.APIError) {
         throw new AppError(
           500,
           'AI_API_ERROR',
-          `Claude API error ${response.status}: ${body.slice(0, 200)}`
+          `Claude API error ${error.status}: ${error.message.slice(0, 200)}`
         );
-      }
-
-      const data = (await response.json()) as {
-        content: Array<{ type: string; text: string }>;
-      };
-
-      // If we prefilled, prepend the prefill text back to get the complete response
-      const responseText = data.content[0].text;
-      return prefillAssistant ? prefillAssistant + responseText : responseText;
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new AppError(500, 'AI_TIMEOUT', 'Claude API request timed out');
       }
       throw new AppError(
         500,
         'AI_API_ERROR',
         `Claude API call failed: ${(error as Error).message}`
       );
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }

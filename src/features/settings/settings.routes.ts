@@ -32,6 +32,7 @@ const updateSettingsSchema = z.object({
       resumeValidation: z.boolean().optional(),
       candidateScoring: z.boolean().optional(),
       resumeParsing: z.boolean().optional(),
+      reviewWorkText: z.boolean().optional(),
     })
     .optional(),
   companyTimezone: z

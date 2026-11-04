@@ -1,28 +1,39 @@
 import mongoose from 'mongoose';
 import { countWorkingDays } from '../../shared/utils/companyDay';
 import { getCompanyTimezone } from '../../shared/utils/companyTimezone';
-import { formatDateKey } from '../../shared/utils/timezone';
+import { addDaysToDateKey, formatDateKey } from '../../shared/utils/timezone';
 import { createLog } from '../activity-logs/activityLog.service';
-import Assignment from '../assignments/assignment.model';
+import Assignment, {
+  type IAssignmentDocument,
+} from '../assignments/assignment.model';
 import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
-import EodSubmission from '../eod-submissions/eodSubmission.model';
-import WorkEntry from '../work-entries/workEntry.model';
 import Scorecard from './scorecard.model';
 import type { IScorecard } from './scorecard.types';
+import { loadWorkActivity } from './workActivity';
 
 const DAYS_IN_WEEK = 7;
 
-function getWeekRange(date: Date): { weekStart: Date; weekEnd: Date } {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-  const weekStart = new Date(d.setDate(diff));
-  weekStart.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
-  return { weekStart, weekEnd };
+/**
+ * The Monday-to-Sunday company week holding a company day. Weeks are keyed by
+ * their calendar days at UTC midnight, so the same week always gets the same
+ * key whatever the timezone of the server or the company.
+ */
+function getWeekRange(dayKey: string): {
+  weekStart: Date;
+  weekEnd: Date;
+  dateKeyFrom: string;
+  dateKeyTo: string;
+} {
+  const day = new Date(`${dayKey}T00:00:00.000Z`).getUTCDay();
+  const dateKeyFrom = addDaysToDateKey(dayKey, day === 0 ? -6 : 1 - day);
+  const dateKeyTo = addDaysToDateKey(dateKeyFrom, 6);
+  return {
+    weekStart: new Date(`${dateKeyFrom}T00:00:00.000Z`),
+    weekEnd: new Date(`${dateKeyTo}T23:59:59.999Z`),
+    dateKeyFrom,
+    dateKeyTo,
+  };
 }
 
 function computeProductivityScore(params: {
@@ -142,56 +153,102 @@ export const generateScorecards = async (
     assignmentFilter['candidateId'] = new mongoose.Types.ObjectId(vaId);
   }
   const activeAssignments = await Assignment.find(assignmentFilter);
-  const { weekStart, weekEnd } = getWeekRange(new Date());
   const companyTimezone = await getCompanyTimezone();
+  const week = getWeekRange(formatDateKey(new Date(), companyTimezone));
+  const generated = await writeScorecards(
+    activeAssignments,
+    week,
+    companyTimezone
+  );
+
+  if (performedBy) {
+    await createLog({
+      action: 'scorecard_generated',
+      resourceType: 'scorecards',
+      // The log's resource id must be an ObjectId; a run has no single record,
+      // so each run gets its own id.
+      resourceId: new mongoose.Types.ObjectId().toString(),
+      description: `Generated ${generated} scorecards for week of ${week.dateKeyFrom}`,
+      metadata: {
+        count: generated,
+        weekStart: week.dateKeyFrom,
+        ...(vaId ? { vaId } : {}),
+      },
+      performedBy,
+    });
+  }
+
+  return { generated };
+};
+
+/**
+ * Fill in last week's scorecards for assignments that do not have one yet.
+ * A scorecard someone already generated is left as it is.
+ */
+export const generateMissingScorecardsForLastWeek = async (): Promise<{
+  generated: number;
+}> => {
+  const companyTimezone = await getCompanyTimezone();
+  const today = formatDateKey(new Date(), companyTimezone);
+  const week = getWeekRange(addDaysToDateKey(getWeekRange(today).dateKeyFrom, -1));
+
+  const assignments = await Assignment.find({
+    startDate: { $lte: week.weekEnd },
+    $or: [
+      { status: 'active' },
+      { status: 'ended', endDate: { $gte: week.weekStart } },
+    ],
+  });
+  const existing = await Scorecard.find({
+    weekStart: week.weekStart,
+    assignmentId: { $in: assignments.map(a => a._id) },
+  }).select('assignmentId');
+  const done = new Set(existing.map(s => String(s.assignmentId)));
+
+  const generated = await writeScorecards(
+    assignments.filter(a => !done.has(String(a._id))),
+    week,
+    companyTimezone
+  );
+  return { generated };
+};
+
+async function writeScorecards(
+  assignments: IAssignmentDocument[],
+  { weekStart, weekEnd, dateKeyFrom, dateKeyTo }: ReturnType<typeof getWeekRange>,
+  companyTimezone: string
+): Promise<number> {
   let generated = 0;
 
-  for (const assignment of activeAssignments) {
-    const vaId = assignment.candidateId.toString();
-    const assignmentId = assignment._id.toString();
-
-    // Work entries for this assignment this week
-    const workEntries = await WorkEntry.find({
-      assignmentId: assignment._id,
-      isDeleted: { $ne: true },
-      entryDate: { $gte: weekStart, $lte: weekEnd },
-    });
-
-    const totalHours =
-      workEntries.reduce((sum, we) => sum + (we.timeSpent ?? 0), 0) / 60; // convert minutes to hours
-    const totalTasksCompleted = workEntries.filter(
-      we => we.status === 'completed'
-    ).length;
+  for (const assignment of assignments) {
+    const activity = await loadWorkActivity(
+      [assignment._id as mongoose.Types.ObjectId],
+      dateKeyFrom,
+      dateKeyTo
+    );
+    const totalHours = activity.totalMinutes / 60;
+    const totalTasksCompleted = activity.tasksCompleted;
     const avgTasksPerDay =
       DAYS_IN_WEEK > 0
         ? Math.round((totalTasksCompleted / DAYS_IN_WEEK) * 10) / 10
         : 0;
-
-    // Category distribution
-    const categoryDistribution: Record<string, number> = {};
-    for (const we of workEntries) {
-      const cat = we.taskCategory ?? 'Other';
-      categoryDistribution[cat] = (categoryDistribution[cat] ?? 0) + 1;
-    }
+    const categoryDistribution = activity.categoryDistribution;
 
     // EOD compliance: how many company business days had a submission.
-    // `dateKeyFrom`/`dateKeyTo` mirror the week window on the company calendar.
-    const dateKeyFrom = formatDateKey(weekStart, companyTimezone);
-    const dateKeyTo = formatDateKey(weekEnd, companyTimezone);
-
-    const eodCount = await EodSubmission.countDocuments({
-      assignmentId: assignment._id,
-      dateKey: { $gte: dateKeyFrom, $lte: dateKeyTo },
-    });
+    const eodCount = activity.eods.length;
     // Reports are due on working days from the assignment's start up to today,
     // not on all seven days of the week.
     const dueFrom = [
       dateKeyFrom,
       formatDateKey(assignment.startDate, companyTimezone),
     ].reduce((a, b) => (a > b ? a : b));
-    const dueTo = [dateKeyTo, formatDateKey(new Date(), companyTimezone)].reduce(
-      (a, b) => (a < b ? a : b)
-    );
+    const dueTo = [
+      dateKeyTo,
+      formatDateKey(new Date(), companyTimezone),
+      ...(assignment.endDate
+        ? [formatDateKey(assignment.endDate, companyTimezone)]
+        : []),
+    ].reduce((a, b) => (a < b ? a : b));
     const dueDays = countWorkingDays(dueFrom, dueTo);
     const eodComplianceRate =
       dueDays > 0 ? Math.min(100, Math.round((eodCount / dueDays) * 100)) : 100;
@@ -199,11 +256,7 @@ export const generateScorecards = async (
     // On-time = submitted during the company day it reports on. Comparing ISO
     // dates (rather than parsed local dates) keeps this correct for a VA whose
     // device is in a different timezone from the company.
-    const eodSubmissions = await EodSubmission.find({
-      assignmentId: assignment._id,
-      dateKey: { $gte: dateKeyFrom, $lte: dateKeyTo },
-    });
-    const onTimeCount = eodSubmissions.filter(eod => {
+    const onTimeCount = activity.eods.filter(eod => {
       const submittedOn = formatDateKey(
         new Date(eod.createdAt as unknown as Date),
         companyTimezone
@@ -247,22 +300,5 @@ export const generateScorecards = async (
     generated++;
   }
 
-  if (performedBy) {
-    await createLog({
-      action: 'scorecard_generated',
-      resourceType: 'scorecards',
-      // The log's resource id must be an ObjectId; a run has no single record,
-      // so each run gets its own id.
-      resourceId: new mongoose.Types.ObjectId().toString(),
-      description: `Generated ${generated} scorecards for week of ${weekStart.toISOString().slice(0, 10)}`,
-      metadata: {
-        count: generated,
-        weekStart: weekStart.toISOString().slice(0, 10),
-        ...(vaId ? { vaId } : {}),
-      },
-      performedBy,
-    });
-  }
-
-  return { generated };
-};
+  return generated;
+}

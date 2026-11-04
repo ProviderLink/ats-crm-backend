@@ -1,6 +1,20 @@
 import { env } from '../../../config/env';
 import { AppError } from '../AppError';
-import type { IAiProvider, IAiProviderGenerateOptions } from './types';
+import type { AiTier, IAiProvider, IAiProviderGenerateOptions } from './types';
+
+// Change here to move every AI feature to another model.
+const MODELS: Record<AiTier, string> = {
+  fast: 'gpt-6-luna',
+  smart: 'gpt-6.1-terra',
+};
+const EFFORT: Record<AiTier, 'low' | 'medium'> = {
+  fast: 'low',
+  smart: 'medium',
+};
+
+// Reasoning counts toward the limit, so callers' reply sizes are too small on
+// their own. Only what is actually used is billed.
+const MIN_MAX_TOKENS = 16_000;
 
 export class OpenAIProvider implements IAiProvider {
   readonly name = 'openai';
@@ -9,7 +23,7 @@ export class OpenAIProvider implements IAiProvider {
     prompt: string,
     options: IAiProviderGenerateOptions = {}
   ): Promise<string> {
-    const { maxTokens = 1024 } = options;
+    const { maxTokens = 1024, jsonSchema, tier = 'fast' } = options;
 
     if (!env.OPENAI_API_KEY) {
       throw new AppError(
@@ -32,10 +46,20 @@ export class OpenAIProvider implements IAiProvider {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4o',
-            max_tokens: maxTokens,
+            model: MODELS[tier],
+            reasoning_effort: EFFORT[tier],
+            max_completion_tokens: Math.max(maxTokens, MIN_MAX_TOKENS),
             messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' },
+            response_format: jsonSchema
+              ? {
+                  type: 'json_schema',
+                  json_schema: {
+                    name: 'response',
+                    strict: true,
+                    schema: jsonSchema,
+                  },
+                }
+              : { type: 'json_object' },
           }),
           signal: controller.signal,
         }
@@ -51,10 +75,20 @@ export class OpenAIProvider implements IAiProvider {
       }
 
       const data = (await response.json()) as {
-        choices: Array<{ message: { content: string } }>;
+        choices: Array<{
+          finish_reason: string;
+          message: { content: string | null; refusal?: string | null };
+        }>;
       };
 
-      return data.choices[0].message.content;
+      const choice = data.choices[0];
+      if (choice.message.refusal) {
+        throw new AppError(500, 'AI_REFUSED', 'OpenAI declined the request');
+      }
+      if (choice.finish_reason === 'length') {
+        throw new AppError(500, 'AI_TRUNCATED', 'OpenAI response was cut off');
+      }
+      return choice.message.content ?? '';
     } catch (error) {
       if (error instanceof AppError) throw error;
       if (error instanceof DOMException && error.name === 'AbortError') {

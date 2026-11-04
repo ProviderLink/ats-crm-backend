@@ -1,16 +1,18 @@
 import { Request } from 'express';
 import { Resend } from 'resend';
 import { Webhook } from 'svix';
+import { uploadToCloudinary } from '../../config/cloudinary';
 import { env } from '../../config/env';
 import logger from '../../shared/utils/logger';
 import Candidate from '../candidates/candidate.model';
-import Email from '../emails/email.model';
+import Email, { type IEmailDocument } from '../emails/email.model';
 import { broadcastEmail } from '../emails/email.realtime';
 import ExternalMeeting from '../external-meetings/externalMeeting.model';
 import type { ProcessedAttachment, ResendWebhookEvent } from './webhook.types';
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET || '';
 const resend = new Resend(env.RESEND_API_KEY);
+const MAX_KEPT_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 /**
  * Verify Resend webhook signature using the official Svix library.
@@ -134,6 +136,49 @@ export async function handleEmailClicked(data: { email_id: string }) {
   }
 }
 
+/** "Jane Doe <jane@x.com>" -> "jane@x.com" */
+export function bareEmailAddress(sender: string): string {
+  return (/<([^>]+)>/.exec(sender)?.[1] ?? sender).trim().toLowerCase();
+}
+
+/**
+ * Copy an inbound email's attachments from Resend's expiring links to our own
+ * storage. An attachment that cannot be copied keeps its current link.
+ */
+export async function keepAttachments(email: IEmailDocument): Promise<void> {
+  let changed = false;
+  for (const attachment of email.attachments) {
+    if (!attachment.url || attachment.url.includes('res.cloudinary.com')) {
+      continue;
+    }
+    if (attachment.size > MAX_KEPT_ATTACHMENT_BYTES) {
+      logger.warn(`Inbound attachment too large to keep: ${attachment.filename}`);
+      continue;
+    }
+    try {
+      const response = await fetch(attachment.url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const { url } = await uploadToCloudinary(
+        { buffer, originalname: attachment.filename } as Express.Multer.File,
+        'email-attachments',
+        { keepFilename: true }
+      );
+      attachment.url = url;
+      changed = true;
+    } catch (error) {
+      logger.error(`Could not keep attachment ${attachment.filename}`, {
+        error: (error as Error).message,
+      });
+    }
+  }
+  if (changed) {
+    // Leave older records' other fields and their position in the list alone.
+    await email.save({ validateModifiedOnly: true, timestamps: false });
+    broadcastEmail('email:updated', email);
+  }
+}
+
 /**
  * Process an "email.received" event (inbound email).
  * Fetches full email content from Resend API, matches to candidate,
@@ -248,10 +293,12 @@ export async function handleEmailReceived(data: { email_id: string }) {
     }
   );
 
+  // The sender is the raw header ("Jane Doe <jane@x.com>"), but candidates and
+  // outbound recipients are stored as bare addresses.
+  const senderAddress = bareEmailAddress(fromEmail);
+
   // Try to find the candidate by sender email.
-  const candidate = await Candidate.findOne({
-    email: fromEmail.toLowerCase(),
-  });
+  const candidate = await Candidate.findOne({ email: senderAddress });
 
   // Determine thread ID based on inReplyTo or messageId.
   let threadId: string = inReplyTo || messageId || '';
@@ -269,7 +316,7 @@ export async function handleEmailReceived(data: { email_id: string }) {
   if (!originalEmail) {
     originalEmail = await Email.findOne({
       direction: 'outbound',
-      to: fromEmail.toLowerCase(),
+      to: senderAddress,
       status: { $in: ['sent', 'delivered'] },
     }).sort({ createdAt: -1 });
   }
@@ -278,127 +325,77 @@ export async function handleEmailReceived(data: { email_id: string }) {
     threadId = originalEmail.threadId;
   }
 
-  if (candidate) {
-    // Create an Email record for the inbound email.
-    const inbound = await Email.create({
-      direction: 'inbound',
-      from: fromEmail,
-      to: Array.isArray(toEmail) ? toEmail : [toEmail],
-      subject,
-      bodyHtml: htmlBody,
-      bodyText: textBody,
-      status: 'received',
-      receivedAt: new Date(),
-      resendId: emailId,
-      threadId,
-      inReplyTo: inReplyTo || null,
-      messageId: messageId || null,
-      context: {
-        candidateId: candidate._id,
-        applicationId: originalEmail?.context?.applicationId || null,
-        jobId: originalEmail?.context?.jobId || null,
-        interviewId: originalEmail?.context?.interviewId || null,
-      },
-      attachments: processedAttachments.map(att => ({
-        filename: att.filename,
-        url: att.downloadUrl,
-        contentType: att.contentType,
-        size: att.size,
-      })),
-    });
-    broadcastEmail('email:created', inbound);
-
-    logger.info(
-      `Created inbound email record for candidate ${candidate.email}`,
-      { candidateId: candidate._id, threadId }
-    );
-  } else {
-    // Sender email not found in candidates. Try to link via original email's context.
-    let linkedCandidate = null;
-    if (originalEmail?.context?.candidateId) {
-      try {
-        linkedCandidate = await Candidate.findById(
-          originalEmail.context.candidateId
-        );
-      } catch {
-        // ID may be invalid — ignore.
-      }
-    }
-
-    if (linkedCandidate) {
-      logger.info(
-        `Linked inbound reply to candidate ${linkedCandidate.email} via thread context (sender used different email: ${fromEmail})`,
-        { candidateId: linkedCandidate._id, threadId }
+  // Sender not a candidate? Try to link via the original email's context, for
+  // a candidate replying from a different address.
+  let linkedCandidate = candidate;
+  if (!linkedCandidate && originalEmail?.context?.candidateId) {
+    try {
+      linkedCandidate = await Candidate.findById(
+        originalEmail.context.candidateId
       );
-
-      const inbound = await Email.create({
-        direction: 'inbound',
-        from: fromEmail,
-        to: Array.isArray(toEmail) ? toEmail : [toEmail],
-        subject,
-        bodyHtml: htmlBody,
-        bodyText: textBody,
-        status: 'received',
-        receivedAt: new Date(),
-        resendId: emailId,
-        threadId,
-        inReplyTo: inReplyTo || null,
-        messageId: messageId || null,
-        context: {
-          candidateId: linkedCandidate._id,
-          applicationId: originalEmail?.context?.applicationId || null,
-          jobId: originalEmail?.context?.jobId || null,
-          interviewId: originalEmail?.context?.interviewId || null,
-        },
-        attachments: processedAttachments.map(att => ({
-          filename: att.filename,
-          url: att.downloadUrl,
-          contentType: att.contentType,
-          size: att.size,
-        })),
-      });
-      broadcastEmail('email:created', inbound);
-    } else {
-      // Truly unknown — store for manual review.
-      logger.warn(`Received email from unknown sender: ${fromEmail}`);
-
-      // A reply from someone we booked an external meeting with is still
-      // "unknown" to the ATS (not a candidate), but the Emails page marks it
-      // as external so it stands out from other unmatched mail.
-      // The sender is the raw header ("Jane Doe <jane@x.com>"), so compare the
-      // bare address.
-      const senderAddress = (/<([^>]+)>/.exec(fromEmail)?.[1] ?? fromEmail)
-        .trim()
-        .toLowerCase();
-      const isExternalContact = await ExternalMeeting.exists({
-        personEmail: senderAddress,
-      });
-
-      const inbound = await Email.create({
-        direction: 'inbound',
-        from: fromEmail,
-        to: Array.isArray(toEmail) ? toEmail : [toEmail],
-        subject,
-        bodyHtml: htmlBody,
-        bodyText: textBody,
-        status: 'received',
-        receivedAt: new Date(),
-        resendId: emailId,
-        threadId,
-        ...(isExternalContact && { context: { type: 'external_meeting' } }),
-        inReplyTo: inReplyTo || null,
-        messageId: messageId || null,
-        attachments: processedAttachments.map(att => ({
-          filename: att.filename,
-          url: att.downloadUrl,
-          contentType: att.contentType,
-          size: att.size,
-        })),
-      });
-      broadcastEmail('email:created', inbound);
-
-      logger.info('Stored unmatched inbound email for manual review');
+    } catch {
+      // ID may be invalid — ignore.
     }
+  }
+
+  let context: Record<string, unknown> | undefined;
+  if (linkedCandidate) {
+    context = {
+      candidateId: linkedCandidate._id,
+      applicationId: originalEmail?.context?.applicationId || null,
+      jobId: originalEmail?.context?.jobId || null,
+      interviewId: originalEmail?.context?.interviewId || null,
+    };
+  } else {
+    // Truly unknown — store for manual review.
+    logger.warn(`Received email from unknown sender: ${fromEmail}`);
+
+    // A reply from someone we booked an external meeting with is still
+    // "unknown" to the ATS (not a candidate), but the Emails page marks it
+    // as external so it stands out from other unmatched mail.
+    const isExternalContact = await ExternalMeeting.exists({
+      personEmail: senderAddress,
+    });
+    if (isExternalContact) context = { type: 'external_meeting' };
+  }
+
+  const inbound = await Email.create({
+    direction: 'inbound',
+    from: fromEmail,
+    to: Array.isArray(toEmail) ? toEmail : [toEmail],
+    subject,
+    bodyHtml: htmlBody,
+    bodyText: textBody,
+    status: 'received',
+    receivedAt: new Date(),
+    resendId: emailId,
+    threadId,
+    ...(context && { context }),
+    inReplyTo: inReplyTo || null,
+    messageId: messageId || null,
+    attachments: processedAttachments.map(att => ({
+      filename: att.filename,
+      url: att.downloadUrl,
+      contentType: att.contentType,
+      size: att.size,
+    })),
+  });
+  broadcastEmail('email:created', inbound);
+
+  logger.info('Stored inbound email', {
+    candidateId: linkedCandidate?._id,
+    threadId,
+  });
+
+  // Resend's download links expire. Copying happens after the record exists so
+  // a slow download cannot make Resend time out and redeliver the webhook.
+  if (inbound.attachments.length > 0) {
+    keepAttachments(inbound).catch(error => {
+      logger.error('Failed to keep inbound attachments', {
+        emailId,
+        error: (error as Error).message,
+      });
+    });
   }
 }
 

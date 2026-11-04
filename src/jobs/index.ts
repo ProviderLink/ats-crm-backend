@@ -1,10 +1,12 @@
 import logger from '../shared/utils/logger';
 import { scheduleEodComplianceJob } from './eodCompliance.job';
+import { scheduleScorecardJob } from './scorecardWeekly.job';
 import { scheduleSurveyDispatcherJob } from './surveyDispatcher.job';
 
 export function startBackgroundJobs(): void {
   scheduleEodComplianceJob();
   scheduleSurveyDispatcherJob();
+  scheduleScorecardJob();
   logger.info('Background jobs scheduled');
 }
 

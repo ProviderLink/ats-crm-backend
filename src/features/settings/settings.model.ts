@@ -28,6 +28,8 @@ const aiSchema = new Schema(
     resumeValidation: { type: Boolean, default: true },
     candidateScoring: { type: Boolean, default: true },
     resumeParsing: { type: Boolean, default: true },
+    // Off by default: VA-written text may contain patient details.
+    reviewWorkText: { type: Boolean, default: false },
   },
   { _id: false }
 );

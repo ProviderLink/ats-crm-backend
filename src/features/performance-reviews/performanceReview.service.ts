@@ -6,6 +6,7 @@ import Candidate from '../candidates/candidate.model';
 import Client from '../clients/client.model';
 import Job from '../jobs/job.model';
 import PerformanceReview from './performanceReview.model';
+import { buildReviewEvidence } from './reviewEvidence';
 import type {
   GenerateReviewInput,
   IPerformanceReview,
@@ -126,11 +127,12 @@ export const generateReview = async (
   const jobDescription =
     job?.description ?? input.jobDescription ?? 'Not provided';
 
+  const evidence = await buildReviewEvidence(input);
+
   const prompt = `
 You are an expert HR performance review generator.
-Generate a comprehensive performance review template
-and respond with ONLY a JSON object, no markdown,
-no explanation.
+Generate a performance review draft for a manager to edit, and respond with
+ONLY a JSON object, no markdown, no explanation.
 
 Employee: ${candidate?.firstName} ${candidate?.lastName}
 Client: ${client?.companyName}
@@ -141,6 +143,17 @@ Review Type: ${input.reviewType}
 Review Period: ${input.reviewPeriodStart} to ${input.reviewPeriodEnd}
 Client Expectations: ${input.clientExpectations ?? 'Not provided'}
 Manager Notes: ${input.managerNotes ?? 'Not provided'}
+
+Work record for the review period:
+${evidence}
+
+Rules for "strengths", "areasForImprovement" and "finalRecommendation":
+- Base every statement only on the work record and the manager notes, and quote
+  the figures you rely on.
+- Never invent behaviour, achievements or problems. The record shows activity,
+  not quality, so do not claim quality unless the manager notes say so.
+- If the record and notes are too thin to support a judgement, say that plainly
+  in that field instead of guessing.
 
 Respond with exactly this JSON structure:
 {
@@ -166,7 +179,10 @@ Generate 6-8 relevant performance categories for this role.
 `;
 
   const provider = await getAiProvider();
-  const text = await provider.generate(prompt, { maxTokens: 2000 });
+  const text = await provider.generate(prompt, {
+    maxTokens: 2000,
+    tier: 'smart',
+  });
   const result = parseJsonResponse<{
     roleSummary: string;
     coreResponsibilities: string[];
@@ -473,7 +489,10 @@ Respond with exactly this JSON structure:
   }
 
   const provider = await getAiProvider();
-  const text = await provider.generate(prompt, { maxTokens: 1500 });
+  const text = await provider.generate(prompt, {
+    maxTokens: 1500,
+    tier: 'smart',
+  });
 
   if (section === 'categories') {
     const result = parseJsonResponse<{

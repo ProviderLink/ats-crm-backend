@@ -5,6 +5,7 @@ import * as candidateService from '../features/candidates/candidate.service';
 import Job from '../features/jobs/job.model';
 import { getSettings } from '../features/settings/settings.service';
 import {
+  CANDIDATE_SCORE_SCHEMA,
   getAiProvider,
   parseJsonResponse,
   withRetry,
@@ -90,7 +91,11 @@ Respond with exactly this JSON structure:
   try {
     const provider = await getAiProvider();
     const text = await withRetry(() =>
-      provider.generate(prompt, { maxTokens: 1500, prefillAssistant: '{' })
+      provider.generate(prompt, {
+        maxTokens: 1500,
+        jsonSchema: CANDIDATE_SCORE_SCHEMA,
+        tier: 'smart',
+      })
     );
     const result = parseJsonResponse<{
       score: number;

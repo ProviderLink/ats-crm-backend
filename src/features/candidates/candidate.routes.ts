@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import optionalAuthenticate from '../../shared/middleware/optionalAuthenticate';
+import { publicApplyLimit } from '../../shared/middleware/publicRateLimit';
 import authenticate from '../../shared/middleware/authenticate';
 import {
   requireAppAccess,
@@ -176,7 +178,14 @@ const router = Router();
  * @desc    Parse resume and return structured JSON (NO Cloudinary upload, NO DB save)
  * @access  Public
  */
-router.post('/public/parse', uploadResume, publicParse);
+// Recruiters' Quick Import also uses this route, signed in, and is not limited.
+router.post(
+  '/public/parse',
+  optionalAuthenticate,
+  publicApplyLimit,
+  uploadResume,
+  publicParse
+);
 
 /**
  * @route   POST /api/v1/ats/candidates/public/upload-and-parse
@@ -212,6 +221,7 @@ const publicApplySchema = z.object({
 
 router.post(
   '/public/upload-and-parse',
+  publicApplyLimit,
   uploadResume,
   validate(publicApplySchema, 'body'),
   publicUploadAndParse

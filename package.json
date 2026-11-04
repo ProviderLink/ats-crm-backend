@@ -25,6 +25,7 @@
     "cleanup:activity-indexes": "ts-node --transpile-only src/scripts/cleanup-activity-indexes.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.4.0",
     "@sentry/node": "^8.0.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.0.0",

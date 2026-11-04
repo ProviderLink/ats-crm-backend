@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import { Request, Response } from 'express';
 import {
   deleteFromCloudinary,
@@ -9,6 +10,8 @@ import catchAsync from '../../shared/utils/catchAsync';
 import { extractResumeText } from '../../shared/utils/extract-resume-text';
 import logger from '../../shared/utils/logger';
 import { parseResumeTextWithAI } from '../../shared/utils/parseResumeWithAI';
+import { takePublicAiSlot } from '../../shared/utils/publicAiBudget';
+import type { ICandidateParsedData } from './candidate.types';
 import { sendSuccess } from '../../shared/utils/response';
 import * as applicationService from '../applications/application.service';
 import { getJobById } from '../jobs/job.service';
@@ -665,6 +668,29 @@ export const updateLegalHold = catchAsync(
   }
 );
 
+/**
+ * AI parsing for anonymous visitors. It only saves the applicant typing, so
+ * when the daily budget is spent or the AI fails they get an empty form to fill
+ * in by hand and can still apply.
+ */
+async function parseResumeForVisitor(
+  rawText: string
+): Promise<ICandidateParsedData | null> {
+  try {
+    if (!(await takePublicAiSlot())) {
+      logger.warn('Public AI budget spent for today; skipping resume parsing');
+      return null;
+    }
+    return await parseResumeTextWithAI(rawText);
+  } catch (error) {
+    logger.error('Public resume parsing failed', {
+      error: (error as Error).message,
+    });
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
 export const publicParse = catchAsync(async (req: Request, res: Response) => {
   if (!req.file) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
@@ -679,7 +705,9 @@ export const publicParse = catchAsync(async (req: Request, res: Response) => {
   );
 
   // Run AI parsing on the extracted text (stateless — no candidate saved)
-  const parsedData = await parseResumeTextWithAI(resumeRawText);
+  const parsedData = req.user
+    ? await parseResumeTextWithAI(resumeRawText)
+    : await parseResumeForVisitor(resumeRawText);
 
   logger.info(
     `Public parse complete: skills=${parsedData?.skills?.length ?? 0}, experience=${parsedData?.experience?.length ?? 0}`
@@ -711,7 +739,7 @@ export const publicUploadAndParse = catchAsync(
     // NO Cloudinary upload happens here. The resume is uploaded to Cloudinary
     // only on final submit (POST /jobs/:id/apply) so abandoned applications
     // don't leave orphan files consuming storage.
-    const parsedData = await parseResumeTextWithAI(resumeRawText);
+    const parsedData = await parseResumeForVisitor(resumeRawText);
 
     logger.info(
       `Public upload-and-parse complete: skills=${parsedData?.skills?.length ?? 0}, experience=${parsedData?.experience?.length ?? 0}`

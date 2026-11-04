@@ -1,6 +1,11 @@
 import type { ICandidateParsedData } from '../../features/candidates/candidate.types';
 import { getSettings } from '../../features/settings/settings.service';
-import { getAiProvider, parseJsonResponse, withRetry } from './ai/index';
+import {
+  PARSED_RESUME_SCHEMA,
+  getAiProvider,
+  parseJsonResponse,
+  withRetry,
+} from './ai/index';
 import logger from './logger';
 
 /**
@@ -179,7 +184,10 @@ CALCULATING yearsOfExperience:
 
   const provider = await getAiProvider();
   const text = await withRetry(() =>
-    provider.generate(prompt, { maxTokens: 4000, prefillAssistant: '{' })
+    provider.generate(prompt, {
+      maxTokens: 4000,
+      jsonSchema: PARSED_RESUME_SCHEMA,
+    })
   );
 
   logger.debug('AI resume parsing response', {

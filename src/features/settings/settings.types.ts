@@ -9,6 +9,7 @@ export interface ISettings {
     resumeValidation: boolean;
     candidateScoring: boolean;
     resumeParsing: boolean;
+    reviewWorkText: boolean;
   };
   applicationConfirmation: {
     enabled: boolean;
@@ -29,6 +30,7 @@ export interface UpdateSettingsInput {
     resumeValidation?: boolean;
     candidateScoring?: boolean;
     resumeParsing?: boolean;
+    reviewWorkText?: boolean;
   };
   applicationConfirmation?: {
     enabled?: boolean;

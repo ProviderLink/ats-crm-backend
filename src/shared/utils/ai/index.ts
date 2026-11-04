@@ -55,6 +55,11 @@ export async function withRetry<T>(
 }
 
 export { parseJsonResponse } from './parse-json';
+export {
+  CANDIDATE_SCORE_SCHEMA,
+  PARSED_RESUME_SCHEMA,
+  VALIDATION_SCHEMA,
+} from './schema';
 export type {
   AiJobResult,
   AiProviderName,

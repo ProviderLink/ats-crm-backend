@@ -1,8 +1,15 @@
+export type AiTier = 'fast' | 'smart';
+
 export interface IAiProviderGenerateOptions {
   /** Max tokens for the response (default: 1024) */
   maxTokens?: number;
-  /** Prefill the assistant response to force a specific output format (e.g., '{' for JSON) */
-  prefillAssistant?: string;
+  /** JSON schema the reply must match (see `schema.ts`) */
+  jsonSchema?: Record<string, unknown>;
+  /**
+   * `fast` (default) is the low-cost model, for extraction and simple checks.
+   * `smart` is for judgements about people and writing a manager will rely on.
+   */
+  tier?: AiTier;
 }
 
 export interface IAiProvider {

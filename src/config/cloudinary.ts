@@ -10,7 +10,8 @@ cloudinary.config({
 
 export const uploadToCloudinary = async (
   file: Express.Multer.File,
-  folder: 'resumes' | 'avatars' | 'logos' | 'portfolios' | 'email-attachments'
+  folder: 'resumes' | 'avatars' | 'logos' | 'portfolios' | 'email-attachments',
+  options: { keepFilename?: boolean } = {}
 ): Promise<{ url: string; publicId: string }> => {
   const resourceType =
     folder === 'resumes' ||
@@ -22,7 +23,15 @@ export const uploadToCloudinary = async (
     const result = await new Promise<{ secure_url: string; public_id: string }>(
       (resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `ats/${folder}`, resource_type: resourceType },
+          {
+            folder: `ats/${folder}`,
+            resource_type: resourceType,
+            // Raw files only keep their extension if it is in the public id.
+            ...(options.keepFilename && {
+              filename_override: file.originalname,
+              use_filename: true,
+            }),
+          },
           (error, result) => {
             if (error || !result)
               reject(error ?? new Error('No result returned'));

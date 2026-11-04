@@ -4,6 +4,7 @@ import Candidate from '../features/candidates/candidate.model';
 import Job from '../features/jobs/job.model';
 import { getSettings } from '../features/settings/settings.service';
 import {
+  VALIDATION_SCHEMA,
   getAiProvider,
   parseJsonResponse,
   withRetry,
@@ -64,7 +65,11 @@ Respond with exactly this JSON structure:
   try {
     const provider = await getAiProvider();
     const text = await withRetry(() =>
-      provider.generate(prompt, { maxTokens: 500, prefillAssistant: '{' })
+      provider.generate(prompt, {
+        maxTokens: 500,
+        jsonSchema: VALIDATION_SCHEMA,
+        tier: 'smart',
+      })
     );
     const result = parseJsonResponse<{
       isValid: boolean;

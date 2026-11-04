@@ -2,6 +2,7 @@ import Candidate from '../features/candidates/candidate.model';
 import { updateAiValidation } from '../features/candidates/candidate.service';
 import { getSettings } from '../features/settings/settings.service';
 import {
+  VALIDATION_SCHEMA,
   getAiProvider,
   parseJsonResponse,
   withRetry,
@@ -87,7 +88,7 @@ Be conservative — only mark as invalid (isValid: false) if clearly fake/garbag
   try {
     const provider = await getAiProvider();
     const text = await withRetry(() =>
-      provider.generate(prompt, { maxTokens: 1000, prefillAssistant: '{' })
+      provider.generate(prompt, { maxTokens: 1000, jsonSchema: VALIDATION_SCHEMA })
     );
     const result = parseJsonResponse<{
       isValid: boolean;

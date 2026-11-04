@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { publicApplyLimit } from '../../shared/middleware/publicRateLimit';
 import authenticate from '../../shared/middleware/authenticate';
 import {
   requireAppAccess,
@@ -210,6 +211,7 @@ router.get(
 router.get('/:id', optionalAuthenticate, getJobById);
 router.post(
   '/:id/apply',
+  publicApplyLimit,
   uploadResumeWithPortfolio,
   validate(applyToJobSchema),
   applyToJob

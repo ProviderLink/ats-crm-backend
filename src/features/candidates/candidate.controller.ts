@@ -654,20 +654,6 @@ export const restoreCandidate = catchAsync(
   }
 );
 
-export const updateLegalHold = catchAsync(
-  async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { legalHold } = req.body;
-    const performedBy = req.user!._id;
-    const candidate = await candidateService.updateCandidateLegalHold(
-      id,
-      legalHold,
-      performedBy
-    );
-    sendSuccess(res, candidate, 'Candidate legal hold updated');
-  }
-);
-
 /**
  * AI parsing for anonymous visitors. It only saves the applicant typing, so
  * when the daily budget is spent or the AI fails they get an empty form to fill

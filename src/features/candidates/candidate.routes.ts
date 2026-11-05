@@ -29,7 +29,6 @@ import {
   restoreCandidate,
   updateCandidate,
   updateEligibility,
-  updateLegalHold,
   updateTalentPool,
   uploadAvatar as uploadAvatarController,
 } from './candidate.controller';
@@ -317,17 +316,6 @@ router.patch(
   requireRoles('admin'),
   validate(restoreCandidateSchema, 'body'),
   restoreCandidate
-);
-
-const legalHoldSchema = z.object({
-  legalHold: z.boolean(),
-});
-
-router.patch(
-  '/:id/legal-hold',
-  requireRoles('admin'),
-  validate(legalHoldSchema, 'body'),
-  updateLegalHold
 );
 
 router.post(

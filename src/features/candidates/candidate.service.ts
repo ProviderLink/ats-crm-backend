@@ -620,15 +620,6 @@ export const deleteCandidate = async (
   if (!candidate)
     throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
 
-  // Legal hold — block deletion regardless of role
-  if (candidate.legalHold) {
-    throw new AppError(
-      409,
-      'LEGAL_HOLD',
-      'Cannot delete candidate — subject to legal hold'
-    );
-  }
-
   // Permanent deletion is only allowed from the Ineligible list.
   // Everywhere else a candidate is closed out by rejecting them, never deleted,
   // so their history stays intact. This mirrors the UI, which only exposes
@@ -1217,31 +1208,6 @@ export const updateCandidateEligibility = async (
       to: eligibilityStatus,
       reason,
     },
-    performedBy: performedBy ?? null,
-  });
-
-  const result = candidate.toSafeObject();
-  emitToAts('candidates', 'candidate:updated', result);
-  return result;
-};
-
-export const updateCandidateLegalHold = async (
-  id: string,
-  legalHold: boolean,
-  performedBy?: string | null
-): Promise<ICandidate> => {
-  const candidate = await Candidate.findById(id);
-  if (!candidate)
-    throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
-
-  candidate.legalHold = legalHold;
-  await candidate.save();
-
-  createLog({
-    action: 'legal_hold_toggled',
-    resourceType: 'candidate',
-    resourceId: id,
-    metadata: { legalHold },
     performedBy: performedBy ?? null,
   });
 

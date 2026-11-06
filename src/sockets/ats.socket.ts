@@ -40,22 +40,27 @@ export const initializeAtsSocket = (io: Server): void => {
       return;
     }
 
-    socket.join('applications');
-    socket.join('candidates');
-    socket.join('jobs');
-    socket.join('clients');
-    socket.join('tags');
-    socket.join('pipeline-templates');
-    socket.join('email-templates');
-    socket.join('emails');
     socket.join(`user:${decoded._id}`);
 
-    // Rooms for data the HTTP API gates behind a permission: only members who
-    // could read it over REST receive it over the socket.
+    // Each room carries data the HTTP API gates behind a permission, so a
+    // member joins only the rooms they could read over REST. Interviews and
+    // external meetings travel in the 'applications' room.
     const permUser = { roles, permissions: decoded.permissions };
-    if (hasPermission(permUser, 'team', 'read')) socket.join('team');
-    if (hasPermission(permUser, 'interviewScorecards', 'read'))
-      socket.join('scorecards');
+    const ROOM_PERMISSIONS: [string, string][] = [
+      ['applications', 'candidates'],
+      ['candidates', 'candidates'],
+      ['jobs', 'jobs'],
+      ['clients', 'clients'],
+      ['tags', 'tags'],
+      ['pipeline-templates', 'pipelineTemplates'],
+      ['email-templates', 'emailTemplates'],
+      ['emails', 'emails'],
+      ['team', 'team'],
+      ['scorecards', 'interviewScorecards'],
+    ];
+    for (const [room, resource] of ROOM_PERMISSIONS) {
+      if (hasPermission(permUser, resource, 'read')) socket.join(room);
+    }
 
     const userId = String(decoded._id);
     trackConnect(userId, socket.id);

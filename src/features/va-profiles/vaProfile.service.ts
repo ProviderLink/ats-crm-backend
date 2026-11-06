@@ -191,7 +191,11 @@ export const addVaNote = async (
     performedBy: authorId ?? null,
   });
 
-  const saved = note as unknown as IVaNote & {
+  // The pushed object is a plain copy; the saved subdocument (with its _id
+  // and timestamps) is the last element of the array.
+  const saved = profile.noteThread[
+    profile.noteThread.length - 1
+  ] as unknown as IVaNote & {
     _id: mongoose.Types.ObjectId;
     author: mongoose.Types.ObjectId | null;
   };

@@ -597,7 +597,11 @@ export const addNote = async (
     performedBy: authorId ?? null,
   });
 
-  const saved = note as unknown as ClientNote & {
+  // The pushed object is a plain copy; the saved subdocument (with its _id
+  // and timestamps) is the last element of the array.
+  const saved = client.notes[
+    client.notes.length - 1
+  ] as unknown as ClientNote & {
     _id: mongoose.Types.ObjectId;
     author: mongoose.Types.ObjectId | null;
   };

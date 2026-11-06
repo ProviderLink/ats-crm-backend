@@ -9,10 +9,10 @@ import { sendSuccess } from '../../shared/utils/response';
 import { createLog } from '../activity-logs/activityLog.service';
 import * as applicationService from '../applications/application.service';
 import * as candidateService from '../candidates/candidate.service';
-import EmailTemplate from '../email-templates/emailTemplate.model';
 import * as emailService from '../emails/email.service';
 import * as settingsService from '../settings/settings.service';
 import * as jobService from './job.service';
+import { buildApplicationThanks } from './applicationThanks';
 import { toPublicJob } from './job.public';
 import { generateJobDraft } from './jobDraft.service';
 import { standardizeJobContent } from './jobStandardize.service';
@@ -277,39 +277,32 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
     runCandidacyValidation(candidateId);
   }
 
-  // Send application confirmation email if enabled in settings (fire-and-forget)
+  // Thank-you email when it is switched on in Settings (fire-and-forget).
+  // Fixed and short on purpose: it names only the job and our own sender name,
+  // never the client, who stays confidential until a candidate is hired.
   settingsService
     .getSettings()
     .then(async settings => {
-      const { enabled, templateId } = settings.applicationConfirmation;
-      if (!enabled || !templateId) return;
-
-      const template = await EmailTemplate.findById(templateId);
-      if (!template || !template.isActive) return;
+      if (!settings.applicationConfirmation.enabled) return;
 
       const candidate = await candidateService.getCandidateById(candidateId);
       if (!candidate.email) return;
 
+      const message = buildApplicationThanks({
+        firstName: candidate.firstName,
+        jobTitle: job.title,
+        senderName: settings.email.fromName || 'Arista ATS',
+      });
       emailService
         .sendEmail({
           to: [candidate.email],
-          subject: template.subject,
-          bodyHtml: template.bodyHtml,
-          bodyText: template.bodyText,
-          templateId: templateId,
+          ...message,
           context: {
             type: 'application_confirmation',
             candidateId,
             jobId,
             applicationId: null,
             interviewId: null,
-          },
-          variables: {
-            candidateName:
-              `${candidate.firstName} ${candidate.lastName}`.trim(),
-            candidateEmail: candidate.email,
-            jobTitle: job.title,
-            companyName: settings.email.fromName,
           },
         })
         .catch(err => {

@@ -33,6 +33,9 @@ import {
   uploadAvatar as uploadAvatarController,
 } from './candidate.controller';
 
+/** Most items accepted in a parsed-resume list (skills, experience...). */
+const MAX_LIST = 100;
+
 const createCandidateSchema = z.object({
   firstName: z.string().min(1).max(50),
   lastName: z.string().min(1).max(50),
@@ -70,9 +73,9 @@ const createCandidateSchema = z.object({
       .object({
         summary: z.string().optional(),
         yearsOfExperience: z.number().min(0).optional(),
-        skills: z.array(z.string()).optional(),
-        languages: z.array(z.string()).optional(),
-        certifications: z.array(z.string()).optional(),
+        skills: z.array(z.string()).max(MAX_LIST).optional(),
+        languages: z.array(z.string()).max(MAX_LIST).optional(),
+        certifications: z.array(z.string()).max(MAX_LIST).optional(),
         experience: z
           .array(
             z.object({
@@ -82,6 +85,7 @@ const createCandidateSchema = z.object({
               description: z.string().optional(),
             })
           )
+          .max(MAX_LIST)
           .optional(),
         education: z
           .array(
@@ -92,6 +96,7 @@ const createCandidateSchema = z.object({
               year: z.string().optional(),
             })
           )
+          .max(MAX_LIST)
           .optional(),
       })
       .optional()
@@ -112,9 +117,9 @@ const updateCandidateSchema = z.object({
     .object({
       summary: z.string().optional(),
       yearsOfExperience: z.number().min(0).optional(),
-      skills: z.array(z.string()).optional(),
-      languages: z.array(z.string()).optional(),
-      certifications: z.array(z.string()).optional(),
+      skills: z.array(z.string()).max(MAX_LIST).optional(),
+      languages: z.array(z.string()).max(MAX_LIST).optional(),
+      certifications: z.array(z.string()).max(MAX_LIST).optional(),
       experience: z
         .array(
           z.object({
@@ -124,6 +129,7 @@ const updateCandidateSchema = z.object({
             description: z.string().optional(),
           })
         )
+        .max(MAX_LIST)
         .optional(),
       education: z
         .array(
@@ -134,6 +140,7 @@ const updateCandidateSchema = z.object({
             year: z.string().optional(),
           })
         )
+        .max(MAX_LIST)
         .optional(),
     })
     .optional()

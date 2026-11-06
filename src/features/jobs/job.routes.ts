@@ -26,6 +26,9 @@ import {
   updateJobStatus,
 } from './job.controller';
 
+/** Most items accepted in a parsed-resume list (skills, experience...). */
+const MAX_LIST = 100;
+
 const salaryRangeSchema = z.object({
   min: z.number().min(0),
   max: z.number().min(0),
@@ -159,9 +162,9 @@ const applyToJobSchema = z.object({
     z
       .object({
         summary: z.string().optional(),
-        skills: z.array(z.string()).optional(),
-        languages: z.array(z.string()).optional(),
-        certifications: z.array(z.string()).optional(),
+        skills: z.array(z.string()).max(MAX_LIST).optional(),
+        languages: z.array(z.string()).max(MAX_LIST).optional(),
+        certifications: z.array(z.string()).max(MAX_LIST).optional(),
         experience: z
           .array(
             z.object({
@@ -171,6 +174,7 @@ const applyToJobSchema = z.object({
               description: z.string().optional(),
             })
           )
+          .max(MAX_LIST)
           .optional(),
         education: z
           .array(
@@ -181,6 +185,7 @@ const applyToJobSchema = z.object({
               year: z.string().optional(),
             })
           )
+          .max(MAX_LIST)
           .optional(),
       })
       .optional()

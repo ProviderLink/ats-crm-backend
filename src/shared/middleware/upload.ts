@@ -4,10 +4,20 @@ import { AppError } from '../utils/AppError';
 
 const storage = multer.memoryStorage();
 
+/**
+ * Largest text field accepted on resume uploads (multer's default is 1 MB).
+ * The public apply form sends the parsed resume as JSON in a field; capping it
+ * keeps an oversized list from exhausting memory while it is validated.
+ */
+const MAX_FIELD_BYTES = 200 * 1024;
+
+const fieldTooLarge = () =>
+  new AppError(400, 'FIELD_TOO_LARGE', 'One of the form fields is too large');
+
 export const uploadResume: RequestHandler = (req, res, next) => {
   multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024, fieldSize: MAX_FIELD_BYTES },
     fileFilter: (_req, file, cb) => {
       const allowed = [
         'application/pdf',
@@ -35,6 +45,7 @@ export const uploadResume: RequestHandler = (req, res, next) => {
           new AppError(400, 'FILE_TOO_LARGE', 'File size must not exceed 5MB')
         );
       }
+      if (err.code === 'LIMIT_FIELD_VALUE') return next(fieldTooLarge());
     }
     if (err) return next(err);
 
@@ -78,7 +89,11 @@ export const uploadResumeWithPortfolio: RequestHandler = (req, res, next) => {
 
   multer({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024, files: 2 },
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+      files: 2,
+      fieldSize: MAX_FIELD_BYTES,
+    },
     fileFilter: (_req, file, cb) => {
       const allowed =
         file.fieldname === 'portfolioFile' ? portfolioTypes : resumeTypes;
@@ -107,6 +122,7 @@ export const uploadResumeWithPortfolio: RequestHandler = (req, res, next) => {
           new AppError(400, 'FILE_TOO_LARGE', 'File size must not exceed 10MB')
         );
       }
+      if (err.code === 'LIMIT_FIELD_VALUE') return next(fieldTooLarge());
     }
     if (err) return next(err);
 

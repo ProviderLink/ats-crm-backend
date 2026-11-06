@@ -177,7 +177,8 @@ export const createAssignment = async (
     );
     const clientEmail = primaryContact?.email ?? client.email;
     if (clientEmail) {
-      const firstName = primaryContact?.name?.split(' ')[0] ?? 'Client';
+      const firstName =
+        primaryContact?.name?.trim().split(' ')[0] || client.companyName;
       const lastName = primaryContact?.name?.split(' ').slice(1).join(' ') ?? '';
 
       const { inviteToken } = await userService.provisionClient(

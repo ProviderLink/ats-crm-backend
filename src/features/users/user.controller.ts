@@ -311,7 +311,7 @@ export const provisionClient = catchAsync(
     }
 
     const nameParts = (primaryContact?.name ?? '').split(' ');
-    const firstName = nameParts[0] || 'Client';
+    const firstName = nameParts[0] || client.companyName;
     const lastName = nameParts.slice(1).join(' ') || '';
 
     const { user, inviteToken } = await userService.provisionClient(

@@ -63,7 +63,8 @@ const permissionsSchema = new Schema(
 const userSchema = new Schema(
   {
     firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+    // Optional: some people have a one-word name (CRM client contacts).
+    lastName: { type: String, default: '', trim: true },
     email: {
       type: String,
       required: true,

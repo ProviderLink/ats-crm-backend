@@ -70,7 +70,7 @@ const updateMeSchema = z.object({
 });
 
 const updatePermissionsSchema = z.object({
-  permissions: z.record(z.record(z.boolean())),
+  permissions: z.record(z.string(), z.record(z.string(), z.boolean())),
 });
 
 const provisionClientSchema = z.object({

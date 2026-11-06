@@ -37,7 +37,7 @@ const sendEmailSchema = z.object({
     .optional(),
   inReplyTo: z.string().optional(),
   threadId: z.string().optional(),
-  variables: z.record(z.string()).optional(),
+  variables: z.record(z.string(), z.string()).optional(),
   attachments: z
     .array(
       z.object({

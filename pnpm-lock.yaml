@@ -18,7 +18,7 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: 1.4.0
-        version: 1.4.0(zod@3.25.76)
+        version: 1.4.0(zod@4.6.7)
       '@sentry/node':
         specifier: ^8.0.0
         version: 8.55.2
@@ -89,8 +89,8 @@ importers:
         specifier: ^0.18.5
         version: 0.18.5
       zod:
-        specifier: ^3.22.0
-        version: 3.25.76
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/bcryptjs':
         specifier: ^2.4.6
@@ -2025,18 +2025,18 @@ packages:
     resolution: {integrity: sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==}
     engines: {node: '>=6'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
-  '@anthropic-ai/sdk@1.4.0(zod@3.25.76)':
+  '@anthropic-ai/sdk@1.4.0(zod@4.6.7)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
     optionalDependencies:
-      zod: 3.25.76
+      zod: 4.6.7
 
   '@babel/runtime@7.29.10': {}
 
@@ -4112,4 +4112,4 @@ snapshots:
 
   yn@3.1.1: {}
 
-  zod@3.25.76: {}
+  zod@4.6.7: {}

@@ -77,7 +77,7 @@ const updateReviewSchema = z.object({
     .optional(),
   overallRating: z.number().min(1).max(5).nullable().optional(),
   clientSatisfactionScore: z.number().min(1).max(5).nullable().optional(),
-  managerRatingInputs: z.record(z.unknown()).nullable().optional(),
+  managerRatingInputs: z.record(z.string(), z.unknown()).nullable().optional(),
   finalRecommendation: z.string().nullable().optional(),
   finalManagerSummary: z.string().optional(),
   reviewedByUserId: z.string().nullable().optional(),

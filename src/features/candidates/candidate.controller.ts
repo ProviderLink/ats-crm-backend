@@ -36,8 +36,10 @@ export const getAllCandidates = catchAsync(
     const inTalentPool =
       inTalentPoolStr !== undefined ? inTalentPoolStr === 'true' : undefined;
 
+    // Only an admin may see permanently ineligible candidates, so the flag
+    // that adds them to the list is ignored for everyone else.
     const includeIneligible =
-      includeIneligibleStr !== undefined
+      includeIneligibleStr !== undefined && req.user!.roles.includes('admin')
         ? includeIneligibleStr === 'true'
         : undefined;
 

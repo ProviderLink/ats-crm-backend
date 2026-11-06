@@ -33,21 +33,22 @@ export const getDashboardStats = async (accountManagerId?: string) => {
   weekStart.setDate(weekStart.getDate() - 7);
   weekStart.setHours(0, 0, 0, 0);
 
-  // ── AM scoping: resolve candidate IDs for this AM ─────
-  let candidateIdFilter: string[] | undefined;
+  // ── AM scoping: this AM's own assignments ─────
+  // Scoped by assignment, not by VA: a VA can also work for another client
+  // under another account manager, and that work is not this AM's to see.
+  let assignmentIdFilter: mongoose.Types.ObjectId[] | undefined;
 
   if (accountManagerId) {
-    const amAssignments = await Assignment.find({
-      accountManagerId,
-    }).lean();
-    const candidateIds = [
-      ...new Set(amAssignments.map(a => String(a.candidateId))),
-    ];
-    if (candidateIds.length === 0) {
+    const amAssignments = await Assignment.find({ accountManagerId })
+      .select('_id')
+      .lean();
+    if (amAssignments.length === 0) {
       // No assignments — return empty stats
       return emptyDashboard();
     }
-    candidateIdFilter = candidateIds;
+    assignmentIdFilter = amAssignments.map(
+      a => a._id as mongoose.Types.ObjectId
+    );
   }
 
   const assignmentBase = accountManagerId ? { accountManagerId } : {};
@@ -67,12 +68,16 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     Assignment.countDocuments({ ...assignmentBase, status: 'ended' }),
     EodSubmission.countDocuments({
       dateKey: companyTodayKey,
-      ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
+      ...(assignmentIdFilter
+        ? { assignmentId: { $in: assignmentIdFilter } }
+        : {}),
     }),
     WorkEntry.countDocuments({
       isDeleted: { $ne: true },
       entryDate: { $gte: todayStart, $lte: todayEnd },
-      ...(candidateIdFilter ? { candidateId: { $in: candidateIdFilter } } : {}),
+      ...(assignmentIdFilter
+        ? { assignmentId: { $in: assignmentIdFilter } }
+        : {}),
     }),
     // A report is due from active assignments that have started, on working
     // days only; at the weekend nobody is missing one.
@@ -102,8 +107,8 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     dueCount > 0 ? Math.round((filedCount / dueCount) * 100) : 100;
 
   const eodQuery: Record<string, unknown> = {};
-  if (candidateIdFilter) {
-    eodQuery.candidateId = { $in: candidateIdFilter };
+  if (assignmentIdFilter) {
+    eodQuery.assignmentId = { $in: assignmentIdFilter };
   }
   const recentEodSubmissions = (await EodSubmission.find(eodQuery)
     .sort({ createdAt: -1 })
@@ -114,11 +119,9 @@ export const getDashboardStats = async (accountManagerId?: string) => {
     isDeleted: { $ne: true },
     entryDate: { $gte: weekStart, $lte: todayEnd },
   };
-  if (candidateIdFilter) {
+  if (assignmentIdFilter) {
     // Aggregation pipelines are not cast by Mongoose, so ids must be ObjectIds.
-    workEntryMatch.candidateId = {
-      $in: candidateIdFilter.map(id => new mongoose.Types.ObjectId(id)),
-    };
+    workEntryMatch.assignmentId = { $in: assignmentIdFilter };
   }
 
   const weeklyAgg = await WorkEntry.aggregate([

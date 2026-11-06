@@ -234,17 +234,54 @@ export const canApplicantUpdateProfile = async (
   return !inPipeline;
 };
 
-/** The candidate a public application belongs to, matched by email then phone. */
-export const findExistingApplicant = async (
-  email: string,
-  phone?: string
-): Promise<ICandidateDocument | null> => {
-  const byEmail = await Candidate.findOne({ email: email.toLowerCase() });
-  if (byEmail) return byEmail;
-  const normalizedPhone = normalizePhone(phone);
-  return normalizedPhone
-    ? Candidate.findOne({ phoneNormalized: normalizedPhone })
-    : null;
+/** "Maria  Santos" and "maria santos" are the same name. */
+const sameName = (
+  c: { firstName?: string | null; lastName?: string | null },
+  firstName: string,
+  lastName: string
+): boolean => {
+  const norm = (v?: string | null) =>
+    (v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return (
+    norm(c.firstName) === norm(firstName) && norm(c.lastName) === norm(lastName)
+  );
+};
+
+/**
+ * The candidate a public application belongs to.
+ *
+ * Matched by email first. A phone match only counts when the name matches
+ * too: two different people can share a number (family, a placeholder like
+ * 1234567890), and merging them would put one person's resume on another's
+ * record. A phone-only match is returned as `possibleDuplicateOf` so the new
+ * candidate can be flagged instead.
+ */
+export const findExistingApplicant = async (input: {
+  email: string;
+  phone?: string;
+  firstName: string;
+  lastName: string;
+}): Promise<{
+  match: ICandidateDocument | null;
+  byPhone: boolean;
+  possibleDuplicateOf: string | null;
+}> => {
+  const byEmail = await Candidate.findOne({ email: input.email.toLowerCase() });
+  if (byEmail)
+    return { match: byEmail, byPhone: false, possibleDuplicateOf: null };
+  const normalizedPhone = normalizePhone(input.phone);
+  if (!normalizedPhone)
+    return { match: null, byPhone: false, possibleDuplicateOf: null };
+  const samePhone = await Candidate.find({ phoneNormalized: normalizedPhone });
+  const named = samePhone.find(c =>
+    sameName(c, input.firstName, input.lastName)
+  );
+  if (named) return { match: named, byPhone: true, possibleDuplicateOf: null };
+  return {
+    match: null,
+    byPhone: false,
+    possibleDuplicateOf: samePhone[0] ? String(samePhone[0]._id) : null,
+  };
 };
 
 /**
@@ -307,15 +344,17 @@ export const findOrCreateCandidate = async (
 ): Promise<{ candidate: ICandidate; isExisting: boolean }> => {
   const normalizedPhone = normalizePhone(input.phone);
 
-  // 1. Email match (case-insensitive), 2. phone match (normalized)
-  const existing =
-    (await Candidate.findOne({ email: input.email.toLowerCase() })) ??
-    (normalizedPhone
-      ? await Candidate.findOne({ phoneNormalized: normalizedPhone })
-      : null);
+  // Email match, or a phone match with the same name (see findExistingApplicant)
+  const {
+    match: existing,
+    byPhone,
+    possibleDuplicateOf,
+  } = await findExistingApplicant(input);
   if (existing) {
     if (await canApplicantUpdateProfile(existing)) {
       await refreshFromApplication(existing, input);
+      // Same person applying from a new address: keep the one they use now.
+      if (byPhone) existing.email = input.email.toLowerCase();
       await existing.save();
     }
     return { candidate: existing.toSafeObject(), isExisting: true };
@@ -372,6 +411,8 @@ export const findOrCreateCandidate = async (
       source: input.source,
       status,
       appliedJobId: input.appliedJobId ?? null,
+      // Shares a phone number with this candidate under a different name.
+      ...(possibleDuplicateOf ? { possibleDuplicateOf } : {}),
     },
     performedBy: createdBy,
   });

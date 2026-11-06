@@ -363,11 +363,26 @@ export const approveApplication = async (
     String(application.jobId)
   );
 
-  await candidateService.updateCandidateStatus(
-    String(application.candidateId),
-    'approved',
-    input.approvedBy
-  );
+  // A hired candidate stays hired while joining another job's pipeline, and a
+  // pooled candidate leaves the Talent Pool once they are in a pipeline.
+  const approvedCandidate = await Candidate.findById(
+    application.candidateId
+  ).select('status inTalentPool');
+  if (approvedCandidate?.status !== 'hired') {
+    await candidateService.updateCandidateStatus(
+      String(application.candidateId),
+      'approved',
+      input.approvedBy
+    );
+  }
+  if (approvedCandidate?.inTalentPool) {
+    await candidateService.updateTalentPool(
+      String(application.candidateId),
+      'remove',
+      undefined,
+      input.approvedBy
+    );
+  }
 
   createLog({
     action: 'approved',
@@ -518,15 +533,24 @@ export const rejectApplication = async (
   // A candidate is never moved to Talent Pool or Ineligible automatically on a
   // non-final reject; that only happens when the destination is explicitly
   // chosen, which the UI offers exclusively on the last live application.
+  const alreadyPooled =
+    destination === 'candidate_pool' &&
+    !!(await Candidate.exists({
+      _id: application.candidateId,
+      inTalentPool: true,
+    }));
   if (destination) {
-    await candidateService.updateTalentPool(
-      String(application.candidateId),
-      destination === 'candidate_pool' ? 'add' : 'remove',
-      destination === 'candidate_pool'
-        ? (input.internalNotes ?? undefined)
-        : undefined,
-      input.rejectedBy
-    );
+    // A candidate already in the pool keeps their original date and notes.
+    if (!alreadyPooled) {
+      await candidateService.updateTalentPool(
+        String(application.candidateId),
+        destination === 'candidate_pool' ? 'add' : 'remove',
+        destination === 'candidate_pool'
+          ? (input.internalNotes ?? undefined)
+          : undefined,
+        input.rejectedBy
+      );
+    }
 
     if (destination === 'permanently_ineligible') {
       await candidateService.updateCandidateEligibility(

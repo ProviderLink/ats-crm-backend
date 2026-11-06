@@ -173,8 +173,13 @@ export function computeTable(
         ? fallbackIds
         : pipelineIds;
 
+  // In Review: a new applicant, or a returning one (approved, hired or in the
+  // Talent Pool) whose application to another job is waiting for review.
+  const pendingAppIds = new Set(
+    slimApps.filter(a => a.phase === 'pending').map(a => a.candidateId)
+  );
   const isInReview = (c: SlimCandidate) =>
-    c.status === 'pending' && !c.inTalentPool;
+    (c.status === 'pending' && !c.inTalentPool) || pendingAppIds.has(c._id);
 
   const jobIdsForTab = (c: SlimCandidate, tab: TableTab): Set<string> => {
     const ids = new Set<string>();

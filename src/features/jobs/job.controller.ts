@@ -7,6 +7,7 @@ import { extractResumeText } from '../../shared/utils/extract-resume-text';
 import logger from '../../shared/utils/logger';
 import { sendSuccess } from '../../shared/utils/response';
 import { createLog } from '../activity-logs/activityLog.service';
+import * as applicationService from '../applications/application.service';
 import * as candidateService from '../candidates/candidate.service';
 import EmailTemplate from '../email-templates/emailTemplate.model';
 import * as emailService from '../emails/email.service';
@@ -134,10 +135,8 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
 
   // A returning applicant who is already approved, hired or in a pipeline keeps
   // their record exactly as it is: nothing is uploaded or overwritten.
-  const existingApplicant = await candidateService.findExistingApplicant(
-    body.email,
-    body.phone
-  );
+  const { match: existingApplicant } =
+    await candidateService.findExistingApplicant(body);
   const refreshProfile =
     !existingApplicant ||
     (await candidateService.canApplicantUpdateProfile(existingApplicant));
@@ -223,6 +222,31 @@ export const applyToJob = catchAsync(async (req: Request, res: Response) => {
       201
     );
     return;
+  }
+
+  // A returning candidate who is approved, in a pipeline, hired or in the
+  // Talent Pool is not In Review, so a profile refresh alone would leave this
+  // application unseen. Record it as a pending application for the job: it
+  // shows in In Review under that job, and the Talent Pool is left as the team
+  // set it until a recruiter approves or rejects it.
+  if (isExisting && (!refreshProfile || candidate.inTalentPool)) {
+    const previous = await applicationService.findApplication(
+      candidateId,
+      jobId
+    );
+    if (!previous) {
+      await applicationService.createApplication({
+        candidateId,
+        jobId,
+        clientId: job.clientId,
+        source: 'direct_apply',
+      });
+      await candidateService.updateCandidate(
+        candidateId,
+        { appliedJobId: jobId } as any,
+        null
+      );
+    }
   }
 
   // Trigger AI resume parsing for the newly created candidate (background)

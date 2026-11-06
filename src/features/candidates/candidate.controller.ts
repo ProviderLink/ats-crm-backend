@@ -543,6 +543,35 @@ export const approveCandidate = catchAsync(
       throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
     }
 
+    // A returning applicant (approved, hired or pooled) holds a pending
+    // application for the job they applied to: approving them approves that
+    // application.
+    const pendingJobId = bodyJobId || candidate.appliedJobId;
+    const pendingApplication = pendingJobId
+      ? await applicationService.findApplication(id, pendingJobId)
+      : null;
+    if (
+      pendingApplication?.phase === 'pending' &&
+      candidate.eligibilityStatus !== 'permanently_ineligible'
+    ) {
+      const approved = await applicationService.approveApplication(
+        String(pendingApplication._id),
+        { approvedBy: updatedBy.toString() }
+      );
+      sendSuccess(
+        res,
+        {
+          candidateId: id,
+          jobId: pendingJobId,
+          applicationId: approved._id,
+          approved: true,
+        },
+        'Candidate approved',
+        200
+      );
+      return;
+    }
+
     // Only pending candidates can be approved
     if (candidate.status !== 'pending') {
       throw new AppError(

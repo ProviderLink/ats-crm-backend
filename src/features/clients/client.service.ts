@@ -3,7 +3,10 @@ import mongoose from 'mongoose';
 import { AppError } from '../../shared/utils/AppError';
 import { emitToAts } from '../../sockets';
 import { createLog } from '../activity-logs/activityLog.service';
+import Assignment from '../assignments/assignment.model';
 import Job from '../jobs/job.model';
+import User from '../users/user.model';
+import { disconnectUser } from '../../sockets/presence';
 import Client from './client.model';
 import type {
   ClientNote,
@@ -371,7 +374,29 @@ export const deleteClient = async (
     );
   }
 
+  const openAssignments = await Assignment.countDocuments({
+    clientId: id,
+    status: { $in: ['active', 'on_hold'] },
+  });
+  if (openAssignments > 0) {
+    throw new AppError(
+      400,
+      'CLIENT_HAS_ACTIVE_ASSIGNMENTS',
+      "Reassign or end the client's active assignments first"
+    );
+  }
+
   await Client.findByIdAndDelete(id);
+
+  // Switch off the client's CRM login so nobody signs in to a deleted client.
+  const logins = await User.find({ clientRef: id }).select('_id');
+  if (logins.length > 0) {
+    await User.updateMany(
+      { clientRef: id },
+      { $set: { isActive: false, refreshTokenAts: null, refreshTokenCrm: null } }
+    );
+    logins.forEach(u => disconnectUser(String(u._id)));
+  }
 
   createLog({
     action: 'deleted',

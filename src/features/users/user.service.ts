@@ -10,6 +10,7 @@ import { sendEmail } from '../../shared/utils/email';
 import logger from '../../shared/utils/logger';
 import { createLog } from '../activity-logs/activityLog.service';
 import { upsertVaProfile } from '../va-profiles/vaProfile.service';
+import Assignment from '../assignments/assignment.model';
 import User from './user.model';
 import type {
   AppAccess,
@@ -478,6 +479,18 @@ export const deactivateUser = async (
 ): Promise<SafeUser> => {
   const user = await User.findById(id);
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+
+  const managed = await Assignment.countDocuments({
+    accountManagerId: id,
+    status: { $in: ['active', 'on_hold'] },
+  });
+  if (managed > 0) {
+    throw new AppError(
+      400,
+      'USER_MANAGES_ASSIGNMENTS',
+      'Reassign their assignments first'
+    );
+  }
 
   const safeUser = user.toSafeObject();
   await User.findByIdAndDelete(id);

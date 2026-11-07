@@ -321,6 +321,37 @@ function buildInviteEmailHtml(params: {
 }
 
 /**
+ * Issue a fresh 24-hour invite for someone who has not set a password yet.
+ * Returns the new token and whether the link is for the CRM.
+ */
+export const renewInvite = async (
+  id: string
+): Promise<{ user: SafeUser; inviteToken: string; isCrmOnly: boolean }> => {
+  const user = await User.findById(id);
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  if (!user.isActive) {
+    throw new AppError(400, 'USER_INACTIVE', 'This account is deactivated');
+  }
+  if (user.emailVerified) {
+    throw new AppError(
+      400,
+      'INVITE_ALREADY_ACCEPTED',
+      'This person has already set a password. Use Forgot password instead.'
+    );
+  }
+  const inviteToken = crypto.randomBytes(32).toString('hex');
+  user.inviteToken = inviteToken;
+  user.inviteTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await user.save();
+  const access = user.appAccess as AppAccess[];
+  return {
+    user: user.toSafeObject(),
+    inviteToken,
+    isCrmOnly: access.includes('crm') && !access.includes('ats'),
+  };
+};
+
+/**
  * Send invitation email to a newly created team member.
  */
 export const sendTeamMemberInvite = async (params: {
@@ -588,6 +619,11 @@ export const provisionVA = async (
       });
       return { user: existing.toSafeObject(), inviteToken: newInviteToken };
     }
+    // Already has CRM access but never set a password: send a fresh invite.
+    if (existing.isActive && !existing.emailVerified) {
+      const renewed = await renewInvite(String(existing._id));
+      return { user: renewed.user, inviteToken: renewed.inviteToken };
+    }
     return { user: existing.toSafeObject(), inviteToken: null };
   }
 
@@ -663,6 +699,11 @@ export const provisionClient = async (
         performedBy: createdBy ?? null,
       });
       return { user: existing.toSafeObject(), inviteToken: newInviteToken };
+    }
+    // Already has CRM access but never set a password: send a fresh invite.
+    if (existing.isActive && !existing.emailVerified) {
+      const renewed = await renewInvite(String(existing._id));
+      return { user: renewed.user, inviteToken: renewed.inviteToken };
     }
     return { user: existing.toSafeObject(), inviteToken: null };
   }

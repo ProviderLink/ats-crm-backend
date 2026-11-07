@@ -420,3 +420,24 @@ export const revokeCrmAccess = catchAsync(
     sendSuccess(res, user, 'CRM access revoked', 200);
   }
 );
+
+/**
+ * POST /shared/users/:id/resend-invite
+ * Send a fresh invite link to someone whose invite expired before they set a
+ * password.
+ */
+export const resendInvite = catchAsync(async (req: Request, res: Response) => {
+  const { user, inviteToken, isCrmOnly } = await userService.renewInvite(
+    req.params.id
+  );
+  await userService.sendTeamMemberInvite({
+    email: user.email,
+    firstName: user.firstName,
+    inviteToken,
+    invitedByName: `${req.user!.firstName} ${req.user!.lastName}`,
+    inviteUrl: isCrmOnly
+      ? `${env.CRM_FRONTEND_URL}/accept-invitation?token=${inviteToken}`
+      : undefined,
+  });
+  sendSuccess(res, user, 'Invite sent', 200);
+});

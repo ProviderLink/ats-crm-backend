@@ -12,6 +12,7 @@ import {
   getUserById,
   provisionClient,
   provisionVA,
+  resendInvite,
   revokeCrmAccess,
   updateMe,
   updatePermissions,
@@ -126,6 +127,11 @@ router.post(
   requirePermission('team', 'write'),
   validate(provisionVASchema),
   provisionVA
+);
+router.post(
+  '/:id/resend-invite',
+  requirePermission('team', 'write'),
+  resendInvite
 );
 router.post(
   '/:id/revoke-crm',

@@ -52,14 +52,18 @@ export async function findEmailByResendId(resendId: string) {
   return Email.findOne({ resendId });
 }
 
+/** Statuses an earlier "sent" or "delayed" event must not overwrite. */
+const FINAL_STATUSES: string[] = ['delivered', 'bounced', 'complained'];
+
 /**
  * Process an "email.sent" event — mark the email as sent.
  */
 export async function handleEmailSent(data: { email_id: string }) {
   const email = await findEmailByResendId(data.email_id);
   if (email) {
-    email.status = 'sent';
-    email.sentAt = new Date();
+    // Events can arrive out of order: never move a later status back to sent.
+    if (!FINAL_STATUSES.includes(email.status)) email.status = 'sent';
+    email.sentAt = email.sentAt ?? new Date();
     await email.save();
   }
 }
@@ -82,6 +86,7 @@ export async function handleEmailDelivered(data: { email_id: string }) {
 export async function handleEmailDelayed(data: { email_id: string }) {
   const email = await findEmailByResendId(data.email_id);
   if (email) {
+    if (FINAL_STATUSES.includes(email.status)) return;
     email.status = 'delayed';
     await email.save();
   }

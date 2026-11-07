@@ -193,6 +193,13 @@ export const createCandidate = catchAsync(
     if (jobId && !job) {
       throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
     }
+    if (job && (job.status === 'draft' || job.status === 'closed')) {
+      throw new AppError(
+        400,
+        'JOB_NOT_ASSIGNABLE',
+        'Candidates cannot be assigned to a draft or closed job'
+      );
+    }
 
     // Extract raw text from uploaded PDF/DOCX for AI parsing
     const resumeRawText = await extractResumeText(
@@ -347,6 +354,13 @@ export const assignJob = catchAsync(async (req: Request, res: Response) => {
   const job = await getJobById(jobId);
   if (!job) {
     throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+  }
+  if (job.status === 'draft' || job.status === 'closed') {
+    throw new AppError(
+      400,
+      'JOB_NOT_ASSIGNABLE',
+      'Candidates cannot be assigned to a draft or closed job'
+    );
   }
 
   // Validate startStageId if provided

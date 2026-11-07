@@ -230,6 +230,16 @@ export const createEodSubmission = async (
   // preferred path) this is the company's *current* day, so a VA in any
   // timezone always files against the day the company is working.
   const companyDay = await resolveCompanyDay(input.date ?? null);
+  if (input.date) {
+    const today = await resolveCompanyDay(null);
+    if (companyDay.dateKey > today.dateKey) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'An EOD cannot be filed for a future date'
+      );
+    }
+  }
 
   // Hours are derived from the shift times rather than trusted from the client:
   // the VA's device clock and locale must not influence a reported figure.

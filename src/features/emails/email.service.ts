@@ -1,4 +1,7 @@
-import { cachedList } from '../../shared/utils/listCache';
+import {
+  cachedList,
+  invalidateListsForRoom,
+} from '../../shared/utils/listCache';
 import mongoose from 'mongoose';
 import { env } from '../../config/env';
 import AppError from '../../shared/utils/AppError';
@@ -135,6 +138,8 @@ export const markEmailAsRead = async (id: string): Promise<IEmail> => {
 export const deleteEmail = async (id: string): Promise<void> => {
   const email = await Email.findByIdAndDelete(id);
   if (!email) throw new AppError(404, 'EMAIL_NOT_FOUND', 'Email not found');
+  // Drop cached email lists so the deleted email disappears at once.
+  invalidateListsForRoom('emails');
 };
 
 export const resendEmail = async (id: string): Promise<IEmail> => {

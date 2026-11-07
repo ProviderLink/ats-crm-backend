@@ -1,3 +1,7 @@
+import {
+  assertOneOf,
+  isInterviewerOnly,
+} from '../../shared/utils/interviewerScope';
 import { Request, Response } from 'express';
 import { AppError } from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
@@ -57,9 +61,21 @@ export const createInterview = catchAsync(
   }
 );
 
+/** An interviewer-only user may act only on interviews they sit on. */
+async function assertMayActOn(req: Request, id: string): Promise<void> {
+  if (!isInterviewerOnly(req)) return;
+  const interview = await interviewService.getInterviewById(id);
+  assertOneOf(
+    String(req.user!._id),
+    (interview as { interviewerIds?: unknown[] }).interviewerIds ?? [],
+    'You can only change interviews you are on'
+  );
+}
+
 export const updateInterview = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    await assertMayActOn(req, id);
     const body = req.body;
     const updatedBy = req.user!._id;
     const interview = await interviewService.updateInterview(
@@ -74,6 +90,7 @@ export const updateInterview = catchAsync(
 export const cancelInterview = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    await assertMayActOn(req, id);
     const cancelledBy = req.user!._id;
     const interview = await interviewService.cancelInterview(id, cancelledBy);
     sendSuccess(res, interview, 'Interview cancelled', 200);

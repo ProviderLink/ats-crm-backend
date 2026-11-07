@@ -18,20 +18,17 @@ import WorkEntry from '../../work-entries/workEntry.model';
  * the assignments where the AM is assigned.  Admin users receive global stats.
  */
 export const getDashboardStats = async (accountManagerId?: string) => {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
-
   // EOD counts use the company business day, not a server-local window, so the
   // dashboard agrees with the compliance job and the EOD list for VAs spread
   // across the world.
   const companyDay = await resolveCompanyDay();
   const companyTodayKey = companyDay.dateKey;
 
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - 7);
-  weekStart.setHours(0, 0, 0, 0);
+  // Work entries store their day as UTC midnight of the chosen date, so
+  // "today" is the company's date at UTC midnight, not the server's day.
+  const todayStart = new Date(`${companyTodayKey}T00:00:00.000Z`);
+  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const weekStart = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // ── AM scoping: this AM's own assignments ─────
   // Scoped by assignment, not by VA: a VA can also work for another client

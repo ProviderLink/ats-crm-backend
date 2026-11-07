@@ -39,11 +39,8 @@ export const login = async (input: LoginInput, ip?: string) => {
     );
   }
 
-  if (!user.isActive) {
-    logSignIn('login_failed', String(user._id), app, ip, 'inactive');
-    throw new AppError(401, 'USER_INACTIVE', 'Account is deactivated');
-  }
-
+  // Check the password first, so a stranger cannot learn that an account
+  // exists and is deactivated.
   const match = await bcrypt.compare(input.password, user.passwordHash);
   if (!match) {
     logSignIn('login_failed', String(user._id), app, ip, 'wrong_password');
@@ -52,6 +49,11 @@ export const login = async (input: LoginInput, ip?: string) => {
       'AUTH_INVALID_CREDENTIALS',
       'Invalid email or password'
     );
+  }
+
+  if (!user.isActive) {
+    logSignIn('login_failed', String(user._id), app, ip, 'inactive');
+    throw new AppError(401, 'USER_INACTIVE', 'Account is deactivated');
   }
 
   const payload: AuthTokenPayload = {

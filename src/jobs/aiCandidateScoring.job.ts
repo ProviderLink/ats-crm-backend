@@ -12,6 +12,7 @@ import {
 } from '../shared/utils/ai/index';
 import { coalesce } from '../shared/utils/coalesce';
 import logger from '../shared/utils/logger';
+import { runResumeParsing } from './aiResumeParsing.job';
 
 /**
  * TYPE 2 — Candidate Scoring (competency against a specific job)
@@ -62,6 +63,13 @@ async function scoreCandidate(
   const settings = await getSettings();
   if (!settings.ai.candidateScoring) return;
 
+  // The resume may still be parsing (it starts at the same moment). Wait for
+  // that parse (or run it) instead of skipping the score for good.
+  if (!candidate.parsedData && candidate.resumeRawText?.trim()) {
+    await runResumeParsing(candidateId).catch(() => undefined);
+    const parsed = await Candidate.findById(candidateId).select('parsedData');
+    candidate.parsedData = parsed?.parsedData ?? null;
+  }
   if (!candidate.parsedData) return;
 
   const prompt = `

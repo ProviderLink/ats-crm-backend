@@ -18,8 +18,8 @@ export async function extractResumeText(
 ): Promise<string> {
   if (mimeType === 'application/pdf') {
     let pages: Array<{ num: number; text: string }> = [];
+    const parser = new PDFParse(new Uint8Array(buffer));
     try {
-      const parser = new PDFParse(new Uint8Array(buffer));
       const result = await parser.getText();
       // NOTE: `result.text` is NOT reliable for detection — pdf-parse v2
       // always appends a `-- N of M --` page marker even when a page has no
@@ -28,7 +28,14 @@ export async function extractResumeText(
       pages = result.pages ?? [];
     } catch (error) {
       console.error('Failed to extract resume text:', error);
-      pages = [];
+      throw new AppError(
+        400,
+        'FILE_UNREADABLE_PDF',
+        'This PDF could not be read. It may be damaged or password-protected. Please upload another file.'
+      );
+    } finally {
+      // Free the parser's memory; without this every upload leaks it.
+      await parser.destroy().catch(() => undefined);
     }
 
     // Strip pdf-parse's page markers and join the real per-page text.

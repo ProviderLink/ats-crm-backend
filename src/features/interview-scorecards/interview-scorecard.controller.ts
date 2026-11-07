@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
 import catchAsync from '../../shared/utils/catchAsync';
+import {
+  assertOneOf,
+  isInterviewerOnly,
+} from '../../shared/utils/interviewerScope';
 import { sendSuccess } from '../../shared/utils/response';
 import {
   createScorecard,
@@ -16,7 +20,10 @@ export const createInterviewScorecard = catchAsync(
     // interviewerId defaults to the logged-in user when the client omits it
     // (J2: encoding the "log on behalf of another interviewer" capability).
     const body = req.body;
-    const interviewerId = body.interviewerId ?? createdBy;
+    // An interviewer-only user logs scorecards for themselves only.
+    const interviewerId = isInterviewerOnly(req)
+      ? createdBy
+      : (body.interviewerId ?? createdBy);
 
     const scorecard = await createScorecard(
       {
@@ -76,6 +83,15 @@ export const updateInterviewScorecard = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const performedBy = req.user!._id;
+
+    if (isInterviewerOnly(req)) {
+      const existing = await getScorecardById(id);
+      assertOneOf(
+        String(performedBy),
+        [existing.interviewerId, existing.createdBy],
+        'You can only edit your own scorecards'
+      );
+    }
 
     const scorecard = await updateScorecard(id, req.body, performedBy);
 

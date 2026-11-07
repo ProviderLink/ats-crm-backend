@@ -185,8 +185,14 @@ export const createCandidate = catchAsync(
     if (!req.file) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Resume file is required');
     }
-    const body = req.body;
+    const { jobId, ...body } = req.body;
     const createdBy = req.user!._id;
+
+    // Check the job before anything is uploaded or saved.
+    const job = jobId ? await getJobById(jobId) : null;
+    if (jobId && !job) {
+      throw new AppError(404, 'JOB_NOT_FOUND', 'Job not found');
+    }
 
     // Extract raw text from uploaded PDF/DOCX for AI parsing
     const resumeRawText = await extractResumeText(
@@ -205,6 +211,33 @@ export const createCandidate = catchAsync(
       },
       createdBy
     );
+
+    if (job) {
+      // Create and assign together: if the assign fails, remove the new
+      // candidate so nothing is left half-imported and a retry works.
+      const candidateId = candidate._id.toString();
+      try {
+        await applicationService.createApplication({
+          candidateId,
+          jobId,
+          clientId: job.clientId,
+          source: 'assigned',
+          createdBy,
+        });
+      } catch (err) {
+        await candidateService
+          .discardNewCandidate(candidateId)
+          .catch(cleanupErr =>
+            logger.error('Failed to remove half-imported candidate', {
+              candidateId,
+              error: (cleanupErr as Error).message,
+            })
+          );
+        throw err;
+      }
+      runCandidateScoring(candidateId, jobId);
+    }
+
     sendSuccess(res, candidate, 'Candidate created', 201);
   }
 );

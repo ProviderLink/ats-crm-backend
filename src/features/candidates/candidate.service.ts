@@ -620,7 +620,9 @@ export const updateCandidate = async (
     candidate.markModified('parsedData');
   }
   if (input.appliedJobId !== undefined) {
-    if (String(candidate.appliedJobId ?? '') !== String(input.appliedJobId ?? '')) {
+    if (
+      String(candidate.appliedJobId ?? '') !== String(input.appliedJobId ?? '')
+    ) {
       changes.push('Applied job updated');
     }
     candidate.appliedJobId = input.appliedJobId
@@ -650,6 +652,24 @@ export const updateCandidate = async (
   const result = candidate.toSafeObject();
   emitToAts('candidates', 'candidate:updated', result);
   return result;
+};
+
+/**
+ * Remove a candidate created moments ago in a request that then failed
+ * (Quick Import's assign step). Unlike deleteCandidate it skips the Ineligible
+ * rule: the record is brand new and has nothing else attached to it.
+ */
+export const discardNewCandidate = async (id: string): Promise<void> => {
+  const candidate = await Candidate.findByIdAndDelete(id);
+  if (!candidate) return;
+  await Promise.all([
+    Application.deleteMany({ candidateId: id }),
+    ActivityLog.deleteMany({ resourceId: id }),
+  ]);
+  if (candidate.resumeUrl) {
+    const publicId = extractCloudinaryPublicId(candidate.resumeUrl, 'raw');
+    if (publicId) await deleteFromCloudinary(publicId, 'raw');
+  }
 };
 
 export const deleteCandidate = async (

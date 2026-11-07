@@ -103,6 +103,9 @@ const createCandidateSchema = z.object({
       .nullable()
   ),
   tags: z.array(z.string()).optional(),
+  // Quick Import: assign this job in the same request, so a failed assign
+  // never leaves a candidate without a job.
+  jobId: z.string().min(1).optional(),
 });
 
 const updateCandidateSchema = z.object({

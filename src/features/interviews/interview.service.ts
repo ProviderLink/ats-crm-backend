@@ -683,3 +683,30 @@ export const getAllInterviews = (
   cachedList('interviews', ['applications', 'candidates', 'jobs', 'team'], filters, () =>
     loadGetAllInterviews(filters)
   );
+
+/**
+ * Cancel an application's upcoming interviews once it is closed (rejected,
+ * moved to another job or the Talent Pool, or hired), so they stop showing on
+ * the calendar, stop blocking slots and drop their meeting link. Each one goes
+ * through cancelInterview, so the usual emails and logs still happen. Never
+ * throws: closing the application must not fail because of an interview.
+ */
+export const cancelUpcomingInterviews = async (
+  applicationId: string,
+  cancelledBy?: string | null
+): Promise<void> => {
+  const upcoming = await Interview.find({
+    applicationId,
+    status: 'scheduled',
+    scheduledAt: { $gte: new Date() },
+  }).select('_id');
+  for (const { _id } of upcoming) {
+    await cancelInterview(String(_id), cancelledBy ?? undefined).catch(err =>
+      logger.error('Failed to cancel interview of a closed application', {
+        applicationId,
+        interviewId: String(_id),
+        error: (err as Error).message,
+      })
+    );
+  }
+};

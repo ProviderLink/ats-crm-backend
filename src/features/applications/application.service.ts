@@ -12,6 +12,7 @@ import { createLog } from '../activity-logs/activityLog.service';
 import Candidate from '../candidates/candidate.model';
 import * as candidateService from '../candidates/candidate.service';
 import DispositionReason from '../disposition-reasons/dispositionReason.model';
+import { cancelUpcomingInterviews } from '../interviews/interview.service';
 import Job from '../jobs/job.model';
 import * as userService from '../users/user.service';
 import Application from './application.model';
@@ -584,6 +585,7 @@ export const rejectApplication = async (
     _id: result._id,
     phase: 'rejected',
   });
+  await cancelUpcomingInterviews(id, input.rejectedBy);
   return result;
 };
 
@@ -750,6 +752,7 @@ export const hireApplication = async (
     _id: result._id,
     phase: 'hired',
   });
+  await cancelUpcomingInterviews(id, input.hiredBy);
   return result;
 };
 

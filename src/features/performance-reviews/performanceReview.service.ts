@@ -339,7 +339,10 @@ export const updateReview = async (
   if (input.overallRating !== undefined) changes.push('Overall rating updated');
   if (input.clientSatisfactionScore !== undefined)
     changes.push('Client satisfaction updated');
-  if (input.finalRecommendation !== undefined || input.finalManagerSummary !== undefined)
+  if (
+    input.finalRecommendation !== undefined ||
+    input.finalManagerSummary !== undefined
+  )
     changes.push('Final recommendation updated');
   createLog({
     action: 'review_updated',
@@ -437,6 +440,34 @@ export const regenerateSection = async (
     );
   }
 
+  // Give the AI the same facts the first draft had, so a regenerated section
+  // is about this VA and this role instead of generic text.
+  const [candidate, client, job] = await Promise.all([
+    Candidate.findById(review.candidateId),
+    Client.findById(review.clientId),
+    review.jobId ? Job.findById(review.jobId) : Promise.resolve(null),
+  ]);
+  const evidence = await buildReviewEvidence({
+    candidateId: String(review.candidateId),
+    clientId: String(review.clientId),
+    reviewPeriodStart: review.reviewPeriodStart,
+    reviewPeriodEnd: review.reviewPeriodEnd,
+  });
+  const context = `
+Employee: ${candidate?.firstName ?? ''} ${candidate?.lastName ?? ''}
+Client: ${client?.companyName ?? ''}
+Job Title: ${job?.title ?? 'Virtual Assistant'}
+Job Description: ${job?.description ?? 'Not provided'}
+Review Type: ${review.reviewType}
+Review Period: ${review.reviewPeriodStart.toISOString().slice(0, 10)} to ${review.reviewPeriodEnd.toISOString().slice(0, 10)}
+Current Role Summary: ${review.aiGenerated?.roleSummary || 'Not provided'}
+
+Work record for the review period:
+${evidence}
+
+Base everything on the facts above. Never invent behaviour or achievements.
+`;
+
   let prompt: string;
 
   if (section === 'categories') {
@@ -444,7 +475,7 @@ export const regenerateSection = async (
 You are an expert HR performance review generator.
 Regenerate the performance categories for an existing review.
 Respond with ONLY a JSON object, no markdown, no explanation.
-
+${context}
 Respond with exactly this JSON structure:
 {
   "categories": [
@@ -466,7 +497,7 @@ Generate 6-8 relevant performance categories.
 You are an expert HR performance review generator.
 Regenerate the performance goals for an existing review.
 Respond with ONLY a JSON object, no markdown, no explanation.
-
+${context}
 Respond with exactly this JSON structure:
 {
   "goals": ["goal1", "goal2", "goal3"]
@@ -479,7 +510,7 @@ Generate 3-5 actionable performance goals.
 You are an expert HR performance review generator.
 Regenerate an improved role summary and core responsibilities for an existing review.
 Respond with ONLY a JSON object, no markdown, no explanation.
-
+${context}
 Respond with exactly this JSON structure:
 {
   "roleSummary": "string",
@@ -514,12 +545,20 @@ Respond with exactly this JSON structure:
       );
     }
 
-    review.categories = result.categories.map((c, index) => ({
-      ...c,
-      rating: null,
-      managerComments: '',
-      sortOrder: c.sortOrder ?? index + 1,
-    })) as unknown as typeof review.categories;
+    // Keep the rating and comments of any category that keeps its name.
+    const key = (name: string) => name.trim().toLowerCase();
+    const previous = new Map(
+      (review.categories ?? []).map(c => [key(c.categoryName), c])
+    );
+    review.categories = result.categories.map((c, index) => {
+      const kept = previous.get(key(c.categoryName));
+      return {
+        ...c,
+        rating: kept?.rating ?? null,
+        managerComments: kept?.managerComments ?? '',
+        sortOrder: c.sortOrder ?? index + 1,
+      };
+    }) as unknown as typeof review.categories;
     review.markModified('categories');
   } else if (section === 'goals') {
     const result = parseJsonResponse<{ goals: string[] }>(text);

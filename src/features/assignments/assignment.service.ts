@@ -8,6 +8,7 @@ import Client from '../clients/client.model';
 import {
   closeCheckins,
   createAssignmentReminders,
+  reassignCheckins,
 } from '../survey-reminders/surveyReminder.service';
 import User from '../users/user.model';
 import * as userService from '../users/user.service';
@@ -287,12 +288,14 @@ export const updateAssignment = async (
     changes.push(input.endDate ? 'End date updated' : 'End date removed');
     assignment.endDate = input.endDate ? new Date(input.endDate) : null;
   }
+  let managerChanged = false;
   if (
     input.accountManagerId !== undefined &&
     String(assignment.accountManagerId) !== input.accountManagerId
   ) {
     await assertValidAccountManager(input.accountManagerId);
     changes.push('Account manager changed');
+    managerChanged = true;
     assignment.accountManagerId = new mongoose.Types.ObjectId(
       input.accountManagerId
     );
@@ -316,6 +319,9 @@ export const updateAssignment = async (
 
   assignment.updatedBy = new mongoose.Types.ObjectId(updatedBy);
   await assignment.save();
+  if (managerChanged) {
+    await reassignCheckins(id, String(assignment.accountManagerId));
+  }
   if (assignment.status === 'ended') await closeCheckins(id);
 
   createLog({

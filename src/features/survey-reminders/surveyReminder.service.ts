@@ -132,6 +132,21 @@ export const closeCheckins = async (assignmentId: string): Promise<void> => {
   );
 };
 
+/** Hand an assignment's open check-ins to its new account manager. */
+export const reassignCheckins = async (
+  assignmentId: string,
+  accountManagerId: string
+): Promise<void> => {
+  await SurveyReminder.updateMany(
+    {
+      relatedType: 'assignment',
+      relatedId: new mongoose.Types.ObjectId(assignmentId),
+      status: { $in: ['pending', 'sent'] },
+    },
+    { $set: { assignedTo: new mongoose.Types.ObjectId(accountManagerId) } }
+  );
+};
+
 /**
  * Bring check-ins in line with the assignments, once a day before they are sent.
  * Ended assignments have theirs closed, which also catches anything ended

@@ -1,6 +1,8 @@
 import os from 'os';
 import { createLog } from '../features/activity-logs/activityLog.service';
 import Assignment from '../features/assignments/assignment.model';
+import Candidate from '../features/candidates/candidate.model';
+import Client from '../features/clients/client.model';
 import SurveyReminder from '../features/survey-reminders/surveyReminder.model';
 import { syncAssignmentCheckins } from '../features/survey-reminders/surveyReminder.service';
 import User from '../features/users/user.model';
@@ -17,6 +19,37 @@ const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 /** Survey reminders are dispatched at 9:00 AM company time. */
 const SURVEY_HOUR = 9;
 const SURVEY_MINUTE = 0;
+
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * "3-day check-in" and "Rahim Uddin (Acme Inc.)", so the manager knows which
+ * VA and client the reminder is for.
+ */
+async function describeReminder(
+  surveyType: string,
+  relatedType: string,
+  relatedId: string
+): Promise<{ checkin: string; about: string }> {
+  const label = surveyType.replace(/_/g, '-');
+  const checkin = `${label.charAt(0).toUpperCase()}${label.slice(1)} check-in`;
+  if (relatedType !== 'assignment') return { checkin, about: '' };
+
+  const assignment = await Assignment.findById(relatedId).select(
+    'candidateId clientId'
+  );
+  if (!assignment) return { checkin, about: '' };
+  const [candidate, client] = await Promise.all([
+    Candidate.findById(assignment.candidateId).select('firstName lastName'),
+    Client.findById(assignment.clientId).select('companyName'),
+  ]);
+  const va =
+    `${candidate?.firstName ?? ''} ${candidate?.lastName ?? ''}`.trim();
+  const company = client?.companyName ?? '';
+  const about = va && company ? `${va} (${company})` : va || company;
+  return { checkin, about };
+}
 
 async function runSurveyDispatcher(): Promise<void> {
   try {
@@ -51,15 +84,21 @@ async function runSurveyDispatcher(): Promise<void> {
       if (!accountManager) continue;
 
       try {
+        const { checkin, about } = await describeReminder(
+          reminder.surveyType,
+          reminder.relatedType,
+          String(reminder.relatedId)
+        );
+        const aboutText = about ? ` for ${about}` : '';
         await sendEmail({
           to: [accountManager.email],
-          subject: `Survey Reminder: ${reminder.surveyType} check-in due`,
+          subject: `${checkin} due${about ? `: ${about}` : ''}`,
           html: `
-            <p>Hi ${accountManager.firstName},</p>
-            <p>You have a ${reminder.surveyType} check-in survey due.</p>
+            <p>Hi ${escapeHtml(accountManager.firstName)},</p>
+            <p>The ${escapeHtml(checkin.toLowerCase())}${escapeHtml(aboutText)} is due.</p>
             <p>Please complete this survey as soon as possible.</p>
           `,
-          text: `Hi ${accountManager.firstName}, you have a ${reminder.surveyType} check-in survey due.`,
+          text: `Hi ${accountManager.firstName}, the ${checkin.toLowerCase()}${aboutText} is due.`,
         });
 
         reminder.status = 'sent';

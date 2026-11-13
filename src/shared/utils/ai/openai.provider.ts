@@ -23,7 +23,13 @@ export class OpenAIProvider implements IAiProvider {
     prompt: string,
     options: IAiProviderGenerateOptions = {}
   ): Promise<string> {
-    const { maxTokens = 1024, jsonSchema, tier = 'fast' } = options;
+    const {
+      maxTokens = 1024,
+      jsonSchema,
+      tier = 'fast',
+      pdf,
+      timeoutMs = 30_000,
+    } = options;
 
     if (!env.OPENAI_API_KEY) {
       throw new AppError(
@@ -34,7 +40,7 @@ export class OpenAIProvider implements IAiProvider {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await fetch(
@@ -49,7 +55,23 @@ export class OpenAIProvider implements IAiProvider {
             model: MODELS[tier],
             reasoning_effort: EFFORT[tier],
             max_completion_tokens: Math.max(maxTokens, MIN_MAX_TOKENS),
-            messages: [{ role: 'user', content: prompt }],
+            messages: [
+              {
+                role: 'user',
+                content: pdf
+                  ? [
+                      {
+                        type: 'file',
+                        file: {
+                          filename: 'resume.pdf',
+                          file_data: `data:application/pdf;base64,${pdf.toString('base64')}`,
+                        },
+                      },
+                      { type: 'text', text: prompt },
+                    ]
+                  : prompt,
+              },
+            ],
             response_format: jsonSchema
               ? {
                   type: 'json_schema',

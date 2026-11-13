@@ -25,6 +25,8 @@ import {
   getCandidateById,
   publicParse,
   publicUploadAndParse,
+  recheckCandidateAi,
+  recheckCandidatesAi,
   rejectCandidate,
   restoreCandidate,
   updateCandidate,
@@ -261,12 +263,29 @@ router.post(
   createCandidate
 );
 
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
+const aiRecheckSchema = z.object({ ids: z.array(objectId).min(1).max(1000) });
+
+router.post(
+  '/ai-recheck',
+  requirePermission('candidates', 'write'),
+  validate(aiRecheckSchema, 'body'),
+  recheckCandidatesAi
+);
+
 // Specific routes must be registered before /:id to avoid param capture
 router.post(
   '/:id/approve',
   requirePermission('candidates', 'write'),
   validate(assignJobSchema),
   approveCandidate
+);
+
+router.post(
+  '/:id/ai-recheck',
+  requirePermission('candidates', 'write'),
+  validate(z.object({ id: objectId }), 'params'),
+  recheckCandidateAi
 );
 
 router.get('/:id', requirePermission('candidates', 'read'), getCandidateById);

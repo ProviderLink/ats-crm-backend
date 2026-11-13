@@ -19,13 +19,19 @@ import logger from '../shared/utils/logger';
  * same application, which previously produced duplicate
  * `ai_validation_updated` activities.
  */
-export function runResumeValidation(applicationId: string): Promise<void> {
-  return coalesce(`validate:${applicationId}`, () =>
-    validateResume(applicationId)
-  );
+export function runResumeValidation(
+  applicationId: string,
+  opts: { force?: boolean } = {}
+): Promise<void> {
+  const key = `validate:${applicationId}${opts.force ? ':force' : ''}`;
+  return coalesce(key, () => validateResume(applicationId, opts.force));
 }
 
-async function validateResume(applicationId: string): Promise<void> {
+/** `force` re-runs even when a result exists (manual AI re-check). */
+async function validateResume(
+  applicationId: string,
+  force = false
+): Promise<void> {
   const application = await Application.findById(applicationId);
   if (!application) return;
 
@@ -37,7 +43,7 @@ async function validateResume(applicationId: string): Promise<void> {
     return;
   }
 
-  if (application.aiValidation !== null) return;
+  if (!force && application.aiValidation !== null) return;
 
   const settings = await getSettings();
   if (!settings.ai.resumeValidation) return;

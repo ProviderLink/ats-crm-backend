@@ -16,3 +16,4 @@ export { runCandidacyValidation } from './aiCandidacyValidation.job';
 export { runCandidateScoring } from './aiCandidateScoring.job';
 export { runResumeParsing } from './aiResumeParsing.job';
 export { runResumeValidation } from './aiResumeValidation.job';
+export { queueAiRecheck } from './aiResumeRecheck.job';

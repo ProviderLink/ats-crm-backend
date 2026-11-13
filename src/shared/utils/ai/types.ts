@@ -10,6 +10,13 @@ export interface IAiProviderGenerateOptions {
    * `smart` is for judgements about people and writing a manager will rely on.
    */
   tier?: AiTier;
+  /**
+   * A PDF sent alongside the prompt. The model reads its pages as images, so
+   * scanned resumes with no text layer can still be read.
+   */
+  pdf?: Buffer;
+  /** Request timeout (default 30s). Reading a PDF needs longer. */
+  timeoutMs?: number;
 }
 
 export interface IAiProvider {

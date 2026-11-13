@@ -26,7 +26,13 @@ export class ClaudeProvider implements IAiProvider {
     prompt: string,
     options: IAiProviderGenerateOptions = {}
   ): Promise<string> {
-    const { maxTokens = 1024, jsonSchema, tier = 'fast' } = options;
+    const {
+      maxTokens = 1024,
+      jsonSchema,
+      tier = 'fast',
+      pdf,
+      timeoutMs = TIMEOUT_MS,
+    } = options;
 
     if (!env.ANTHROPIC_API_KEY) {
       throw new AppError(
@@ -39,7 +45,7 @@ export class ClaudeProvider implements IAiProvider {
     // Callers that want retries wrap this in `withRetry`.
     const client = new Anthropic({
       apiKey: env.ANTHROPIC_API_KEY,
-      timeout: TIMEOUT_MS,
+      timeout: timeoutMs,
       maxRetries: 0,
     });
 
@@ -47,7 +53,24 @@ export class ClaudeProvider implements IAiProvider {
       const request = (model: AiTier) => ({
         model: MODELS[model],
         max_tokens: Math.max(maxTokens, MIN_MAX_TOKENS),
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          {
+            role: 'user',
+            content: pdf
+              ? [
+                  {
+                    type: 'document',
+                    source: {
+                      type: 'base64',
+                      media_type: 'application/pdf',
+                      data: pdf.toString('base64'),
+                    },
+                  },
+                  { type: 'text', text: prompt },
+                ]
+              : prompt,
+          },
+        ],
         output_config: {
           effort: EFFORT[model],
           ...(jsonSchema && {

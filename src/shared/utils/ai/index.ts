@@ -58,6 +58,7 @@ export { parseJsonResponse } from './parse-json';
 export {
   CANDIDATE_SCORE_SCHEMA,
   PARSED_RESUME_SCHEMA,
+  RESUME_TEXT_SCHEMA,
   VALIDATION_SCHEMA,
 } from './schema';
 export type {

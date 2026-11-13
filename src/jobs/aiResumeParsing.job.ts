@@ -11,11 +11,22 @@ import { parseResumeTextWithAI } from '../shared/utils/parseResumeWithAI';
  * (public apply, internal create, assign-job), so one application could start
  * three concurrent parses and write three `parsed_data_updated` activities.
  */
-export function runResumeParsing(candidateId: string): Promise<void> {
-  return coalesce(`parse:${candidateId}`, () => parseResume(candidateId));
+export function runResumeParsing(
+  candidateId: string,
+  opts: { force?: boolean } = {}
+): Promise<void> {
+  const key = `parse:${candidateId}${opts.force ? ':force' : ''}`;
+  return coalesce(key, () => parseResume(candidateId, opts.force));
 }
 
-async function parseResume(candidateId: string): Promise<void> {
+/**
+ * `force` re-parses even a full profile (manual AI re-check), replacing it
+ * with what the resume says now. A failed parse leaves the old profile.
+ */
+async function parseResume(
+  candidateId: string,
+  force = false
+): Promise<void> {
   const candidate = await Candidate.findById(candidateId);
   if (!candidate) return;
 
@@ -24,6 +35,7 @@ async function parseResume(candidateId: string): Promise<void> {
   // is treated as "not yet parsed" so the AI gets another chance.
   const pd = candidate.parsedData;
   if (
+    !force &&
     pd !== null &&
     pd !== undefined &&
     ((pd.skills && pd.skills.length > 0) ||
@@ -37,12 +49,17 @@ async function parseResume(candidateId: string): Promise<void> {
   }
 
   if (pd) {
-    logger.info('Re-parsing candidate with hollow parsed data', {
-      candidateId,
-      hadSummary: !!pd.summary,
-      hadSkills: pd.skills?.length ?? 0,
-      hadExperience: pd.experience?.length ?? 0,
-    });
+    logger.info(
+      force
+        ? 'Re-parsing candidate (manual AI re-check)'
+        : 'Re-parsing candidate with hollow parsed data',
+      {
+        candidateId,
+        hadSummary: !!pd.summary,
+        hadSkills: pd.skills?.length ?? 0,
+        hadExperience: pd.experience?.length ?? 0,
+      }
+    );
   }
 
   if (!candidate.resumeRawText || candidate.resumeRawText.trim() === '') {

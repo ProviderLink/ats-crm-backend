@@ -10,6 +10,9 @@ const number = { type: 'number' };
 const strings = { type: 'array', items: string };
 
 /** Reply shapes for structured AI output. Claude is held to these exactly. */
+/** Plain text read out of a resume file. */
+export const RESUME_TEXT_SCHEMA = object({ text: string });
+
 export const VALIDATION_SCHEMA = object({
   isValid: { type: 'boolean' },
   score: number,

@@ -27,16 +27,18 @@ import { runResumeParsing } from './aiResumeParsing.job';
  */
 export function runCandidateScoring(
   candidateId: string,
-  jobId: string
+  jobId: string,
+  opts: { force?: boolean } = {}
 ): Promise<void> {
-  return coalesce(`score:${candidateId}:${jobId}`, () =>
-    scoreCandidate(candidateId, jobId)
-  );
+  const key = `score:${candidateId}:${jobId}${opts.force ? ':force' : ''}`;
+  return coalesce(key, () => scoreCandidate(candidateId, jobId, opts.force));
 }
 
+/** `force` re-runs even when a score exists (manual AI re-check). */
 async function scoreCandidate(
   candidateId: string,
-  jobId: string
+  jobId: string,
+  force = false
 ): Promise<void> {
   const candidate = await Candidate.findById(candidateId);
   const job = await Job.findById(jobId);
@@ -53,7 +55,11 @@ async function scoreCandidate(
   }
 
   // Idempotent: skip if application already has aiScore
-  if (application.aiScore !== null && application.aiScore !== undefined) {
+  if (
+    !force &&
+    application.aiScore !== null &&
+    application.aiScore !== undefined
+  ) {
     logger.debug('Application already has aiScore, skipping', {
       applicationId: application._id,
     });

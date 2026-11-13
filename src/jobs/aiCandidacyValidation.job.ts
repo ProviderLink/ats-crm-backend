@@ -20,18 +20,28 @@ import logger from '../shared/utils/logger';
  * Coalesced so the several fire-and-forget call sites cannot race each other
  * into writing duplicate `ai_validation_updated` activities.
  */
-export function runCandidacyValidation(candidateId: string): Promise<void> {
-  return coalesce(`candidacy:${candidateId}`, () =>
-    validateCandidacy(candidateId)
-  );
+export function runCandidacyValidation(
+  candidateId: string,
+  opts: { force?: boolean } = {}
+): Promise<void> {
+  const key = `candidacy:${candidateId}${opts.force ? ':force' : ''}`;
+  return coalesce(key, () => validateCandidacy(candidateId, opts.force));
 }
 
-async function validateCandidacy(candidateId: string): Promise<void> {
+/** `force` re-runs even when a result exists (manual AI re-check). */
+async function validateCandidacy(
+  candidateId: string,
+  force = false
+): Promise<void> {
   const candidate = await Candidate.findById(candidateId);
   if (!candidate) return;
 
   // Idempotent: skip if already validated
-  if (candidate.aiValidation !== null && candidate.aiValidation !== undefined) {
+  if (
+    !force &&
+    candidate.aiValidation !== null &&
+    candidate.aiValidation !== undefined
+  ) {
     logger.debug('Candidate already has candidacy validation, skipping', {
       candidateId,
     });

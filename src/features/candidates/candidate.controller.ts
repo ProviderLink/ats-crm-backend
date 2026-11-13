@@ -4,7 +4,7 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from '../../config/cloudinary';
-import { runCandidateScoring } from '../../jobs';
+import { queueAiRecheck, runCandidateScoring } from '../../jobs';
 import AppError from '../../shared/utils/AppError';
 import catchAsync from '../../shared/utils/catchAsync';
 import { extractResumeText } from '../../shared/utils/extract-resume-text';
@@ -16,6 +16,7 @@ import { sendSuccess } from '../../shared/utils/response';
 import * as applicationService from '../applications/application.service';
 import { getJobById } from '../jobs/job.service';
 import * as candidateService from './candidate.service';
+import Candidate from './candidate.model';
 import * as tableService from './candidate.table.service';
 
 export const getAllCandidates = catchAsync(
@@ -821,3 +822,39 @@ export const publicUploadAndParse = catchAsync(
     );
   }
 );
+
+/**
+ * Re-read the stored resume (with AI for scanned PDFs) and re-run parsing,
+ * validation and scoring. Runs in the background; results arrive over the
+ * realtime `candidate:updated` / `application:updated` events.
+ */
+export const recheckCandidateAi = catchAsync(
+  async (req: Request, res: Response) => {
+    const queued = queueAiRecheck(
+      await recheckableIds([req.params.id], req.user!.roles)
+    );
+    if (queued === 0 && !(await Candidate.exists({ _id: req.params.id }))) {
+      throw new AppError(404, 'CANDIDATE_NOT_FOUND', 'Candidate not found');
+    }
+    sendSuccess(res, { queued }, 'AI re-check started', 202);
+  }
+);
+
+/** Bulk version of `recheckCandidateAi`. */
+export const recheckCandidatesAi = catchAsync(
+  async (req: Request, res: Response) => {
+    const { ids } = req.body as { ids: string[] };
+    const queued = queueAiRecheck(await recheckableIds(ids, req.user!.roles));
+    sendSuccess(res, { queued }, 'AI re-check started', 202);
+  }
+);
+
+/** Existing candidates the user may see (ineligible ones are admin-only). */
+async function recheckableIds(ids: string[], roles: string[]): Promise<string[]> {
+  const filter: Record<string, unknown> = { _id: { $in: ids } };
+  if (!roles.includes('admin')) {
+    filter.eligibilityStatus = { $ne: 'permanently_ineligible' };
+  }
+  const found = await Candidate.find(filter).select('_id').lean();
+  return found.map(c => String(c._id));
+}

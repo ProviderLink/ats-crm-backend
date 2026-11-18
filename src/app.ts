@@ -38,6 +38,7 @@ import emailTemplateRouter from './features/email-templates/emailTemplate.routes
 import emailRouter from './features/emails/email.routes';
 import eodReminderRouter from './features/eod-reminders/eodReminder.routes';
 import eodSubmissionRouter from './features/eod-submissions/eodSubmission.routes';
+import exchangeRateRouter from './features/exchange-rates/exchangeRate.routes';
 import interviewScorecardRouter from './features/interview-scorecards/interview-scorecard.routes';
 import externalMeetingRouter from './features/external-meetings/externalMeeting.routes';
 import interviewRouter from './features/interviews/interview.routes';
@@ -152,6 +153,7 @@ app.use('/api/v1/ats/disposition-reasons', dispositionReasonRouter);
 app.use('/api/v1/ats/email-templates', emailTemplateRouter);
 app.use('/api/v1/ats/emails', emailRouter);
 app.use('/api/v1/ats/dashboard', atsDashboardRouter);
+app.use('/api/v1/ats/exchange-rates', exchangeRateRouter);
 
 // CRM routes
 app.use('/api/v1/crm/assignments', assignmentRouter);

@@ -19,7 +19,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ['open'],
   open: ['on_hold', 'closed'],
   on_hold: ['open', 'closed'],
-  closed: [],
+  closed: ['open'],
 };
 
 const loadGetAllJobs = async (filters: {
